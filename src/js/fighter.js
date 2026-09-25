@@ -651,7 +651,7 @@ class Fighter {
 
   // ---------- bordes ----------
   checkLedge() {
-    if (this.grounded || this.ledgeCd > 0 || this.dead) return;
+    if (this.grounded || this.ledgeCd > 0 || this.dead || this.sunk) return; // al que se lleva el canal ya no alcanza la orilla
     const recovering = this.state === 'attack' && this.move && this.move.def.helpless && this.move.f > 10;
     if ((!['air', 'helpless'].includes(this.state) && !recovering) || this.vy < 0) return;
     if (this.ctrl.y > 0.6) return;

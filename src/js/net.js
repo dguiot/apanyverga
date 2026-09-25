@@ -41,7 +41,15 @@ class NetCtrl extends Controller {
   }
 }
 
+// código corto de sala para invitar (sin letras que se confunden: 0/O, 1/I/L)
+const ROOM_ABC = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+const roomCode = () => Array.from({ length: 4 }, () => ROOM_ABC[randi(0, ROOM_ABC.length - 1)]).join('');
+// ?sala=K7QX en el link: entra directo a esa sala
+function inviteCodeFromURL() {
+  try { const c = new URLSearchParams(location.search).get('sala'); return c ? c.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6) || null : null; } catch (e) { return null; }
+}
 const Net = {
+  code: null, wantCode: inviteCodeFromURL(),
   room: null, user: null, ok: false, tried: false, conn: false,
   role: 'off', hostPeer: null, localDev: 'kb1', names: {}, asked: {},
   lob: { ph: 'lobby', ep: 0 }, lastLobJSON: '', view: null, lastSnap: null, lastEv: 0, lostHostT: 0,
@@ -66,6 +74,26 @@ const Net = {
   byOf(peer) { const p = this.peers().find(x => x.peer === peer); return p && p.by ? p.by : null; },
   presOf(peer) { const p = this.peers().find(x => x.peer === peer); return p && p.presence && p.presence.g === 'golpazo' ? p.presence : null; },
   hosts() { return this.peers().filter(p => p.presence && p.presence.g === 'golpazo' && p.presence.role === 'host' && p.presence.lob); },
+  hostByCode(code) { return code ? this.hosts().find(h => !h.sameTab && h.presence.code === code) || null : null; },
+  codeOf(peer) { const p = this.presOf(peer); return p && p.code ? p.code : null; },
+  // ---------- invitar ----------
+  inviteURL() {
+    if (!window.APYV_WEB || !this.code) return null;
+    try { return location.origin + location.pathname + '?sala=' + this.code; } catch (e) { return null; }
+  },
+  inviteText() {
+    const who = this.user && this.user.name ? this.user.name() : '', url = this.inviteURL();
+    return url ? `¡Vente a jugar A pan y verga${who ? ' con ' + who : ''}! Entra directo a mi sala: ${url}`
+      : `¡Vente a jugar A pan y verga! Abre el juego (el link que te compartí), entra a "Jugar online" y elige mi sala · código ${this.code}`;
+  },
+  // compartir (celular) o copiar el link; si el navegador no deja, queda escrito en pantalla
+  async invite() {
+    const text = this.inviteText(), url = this.inviteURL();
+    try { if (navigator.share && url) { await navigator.share({ title: 'A pan y verga', text, url }); return 'share'; } } catch (e) { if (e && e.name === 'AbortError') return 'abort'; }
+    try { if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(text); Toasts.push(url ? '📋 Link de invitación copiado: pégalo en WhatsApp' : '📋 Invitación copiada: pégala en WhatsApp'); return 'copy'; } } catch (e) { /* sin portapapeles */ }
+    Toasts.push(url ? 'Comparte este link: ' + url : `Diles que elijan tu sala · código ${this.code}`);
+    return 'show';
+  },
   guestsOf(peer) { return this.peers().filter(p => !p.sameTab && p.presence && p.presence.g === 'golpazo' && p.presence.role === 'guest' && p.presence.join === peer); },
   nameOf(peer) {
     const p = this.peers().find(x => x.peer === peer);
@@ -84,7 +112,8 @@ const Net = {
   host(dev) {
     this.role = 'host'; this.localDev = dev; this.hostPeer = this.myPeer();
     this.lob = { ph: 'lobby', ep: (this.lob.ep || 0) + 1 };
-    this.set({ role: 'host', join: null, lob: null, st: null, inp: null });
+    if (!this.code) this.code = roomCode(); // el mismo en toda la visita: el link que ya mandaste sigue sirviendo
+    this.set({ role: 'host', code: this.code, join: null, lob: null, st: null, inp: null });
     this.lastLobJSON = '';
   },
   join(peer, dev) {

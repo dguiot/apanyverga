@@ -1,54 +1,90 @@
 'use strict';
 // ============================================================
 //  CONTROLES TÁCTILES (celular / tableta)
-//  Palanca flotante a la izquierda y botones a la derecha. Se comporta
-//  como un control más ('touch'): inclinar = golpe normal, deslizar
-//  rápido = smash, igual que un stick analógico.
+//  Van en una capa encima de TODA la pantalla, no dentro del cuadro del
+//  juego: en un teléfono alargado el juego deja franjas a los lados y
+//  justo ahí descansan los pulgares.
+//  · Palanca flotante: aparece donde apoyas el pulgar izquierdo (cualquier
+//    punto de la mitad izquierda) y lo sigue si te sales del círculo.
+//    Inclinar = golpe normal, deslizar rápido = smash, como un stick.
+//  · Cinco botones en abanico alrededor del pulgar derecho, del tamaño de
+//    lo que más se usa: A (ataque) el más grande, luego B (especial) y
+//    Saltar, Escudo y Agarrar (agarrar + dirección = lanzar).
 // ============================================================
 const TouchPad = {
   active: false,                 // se activa con el primer toque
-  stick: null,                   // { id, cx, cy, x, y }
+  stick: null,                   // { id, cx, cy, x, y } en pixeles de pantalla
   held: new Map(),               // pointerId -> acción
   pressT: {},                    // acción -> momento del último toque (para el destello)
-  R: 78,                         // radio de la palanca (unidades de pantalla)
+  // posición: distancia desde la esquina inferior derecha, en unidades de "u" (lo corto de la pantalla)
   BUTTONS: [
-    { a: 'attack',  x: 1150, y: 585, r: 60, label: 'A',      col: '#e63946' },
-    { a: 'special', x: 1028, y: 640, r: 46, label: 'B',      col: '#3a86ff' },
-    { a: 'jump',    x: 1212, y: 462, r: 46, label: 'Salto',  col: '#2dc653' },
-    { a: 'shield',  x: 1060, y: 500, r: 40, label: 'Escudo', col: '#8ecae6' },
-    { a: 'grab',    x: 932,  y: 668, r: 34, label: 'Agarre', col: '#ffbe0b' },
-    { a: 'smash',   x: 1212, y: 350, r: 34, label: 'Smash',  col: '#ff9f1c' },
-    { a: 'start',   x: W / 2, y: 30, r: 24, label: 'II',     col: '#cbd5e1' },
+    { a: 'attack',  label: 'A',       sub: 'Ataque',   col: '#e63946', dx: 0.20, dy: 0.21, r: 0.125 },
+    { a: 'special', label: 'B',       sub: 'Especial', col: '#3a86ff', dx: 0.47, dy: 0.13, r: 0.10 },
+    { a: 'jump',    label: 'Saltar',                   col: '#2dc653', dx: 0.13, dy: 0.48, r: 0.10 },
+    { a: 'shield',  label: 'Escudo',                   col: '#8ecae6', dx: 0.43, dy: 0.42, r: 0.085 },
+    { a: 'grab',    label: 'Agarrar',                  col: '#ffbe0b', dx: 0.68, dy: 0.29, r: 0.075 },
   ],
+  el: null, g: null, L: null, fsRefused: false, wasFs: false,
   shown() { return this.active && APP.screen === 'battle'; },
+  // ---------- capa y medidas ----------
+  setup() {
+    if (this.el) return;
+    const el = this.el = document.createElement('canvas');
+    el.id = 'touchpad'; el.setAttribute('aria-hidden', 'true');
+    el.style.cssText = 'position:fixed;left:0;top:0;pointer-events:none;z-index:4;background:transparent;max-width:none';
+    document.body.appendChild(el);
+    this.g = el.getContext('2d');
+    // márgenes seguros (muesca y barra de inicio)
+    const probe = this.probe = document.createElement('div');
+    probe.style.cssText = 'position:fixed;left:env(safe-area-inset-left,0px);right:env(safe-area-inset-right,0px);top:env(safe-area-inset-top,0px);bottom:env(safe-area-inset-bottom,0px);pointer-events:none;visibility:hidden';
+    document.body.appendChild(probe);
+    this.measure();
+  },
+  measure() {
+    if (!this.el) return;
+    const vw = window.innerWidth, vh = window.innerHeight, dpr = Math.min(window.devicePixelRatio || 1, 2);
+    this.el.style.width = vw + 'px'; this.el.style.height = vh + 'px';
+    this.el.width = Math.round(vw * dpr); this.el.height = Math.round(vh * dpr);
+    const r = this.probe.getBoundingClientRect();
+    const sl = Math.max(12, r.left), sr = Math.max(12, vw - r.right), st = Math.max(8, r.top), sb = Math.max(10, vh - r.bottom);
+    const u = clamp(Math.min(vw, vh), 280, 440);
+    this.L = { vw, vh, dpr, u, sl, sr, st, sb, R: u * 0.17, knob: u * 0.075,
+      home: { x: sl + u * 0.3, y: vh - sb - u * 0.3 },
+      pause: { x: vw / 2, y: st + 22, r: 19 },
+      btns: this.BUTTONS.map(b => Object.assign({}, b, { x: vw - sr - b.dx * u, y: vh - sb - b.dy * u, rr: b.r * u })) };
+  },
   hitButton(x, y) {
-    let best = null, bd = 1e9;
-    for (const b of this.BUTTONS) { const d = Math.hypot(x - b.x, y - b.y); if (d < b.r * 1.25 && d < bd) { bd = d; best = b; } }
+    const L = this.L; let best = null, bd = 1e9;
+    for (const b of L.btns) { const d = Math.hypot(x - b.x, y - b.y); if (d < b.rr * 1.4 && d < bd) { bd = d; best = b; } }
+    if (!best && Math.hypot(x - L.pause.x, y - L.pause.y) < L.pause.r * 1.8) best = { a: 'start' };
     return best;
   },
+  // ---------- toques ----------
   down(e) {
     if (e.pointerType !== 'touch') return;
-    if (!this.active) { this.active = true; this.tryFullscreen(); }
+    if (!this.active) {
+      this.active = true; this.setup();
+      if (!this.fsSupported() && !this.isStandalone() && typeof Toasts !== 'undefined') setTimeout(() => Toasts.push('📱 Pantalla completa: Compartir → "Agregar a inicio" y ábrelo desde el ícono'), 1200);
+    }
     if (!this.shown()) return;
-    const p = toLogical(e);
-    try { canvas.setPointerCapture(e.pointerId); } catch (er) { /* sin captura */ }
-    const b = this.hitButton(p.x, p.y);
+    const x = e.clientX, y = e.clientY;
+    const b = this.hitButton(x, y);
     if (b) { this.held.set(e.pointerId, b.a); this.pressT[b.a] = performance.now(); if (navigator.vibrate) try { navigator.vibrate(8); } catch (er) { /* sin vibración */ } }
-    else if (p.x < W * 0.5 && !this.stick) this.stick = { id: e.pointerId, cx: p.x, cy: p.y, x: p.x, y: p.y };
+    else if (x < this.L.vw * 0.46 && !this.stick) this.stick = { id: e.pointerId, cx: x, cy: y, x, y };
     e.preventDefault();
   },
   move(e) {
     if (e.pointerType !== 'touch' || !this.shown()) return;
-    const p = toLogical(e);
+    const x = e.clientX, y = e.clientY;
     if (this.stick && this.stick.id === e.pointerId) {
-      this.stick.x = p.x; this.stick.y = p.y;
-      // la palanca sigue al dedo si se sale mucho del círculo
-      const dx = p.x - this.stick.cx, dy = p.y - this.stick.cy, d = Math.hypot(dx, dy), max = this.R * 1.35;
+      this.stick.x = x; this.stick.y = y;
+      // la palanca sigue al dedo: si se sale del círculo, el centro lo alcanza
+      const R = this.L.R, dx = x - this.stick.cx, dy = y - this.stick.cy, d = Math.hypot(dx, dy), max = R * 1.2;
       if (d > max) { this.stick.cx += dx * (1 - max / d); this.stick.cy += dy * (1 - max / d); }
     } else if (this.held.has(e.pointerId)) {
-      // deslizar el dedo entre botones cambia de botón (como en los juegos de celular)
-      const b = this.hitButton(p.x, p.y);
-      if (b && b.a !== this.held.get(e.pointerId)) { this.held.set(e.pointerId, b.a); this.pressT[b.a] = performance.now(); }
+      // deslizar el dedo entre botones cambia de botón
+      const b = this.hitButton(x, y);
+      if (b && b.a !== 'start' && b.a !== this.held.get(e.pointerId)) { this.held.set(e.pointerId, b.a); this.pressT[b.a] = performance.now(); }
     }
     e.preventDefault();
   },
@@ -56,72 +92,113 @@ const TouchPad = {
     if (e.pointerType !== 'touch') return;
     if (this.stick && this.stick.id === e.pointerId) this.stick = null;
     this.held.delete(e.pointerId);
+    // soltar el dedo sí cuenta como gesto para el navegador: aquí se puede pedir pantalla completa
+    this.tryFullscreen();
   },
   release() { this.stick = null; this.held.clear(); },
   read() {
     const s = blankState();
-    if (!this.shown()) return s;
+    if (!this.shown() || !this.L) return s;
     if (this.stick) {
-      let x = (this.stick.x - this.stick.cx) / this.R, y = (this.stick.y - this.stick.cy) / this.R;
+      let x = (this.stick.x - this.stick.cx) / this.L.R, y = (this.stick.y - this.stick.cy) / this.L.R;
       const m = Math.hypot(x, y); if (m > 1) { x /= m; y /= m; }
       s.x = Math.abs(x) < 0.16 ? 0 : x; s.y = Math.abs(y) < 0.16 ? 0 : y;
     }
     for (const a of this.held.values()) s[a] = true;
     s.tapJump = false; // en pantalla táctil saltar es con su botón: subir la palanca no salta sola
-    s.any = s.attack || s.special || s.jump || s.shield || s.grab || s.smash || s.start;
+    s.any = s.attack || s.special || s.jump || s.shield || s.grab || s.start;
     return s;
   },
+  // ---------- pantalla completa ----------
+  landscape() { return window.innerWidth > window.innerHeight; },
+  fsSupported() { const el = document.documentElement; return !!(el.requestFullscreen || el.webkitRequestFullscreen); },
+  isStandalone() { return (window.matchMedia && matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches) || navigator.standalone === true; },
   tryFullscreen() {
+    if (!this.active || !this.landscape() || this.fsRefused || this.isStandalone()) return;
+    if (document.fullscreenElement || document.webkitFullscreenElement) return;
     try {
-      const el = document.documentElement;
-      if (!document.fullscreenElement && el.requestFullscreen) el.requestFullscreen({ navigationUI: 'hide' }).then(() => { try { screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape').catch(() => {}); } catch (er) { /* sin giro */ } }).catch(() => {});
+      const el = document.documentElement, req = el.requestFullscreen || el.webkitRequestFullscreen;
+      if (!req) return;
+      const p = req.call(el, { navigationUI: 'hide' });
+      const lock = () => { try { screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape').catch(() => {}); } catch (er) { /* sin bloqueo */ } };
+      if (p && p.then) p.then(lock).catch(() => {}); else lock();
     } catch (er) { /* sin pantalla completa */ }
   },
+  onFsChange() {
+    const fs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+    // si la persona se salió a propósito, no la regresamos hasta que vuelva a girar el teléfono
+    if (this.wasFs && !fs && this.landscape()) this.fsRefused = true;
+    this.wasFs = fs;
+  },
+  onResize() {
+    const land = this.landscape();
+    if (land && this._land === false) this.fsRefused = false; // giró otra vez a horizontal
+    this._land = land;
+    this.measure();
+  },
+  // ---------- dibujo ----------
   draw() {
+    if (!this.el) return;
+    const g = this.g, L = this.L;
+    g.setTransform(L.dpr, 0, 0, L.dpr, 0, 0);
+    g.clearRect(0, 0, L.vw, L.vh);
+    if (this.active && !this.landscape()) {
+      // aviso para girar el teléfono
+      g.fillStyle = 'rgba(6,10,18,.88)'; g.fillRect(0, 0, L.vw, L.vh);
+      g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#f4efe8';
+      g.font = `700 ${Math.round(L.vw * 0.09)}px 'Barlow Condensed', 'Barlow', system-ui, sans-serif`; g.fillText('Gira el teléfono ↻', L.vw / 2, L.vh / 2 - 20);
+      g.font = `600 ${Math.round(L.vw * 0.04)}px 'Barlow', system-ui, sans-serif`; g.fillStyle = '#cbd5e1';
+      g.fillText('Se juega de lado: así caben la palanca y los botones', L.vw / 2, L.vh / 2 + 30);
+      return;
+    }
     if (!this.shown()) return;
-    const c = ctx, now = performance.now();
-    c.save();
+    const now = performance.now();
     // palanca
-    const st = this.stick;
-    const cx = st ? st.cx : 190, cy = st ? st.cy : 560;
-    c.globalAlpha = st ? 0.9 : 0.45;
-    const bg = c.createRadialGradient(cx, cy, 10, cx, cy, this.R);
-    bg.addColorStop(0, 'rgba(255,255,255,.05)'); bg.addColorStop(1, 'rgba(255,255,255,.16)');
-    c.fillStyle = bg; c.beginPath(); c.arc(cx, cy, this.R, 0, TAU); c.fill();
-    c.strokeStyle = 'rgba(255,255,255,.4)'; c.lineWidth = 2; c.stroke();
+    const st = this.stick, cx = st ? st.cx : L.home.x, cy = st ? st.cy : L.home.y, R = L.R;
+    g.globalAlpha = st ? 0.9 : 0.4;
+    const bg = g.createRadialGradient(cx, cy, 6, cx, cy, R);
+    bg.addColorStop(0, 'rgba(255,255,255,.05)'); bg.addColorStop(1, 'rgba(255,255,255,.18)');
+    g.fillStyle = bg; g.beginPath(); g.arc(cx, cy, R, 0, TAU); g.fill();
+    g.strokeStyle = 'rgba(255,255,255,.45)'; g.lineWidth = 2; g.stroke();
     let kx = cx, ky = cy;
-    if (st) { const dx = st.x - cx, dy = st.y - cy, d = Math.hypot(dx, dy), k = d > this.R ? this.R / d : 1; kx = cx + dx * k; ky = cy + dy * k; }
-    const kg = c.createRadialGradient(kx - 8, ky - 10, 4, kx, ky, 36);
+    if (st) { const dx = st.x - cx, dy = st.y - cy, d = Math.hypot(dx, dy), k = d > R ? R / d : 1; kx = cx + dx * k; ky = cy + dy * k; }
+    const kg = g.createRadialGradient(kx - L.knob * 0.25, ky - L.knob * 0.3, 2, kx, ky, L.knob);
     kg.addColorStop(0, 'rgba(255,255,255,.95)'); kg.addColorStop(1, 'rgba(160,175,200,.8)');
-    c.fillStyle = kg; c.beginPath(); c.arc(kx, ky, 34, 0, TAU); c.fill();
-    if (!st) text('Mueve', cx, cy + this.R + 18, 14, 'rgba(255,255,255,.7)', { body: true, weight: 600 });
+    g.fillStyle = kg; g.beginPath(); g.arc(kx, ky, L.knob, 0, TAU); g.fill();
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    if (!st) { g.globalAlpha = 0.75; g.fillStyle = '#fff'; g.font = `600 ${Math.round(L.u * 0.036)}px 'Barlow', system-ui, sans-serif`; g.fillText('Pon el pulgar donde quieras', cx, cy + R + L.u * 0.04); }
     // botones
     const pressed = new Set(this.held.values());
-    for (const b of this.BUTTONS) {
-      const on = pressed.has(b.a), fl = Math.max(0, 1 - (now - (this.pressT[b.a] || 0)) / 180);
-      c.globalAlpha = on ? 0.95 : 0.55;
-      const g = c.createRadialGradient(b.x - b.r * 0.3, b.y - b.r * 0.35, 2, b.x, b.y, b.r);
-      g.addColorStop(0, mixStr(b.col, '#ffffff', on ? 0.55 : 0.35)); g.addColorStop(1, withAlpha(shade(b.col, -0.35), 0.85));
-      c.fillStyle = g; c.beginPath(); c.arc(b.x, b.y, b.r * (on ? 0.94 : 1), 0, TAU); c.fill();
-      c.strokeStyle = on ? '#ffffff' : 'rgba(255,255,255,.45)'; c.lineWidth = on ? 3 : 1.5; c.stroke();
-      if (fl > 0) { c.globalAlpha = fl * 0.6; c.strokeStyle = '#fff'; c.lineWidth = 4; c.beginPath(); c.arc(b.x, b.y, b.r + (1 - fl) * 16, 0, TAU); c.stroke(); }
-      c.globalAlpha = on ? 1 : 0.85;
-      const big = b.label.length <= 2;
-      text(b.label, b.x, b.y + 1, big ? b.r * 0.8 : 14, '#ffffff', big ? { weight: 700 } : { body: true, weight: 700 });
+    for (const b of L.btns) {
+      const on = pressed.has(b.a), fl = Math.max(0, 1 - (now - (this.pressT[b.a] || 0)) / 180), r = b.rr * (on ? 0.94 : 1);
+      g.globalAlpha = on ? 0.95 : 0.6;
+      const bgr = g.createRadialGradient(b.x - r * 0.3, b.y - r * 0.35, 2, b.x, b.y, r);
+      bgr.addColorStop(0, mixStr(b.col, '#ffffff', on ? 0.55 : 0.35)); bgr.addColorStop(1, withAlpha(shade(b.col, -0.35), 0.88));
+      g.fillStyle = bgr; g.beginPath(); g.arc(b.x, b.y, r, 0, TAU); g.fill();
+      g.strokeStyle = on ? '#ffffff' : 'rgba(255,255,255,.5)'; g.lineWidth = on ? 3 : 1.5; g.stroke();
+      if (fl > 0) { g.globalAlpha = fl * 0.6; g.strokeStyle = '#fff'; g.lineWidth = 4; g.beginPath(); g.arc(b.x, b.y, b.rr + (1 - fl) * 14, 0, TAU); g.stroke(); }
+      g.globalAlpha = on ? 1 : 0.92; g.fillStyle = '#fff';
+      const letter = b.label.length <= 2;
+      g.font = letter ? `800 ${Math.round(b.rr * 0.82)}px 'Barlow Condensed', 'Barlow', system-ui, sans-serif` : `700 ${Math.round(b.rr * 0.36)}px 'Barlow', system-ui, sans-serif`;
+      g.fillText(b.label, b.x, b.y + (b.sub ? -b.rr * 0.1 : 1));
+      if (b.sub) { g.font = `700 ${Math.round(b.rr * 0.24)}px 'Barlow', system-ui, sans-serif`; g.globalAlpha *= 0.85; g.fillText(b.sub, b.x, b.y + b.rr * 0.48); }
     }
-    c.restore();
-    // aviso para girar el teléfono
-    if (window.innerHeight > window.innerWidth * 1.05) {
-      c.fillStyle = 'rgba(6,10,18,.8)'; c.fillRect(0, 0, W, H);
-      sfText('Gira el teléfono ↻', W / 2, H / 2 - 20, 80, PAPER);
-      text('Se juega de lado para que quepan la palanca y los botones', W / 2, H / 2 + 50, 24, '#cbd5e1', { body: true, weight: 600 });
-    }
+    // pausa
+    const P = L.pause; g.globalAlpha = pressed.has('start') ? 0.95 : 0.55;
+    g.fillStyle = 'rgba(203,213,225,.35)'; g.beginPath(); g.arc(P.x, P.y, P.r, 0, TAU); g.fill();
+    g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineWidth = 1.5; g.stroke();
+    g.fillStyle = '#fff'; g.fillRect(P.x - 6, P.y - 7, 4, 14); g.fillRect(P.x + 2, P.y - 7, 4, 14);
+    g.globalAlpha = 1;
   },
 };
-canvas.addEventListener('pointerdown', e => TouchPad.down(e), { passive: false });
-canvas.addEventListener('pointermove', e => TouchPad.move(e), { passive: false });
-canvas.addEventListener('pointerup', e => TouchPad.up(e));
-canvas.addEventListener('pointercancel', e => TouchPad.up(e));
+// los toques se escuchan en toda la ventana (también en las franjas fuera del cuadro del juego)
+window.addEventListener('pointerdown', e => TouchPad.down(e), { capture: true, passive: false });
+window.addEventListener('pointermove', e => TouchPad.move(e), { capture: true, passive: false });
+window.addEventListener('pointerup', e => TouchPad.up(e), { capture: true });
+window.addEventListener('pointercancel', e => TouchPad.up(e), { capture: true });
 window.addEventListener('blur', () => TouchPad.release());
+window.addEventListener('resize', () => TouchPad.onResize());
+document.addEventListener('fullscreenchange', () => TouchPad.onFsChange());
+document.addEventListener('webkitfullscreenchange', () => TouchPad.onFsChange());
 // quién es "el ratón" en los menús: con pantalla táctil es la palanca en pantalla
 function pointerDev() { return TouchPad.active ? 'touch' : 'kb1'; }

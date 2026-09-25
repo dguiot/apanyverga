@@ -22,11 +22,36 @@ icon = "data:image/svg+xml," + "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBo
 head = ('<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'
         '<meta name="theme-color" content="#060d18">\n'
         '<meta name="description" content="A pan y verga… y se nos acabó el pan. Juego de peleas para hasta 4 jugadores, en la misma pantalla o en línea con voz y cámara.">\n'
-        f'<link rel="icon" href="{icon}">\n')
+        f'<link rel="icon" href="{icon}">\n'
+        # "Agregar a inicio": desde el ícono abre a pantalla completa y de lado (en iPhone es la única forma)
+        '<link rel="manifest" href="manifest.webmanifest">\n'
+        '<link rel="apple-touch-icon" href="icons/icon-180.png">\n'
+        '<meta name="mobile-web-app-capable" content="yes">\n'
+        '<meta name="apple-mobile-web-app-capable" content="yes">\n'
+        '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">\n'
+        '<meta name="apple-mobile-web-app-title" content="A pan y verga">\n')
 html = html.replace('<meta charset="utf-8">', '<meta charset="utf-8">\n' + head, 1)
 block = re.search(r'<!--SCRIPTS-->(.*?)<!--/SCRIPTS-->', html, re.S).group(1)
 page = html.replace(block, "\n<script>\n" + vendor + "\n</script>\n<script src=\"config.js\"></script>\n<script>\n'use strict';\n" + '\n'.join(js) + "\n</script>\n")
 (out / 'index.html').write_text(page)
+(out / 'icons').mkdir(exist_ok=True)
+for n in (180, 192, 512): (out / 'icons' / f'icon-{n}.png').write_bytes((root / 'icons' / f'icon-{n}.png').read_bytes())
+(out / 'manifest.webmanifest').write_text('''{
+  "name": "A pan y verga",
+  "short_name": "A pan y verga",
+  "description": "…y se nos acabó el pan. Peleas para hasta 4, en la misma pantalla o en línea.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#060d18",
+  "theme_color": "#060d18",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
+''')
 cfg = out / 'config.js'
 if not cfg.exists():
     cfg.write_text("""// Configuración de la versión web de "A pan y verga".

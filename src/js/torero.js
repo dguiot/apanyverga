@@ -11,11 +11,11 @@
 
 // ---------- cómo se ve ----------
 LOOKS.puentin = {
-  skin: '#d9a17e', hair: '#1a1411', hairBack: 'short', eye: '#2b1a10', lips: '#9a5a48',
+  skin: '#c48a6c', hair: '#221816', hairBack: 'short', eye: '#2b1a10', lips: '#9a5a48',
   top: '#8a1531', top2: '#5c0d20', garment: 'torero', sleeve: 'long', gold: '#e9b949', gold2: '#a8781f',
   shirt: '#f6f1e7', tie: '#141418', faja: '#141418',
   pants: '#8a1531', braid: '#e9b949', bootH: 0.46, boot: '#f2a0b6', feet: 'slipper', shoe: '#121216', sole: '#050507', bow: '#e9b949',
-  headwear: 'montera', montera: '#16161a', accent: '#e9b949', capote: '#c2185b', capoteIn: '#f2c230',
+  headwear: 'montera', montera: '#16161a', hatY: 0.25, hatS: 0.9, accent: '#e9b949', capote: '#c2185b', capoteIn: '#f2c230',
   build: { chest: 16.5, waist: 10.5, arm: 0.95, leg: 0.95 }, prop: { leg: 1.06, torso: 1.0, arm: 1.02, head: 1.0 },
 };
 
@@ -116,7 +116,13 @@ drawFoot2 = function (c, L, x, y, rot, k, dk, OUT) {
 // montera: negra, de astracán, con sus dos borlas; va sobre la cabeza dibujada o sobre la foto
 function drawHeadwear(c, id, L, OUT, photo) {
   if (L.headwear !== 'montera') return;
-  const RX = SK.headRX, RY = SK.headRY, by = -RY * (photo ? (L.hatY || 0.7) : 0.56), k = photo ? (L.hatS || 1.05) : 1;
+  const RX = SK.headRX, RY = SK.headRY;
+  let by = -RY * 0.56, k = 1;
+  if (photo && typeof FACE_DATA !== 'undefined' && FACE_DATA[id]) {
+    // sobre la foto: el ala en el nacimiento del pelo y tan ancha como la cabeza
+    const d = FACE_DATA[id], w = RX * 2.25 * d.scale, h = w * d.hh / d.hw;
+    by = -h / 2 + h * (L.hatY || 0.2); k = w / (2.3 * RX) * (L.hatS || 1);
+  }
   c.save(); c.translate(0, by); c.scale(k, k);
   // coleta del torero: el moñito negro de la nuca
   if (!photo) { c.fillStyle = OUT; c.beginPath(); c.ellipse(-RX * 0.98, RY * 0.5, 4.6, 3.8, 0.4, 0, TAU); c.fill(); c.fillStyle = L.hair; c.beginPath(); c.ellipse(-RX * 0.98, RY * 0.5, 3.4, 2.7, 0.4, 0, TAU); c.fill(); }

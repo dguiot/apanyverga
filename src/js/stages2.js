@@ -14,7 +14,7 @@ STAGE_DEFS.city = () => {
   const lift = off => (t, s) => [s.bx, 300 + Math.cos(t * 0.011 + off) * 305];
   return {
     name: 'Azoteas de Neón', song: 'volcano', big: true, zoomMin: 0.3,
-    blast: { l: -2050, r: 2050, t: -1550, b: 1200 }, cam: { l: -1650, r: 1650, t: -1250, b: 900 },
+    blast: { l: -2050, r: 2050, t: -1250, b: 1200 }, // techo: ~850 sobre la azotea más alta, como en los chicos cam: { l: -1650, r: 1650, t: -1250, b: 900 },
     solids: [
       surf(-440, -60, 880, 780, { ledge: 1, tint: '#1d2a44' }),
       surf(-1150, 20, 550, 700, { ledge: 1, tint: '#241f3d' }),
@@ -136,7 +136,7 @@ STAGE_DEFS.stadium = (opts = {}) => {
   );
   return {
     name: 'Estadio Golpazo', song: 'temple', big: true, zoomMin: 0.33, soccer,
-    blast: { l: -1950, r: 1950, t: -1450, b: 950 }, cam: { l: -1500, r: 1500, t: -1100, b: 700 },
+    blast: { l: -1950, r: 1950, t: -1250, b: 950 }, cam: { l: -1500, r: 1500, t: -1100, b: 700 },
     solids,
     plats: [
       surf(-640, -210, 210, 14, { plat: 1 }),

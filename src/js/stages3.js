@@ -186,7 +186,7 @@ STAGE_DEFS.pyramid = () => {
   const slab = (x, y, ph) => surf(x, y, 190, 14, { plat: 1, glyph: 1, move: (t, s) => [s.bx, s.by + Math.sin(t * 0.02 + ph) * 18] });
   return {
     name: 'Pirámide del Sol', song: 'temple', big: true, zoomMin: 0.27,
-    blast: { l: -2450, r: 2450, t: -1650, b: 1300 }, cam: { l: -2050, r: 2050, t: -1300, b: 1050 },
+    blast: { l: -2450, r: 2450, t: -1300, b: 1300 }, cam: { l: -2050, r: 2050, t: -1300, b: 1050 },
     solids: tiers,
     plats: [surf(-165, -385, 330, 14, { plat: 1, roof: 1 }), slab(-1330, 40, 0), slab(1140, 40, 2), slab(-860, -170, 1), slab(670, -170, 3)],
     light: { dir: [-0.75, -0.66], rim: '#fff1c8', rimA: 0.7, shade: 'rgba(60,40,30,.34)', amb: 'rgba(255,200,140,.05)' },

@@ -13,13 +13,14 @@ const { spawn } = require('child_process');
   const errs = [];
   let pass = 0, fail = 0;
   const ok = (n, c, info) => { if (c) pass++; else fail++; console.log(`${c ? 'OK  ' : 'FAIL'} ${n}${info !== undefined ? '  → ' + info : ''}`); };
-  const mk = async (name, init) => {
+  await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: 'http://localhost:8768' });
+  const mk = async (name, init, qs) => {
     const p = await ctx.newPage();
     if (init) await p.addInitScript(init);
     p.on('pageerror', e => errs.push(name + ' ' + e.message + ' ' + (e.stack || '').split('\n')[1]));
     p.on('console', m => { if (m.type() === 'error') errs.push(name + ' ' + m.text().slice(0, 200)); });
     p.on('dialog', d => d.accept(name));
-    await p.goto('http://localhost:8768/index.html');
+    await p.goto('http://localhost:8768/index.html' + (qs || ''));
     return p;
   };
   const key = async (p, k, wait = 180) => { await p.keyboard.down(k); await p.waitForTimeout(50); await p.keyboard.up(k); await p.waitForTimeout(wait); };
@@ -29,7 +30,7 @@ const { spawn } = require('child_process');
   const A = await mk('Ana');
   await A.evaluate(() => localStorage.clear()); await A.reload(); await A.waitForTimeout(400);
   ok('versión web: se instala el adaptador de Supabase', await A.evaluate(() => window.APYV_WEB === true && window.claude && window.claude.web === true));
-  ok('versión web: con las fotos de las caras', await A.evaluate(() => typeof FACE_DATA !== 'undefined' && Object.keys(FACE_IMG).length === 5), await A.evaluate(() => Object.keys(FACE_IMG).join(',')));
+  ok('versión web: con las fotos de las caras', await A.evaluate(() => typeof FACE_DATA !== 'undefined' && Object.keys(FACE_IMG).length === 6), await A.evaluate(() => Object.keys(FACE_IMG).join(',')));
   ok('versión web: título y viewport para celular', await A.evaluate(() => document.title === 'A pan y verga' && !!document.querySelector('meta[name=viewport]')));
   const B = await mk('Beto');
   await A.waitForTimeout(800);
@@ -52,6 +53,21 @@ const { spawn } = require('child_process');
   await key(B, 'KeyJ', 900);
   const slotsA = await A.evaluate(() => APP.slots.map(s => s.type === 'none' ? '-' : `${s.type}:${s.pick || s.cur}${s.remote ? ':R:' + s.name : ''}`).join(' '));
   ok('anfitrión ve a Beto listo con Michi', slotsA.includes('michi:R:Beto'), slotsA);
+  // ---- invitar: código de sala, link copiado y entrar directo con el link
+  const code = await A.evaluate(() => Net.code);
+  ok('la sala tiene código para invitar', /^[A-Z0-9]{4}$/.test(code || '') && await B.evaluate(c => Net.hosts().some(h => h.presence.code === c), code), code);
+  await key(A, 'KeyI', 500);
+  const clip = await A.evaluate(() => navigator.clipboard.readText().catch(e => 'ERR ' + e.message));
+  ok('el botón Invitar copia el link con la sala', clip.includes('http://localhost:8768/index.html?sala=' + code), clip.slice(0, 120));
+  const E = await mk('Eva', null, '?sala=' + code);
+  await E.waitForTimeout(800);
+  await key(E, 'Enter', 400);
+  const inE = await waitFor(E, () => APP.screen === 'netroom', null, 8000);
+  ok('quien abre el link entra directo a esa sala', inE && await E.evaluate(() => Net.nameOf(Net.hostPeer)) === 'Ana', `${await scr(E)} · sala de ${await E.evaluate(() => Net.hostPeer && Net.nameOf(Net.hostPeer))}`);
+  ok('el anfitrión la ve entrar', await waitFor(A, () => APP.slots.some(s => s.remote && s.name === 'Eva'), null, 5000), await A.evaluate(() => APP.slots.map(s => s.name || s.type).join(',')));
+  await A.screenshot({ path: 'shots/w0-invite.png' });
+  await E.evaluate(() => { Net.leave(); APP.go('main'); }); await E.close();
+  await waitFor(A, () => !APP.slots.some(s => s.remote && s.name === 'Eva'), null, 6000);
   // conexión directa lista antes de pelear
   ok('conexión directa (DataChannel) abierta', await waitFor(B, () => { const d = Net.room._debug(); return d.links.length === 1 && d.links[0][1] === 'open'; }, null, 6000), JSON.stringify(await B.evaluate(() => Net.room._debug().links)));
   // ---- pelea
@@ -77,7 +93,7 @@ const { spawn } = require('child_process');
   const doc = await A.evaluate(() => JSON.parse(localStorage.getItem('__mock_sb_apyv_docs') || '[]')[0]);
   ok('la pelea quedó en la tabla (por cuenta, sin nombres)', saved && doc.coll === 'matches' && doc.body.players.length === 2 && doc.body.players[0].uid !== doc.body.players[1].uid && !('name' in doc.body.players[0]), JSON.stringify(doc && doc.body.players.map(p => p.uid.slice(0, 8))));
   const players = await A.evaluate(() => JSON.parse(localStorage.getItem('__mock_sb_apyv_players') || '[]').map(p => p.name).sort().join(','));
-  ok('los nombres quedaron en apyv_players', players === 'Ana,Beto', players);
+  ok('los nombres quedaron en apyv_players', players === 'Ana,Beto,Eva', players);
   // ---- salón de la fama
   await A.evaluate(() => APP.go('fame'));
   await waitFor(A, () => Fame.rows && Fame.rows.length === 2 && Object.keys(Fame.profiles).length === 2, null, 6000);

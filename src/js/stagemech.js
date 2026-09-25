@@ -90,8 +90,10 @@ const CANAL_Y = 50;
 STAGE_MECH.xochi = {
   mech(f) {
     const prev = f._wy === undefined ? f.y : f._wy; f._wy = f.y;
-    if (f.grounded) { f.skips = 0; return; }
-    if (['ledge', 'climb', 'grabbed', 'holding', 'respawn'].includes(f.state)) return;
+    // de vuelta en tierra (o colgado de la orilla) se acaba el hundimiento: si se quedara marcado,
+    // cada golpe posterior se cancelaba en el aire y nadie salía volando (llegaban a 999%)
+    if (f.grounded || ['ledge', 'climb', 'respawn'].includes(f.state)) { f.skips = 0; f.sunk = false; return; }
+    if (['grabbed', 'holding'].includes(f.state)) return;
     if (f.sunk) { if (f.lastHitBy) f.lastHitTimer = Math.max(f.lastHitTimer, 2); if (f.state !== 'helpless') f.setState('helpless'); f.vy = 4; f.vx *= 0.85; f.lx = f.ly = 0; if (this.t % 6 === 0) spawnFx('drop', f.x, CANAL_Y); return; }
     const hull = this.solids[0];
     if (f.x > hull.x - 6 && f.x < hull.x + hull.w + 6) return; // encima de la trajinera no hay agua

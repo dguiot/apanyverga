@@ -24,6 +24,8 @@ const AV = {
     if (this.denied) return this.fail('Tu acceso a este juego no permite enviar video. Pide al dueño que te dé permiso para interactuar.');
     this.starting = true; this.err = null;
     let stream = null, err = null;
+    // iPhone: con micrófono el audio tiene que ser de llamada (el juego lo pone en 'playback' para ignorar el modo silencio)
+    try { if (navigator.audioSession) navigator.audioSession.type = 'play-and-record'; } catch (e) { /* sin sesión */ }
     try {
       stream = await navigator.mediaDevices.getUserMedia({
         video: { width: { ideal: 320 }, height: { ideal: 240 }, frameRate: { ideal: 15, max: 20 }, facingMode: 'user' },

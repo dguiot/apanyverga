@@ -20,10 +20,15 @@ const Audio8 = {
         for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
         try { const m = localStorage.getItem('golpazo-muted'); if (m === '1') this.setMuted(true); if (m === 'fx') this.setSound('fx'); } catch (e) {}
       }
-      if (this.ctx.state === 'suspended') this.ctx.resume();
+      if (this.ctx.state === 'suspended') { const p = this.ctx.resume(); if (p && p.catch) p.catch(() => {}); }
+      // iPhone: que suene aunque el interruptor de silencio esté puesto (con videollamada lo decide el micrófono)
+      try { if (navigator.audioSession && navigator.audioSession.type !== 'play-and-record') navigator.audioSession.type = 'playback'; } catch (e) { /* sin sesión */ }
+      // iOS: un búfer mudo dentro del gesto termina de abrir el audio
+      if (!this.primed && this.ctx.state !== 'closed') { const b = this.ctx.createBuffer(1, 1, 22050), s = this.ctx.createBufferSource(); s.buffer = b; s.connect(this.ctx.destination); s.start(0); this.primed = true; }
     } catch (e) { /* sin audio */ }
   },
   get ready() { return this.ctx && this.ctx.state === 'running'; },
+  sfxBus() { return { input: this.sfxGain, send: null, rev: null }; },
   MUS_GAIN: 0.16,
   // salida con compresor: la mezcla nunca satura aunque suenen muchos golpes a la vez
   buildOut() {
@@ -131,6 +136,31 @@ const Audio8 = {
       case 'counter': this.tone('square', 1200, 1200, 0.05, 0.12); this.tone('square', 1600, 1600, 0.12, 0.12, 0.05); break;
       case 'teleport': this.tone('sine', 1500, 200, 0.18, 0.12); break;
       case 'game': this.tone('square', 392, 392, 0.2, 0.15); this.tone('square', 523, 523, 0.2, 0.15, 0.2); this.tone('square', 784, 784, 0.6, 0.15, 0.4); break;
+      // del mariachi: se pedían desde el principio pero no existían, así que no sonaban
+      case 'trumpet': {
+        // "ta-ra-rá" de trompetas en tercera
+        const t = this.ctx.currentTime, v = 0.11 * clamp(k, 0.2, 1.5), o = { bus: this.sfxBus(), cut: 2600, cutK: 3.2, cutPeak: 1.8, cutT: 0.1, att: 0.02, dec: 0.08, sus: 0.75, rel: 0.1, vib: 0.008 };
+        [[67, 0, 0.09], [72, 0.1, 0.09], [76, 0.2, 0.34]].forEach(([n, d, du]) => { const f = 440 * Math.pow(2, (n - 69) / 12); this.syn(f, t + d, du, v, o); this.syn(f * 1.26, t + d, du, v * 0.55, o); });
+        break;
+      }
+      case 'violin': {
+        const t = this.ctx.currentTime, v = 0.07 * clamp(k, 0.2, 1.5), o = { bus: this.sfxBus(), waves: [['sawtooth', -8, 0.4], ['sawtooth', 0, 0.35], ['sawtooth', 9, 0.4]], cut: 2800, cutK: 3.6, att: 0.04, dec: 0.1, sus: 0.85, rel: 0.15, vib: 0.012, vibRate: 5.8 };
+        [[76, 0, 0.12], [79, 0.12, 0.3]].forEach(([n, d, du]) => this.syn(440 * Math.pow(2, (n - 69) / 12), t + d, du, v, o));
+        break;
+      }
+      case 'strum': {
+        // rasgueo de guitarra: acorde de sol, cuerda por cuerda
+        const t = this.ctx.currentTime, v = 0.07 * clamp(k, 0.2, 1.5), o = { bus: this.sfxBus(), waves: [['sawtooth', 0, 0.6], ['triangle', 0, 0.6]], cut: 700, cutK: 9, cutPeak: 5, cutT: 0.12, att: 0.003, dec: 0.12, sus: 0.25, rel: 0.25 };
+        [55, 59, 62, 67, 71].forEach((n, i) => this.syn(440 * Math.pow(2, (n - 69) / 12), t + i * 0.016, 0.35, v, o));
+        this.noise(0.05, 0.05 * k, 3000, 1, 0);
+        break;
+      }
+      case 'voice': {
+        // voz grave que acompaña el rugido
+        const t = this.ctx.currentTime, v = 0.16 * clamp(k, 0.2, 1.5);
+        this.syn(98, t, 0.5, v, { bus: this.sfxBus(), waves: [['sawtooth', -10, 0.6], ['sawtooth', 12, 0.5], ['square', 0, 0.2]], cut: 900, cutPeak: 1.6, cutT: 0.3, att: 0.05, dec: 0.2, sus: 0.7, rel: 0.25, vib: 0.03, vibRate: 7, scoop: 0.08 });
+        break;
+      }
     }
   },
 
@@ -315,7 +345,7 @@ const Audio8 = {
   },
   // Una voz de sintetizador: osciladores levemente desafinados → filtro con envolvente → volumen.
   syn(f, t, dur, vol, o = {}) {
-    const c = this.ctx, bus = this.musBus();
+    const c = this.ctx, bus = o.bus || this.musBus(); // o.bus: los efectos usan su propio canal
     const g = c.createGain(), flt = c.createBiquadFilter();
     const att = o.att || 0.01, dec = o.dec || 0.1, sus = o.sus ?? 0.7, rel = o.rel || 0.08;
     dur = Math.max(dur, att + dec + 0.01);
@@ -336,8 +366,8 @@ const Audio8 = {
       og.gain.value = mul ?? 1; osc.connect(og); og.connect(flt); oscs.push(osc);
     }
     flt.connect(g); g.connect(bus.input);
-    if (o.echo) { const s = c.createGain(); s.gain.value = o.echo; g.connect(s); s.connect(bus.send); }
-    if (o.rev) { const s = c.createGain(); s.gain.value = o.rev; g.connect(s); s.connect(bus.rev); }
+    if (o.echo && bus.send) { const s = c.createGain(); s.gain.value = o.echo; g.connect(s); s.connect(bus.send); }
+    if (o.rev && bus.rev) { const s = c.createGain(); s.gain.value = o.rev; g.connect(s); s.connect(bus.rev); }
     if (o.vib && dur > 0.25) {
       const lfo = c.createOscillator(), lg = c.createGain(), d0 = t + Math.min(0.22, dur * 0.4);
       lfo.frequency.value = o.vibRate || 5.2; lg.gain.setValueAtTime(0, t); lg.gain.setValueAtTime(0, d0);
@@ -449,3 +479,7 @@ const Audio8 = {
     if (S.def.grito && S.pass % 3 === 0) for (const [b, st] of S.def.grito) if (i === b * L + st) this.grito(when);
   },
 };
+
+// Los navegadores solo dejan sonar después de un gesto: tecla, clic o SOLTAR el dedo (apoyarlo no cuenta).
+// Los botones de un control de juego no cuentan: con control hace falta un clic, toque o tecla (ver el aviso del menú).
+for (const ev of ['keydown', 'mousedown', 'pointerdown', 'pointerup', 'touchend', 'click']) window.addEventListener(ev, () => Audio8.unlock(), { capture: true, passive: true });

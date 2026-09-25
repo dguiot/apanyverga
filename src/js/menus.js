@@ -166,6 +166,13 @@ const APP = {
     if (!['battle', 'demo', 'vs'].includes(this.screen)) {
       slab(sx, sy, 46, 40, { skew: 0.2 });
       text(Audio8.muted ? '🔇' : '🔊', sx + 23, sy + 21, 18, PAPER, { body: true });
+      // el navegador todavía no deja sonar (con control de juego pasa siempre: sus botones no cuentan como gesto)
+      if (!Audio8.ready && Audio8.soundMode() !== 'off' && !avButtonShown()) {
+        const msg = TouchPad.active ? 'Toca la pantalla para activar el sonido' : 'Haz clic o pulsa una tecla para activar el sonido';
+        const a = 0.75 + 0.25 * Math.sin(this.t / 9);
+        slab(sx - 392, sy + 2, 380, 36, { skew: 0.2, edge: '#ffbe0b' });
+        ctx.globalAlpha = a; text('🔈 ' + msg, sx - 202, sy + 21, 15, '#ffe8a3', { body: true, weight: 700 }); ctx.globalAlpha = 1;
+      }
     }
   },
 
@@ -175,7 +182,9 @@ const APP = {
     const d = Devices.anyConfirm();
     if (d || Pointer.clicked) {
       Audio8.unlock(); Audio8.sfx('confirm');
+      if (d && /^pad/.test(d) && !Audio8.ready && Audio8.soundMode() !== 'off') Toasts.push('🔈 Para oír el juego: un clic o una tecla (el navegador no deja sonar con solo el control)');
       this.firstDev = d || pointerDev();
+      if (Net.wantCode) { this.inviteT = 0; return this.go('online'); } // abriste un link de invitación
       this.go('main'); this.menuSel = 0; return;
     }
     for (const dv of Devices.list) { const c = Devices.ctrls[dv]; if (c && c.cur.any) this.idle = 0; }
@@ -260,7 +269,27 @@ const APP = {
   modeSel: 0, modeBack: 'main',
   modeRect(i) { const w = 386, h = 150, gap = 16, x0 = (W - (3 * w + 2 * gap)) / 2; return { x: x0 + (i % 3) * (w + gap), y: 84 + Math.floor(i / 3) * (h + gap), w, h }; },
   toggleRect(i) { const w = 386, gap = 16, x0 = (W - (3 * w + 2 * gap)) / 2; return { x: x0 + i * (w + gap), y: 420, w, h: 96 }; },
+  // ---------------- invitar a la sala (anfitrión) ----------------
+  // arriba a la izquierda en la selección de personajes, abajo a la derecha al elegir el modo
+  // (arriba a la derecha van la cámara y el sonido)
+  inviteRect() { return this.screen === 'modesel' ? { x: W - 290, y: 648, w: 250, h: 40 } : { x: 118, y: 14, w: 250, h: 40 }; },
+  inviteUpdate() {
+    if (Net.role !== 'host' || !Net.code) return;
+    const b = this.inviteRect();
+    if (clickIn(b.x, b.y, b.w, b.h) || keyEdge('kb1', 'KeyI')) { Audio8.sfx('confirm'); Net.invite(); Pointer.clicked = false; }
+  },
+  inviteDraw(showLink) {
+    if (Net.role !== 'host' || !Net.code) return;
+    const b = this.inviteRect(), hv = hover(b.x, b.y, b.w, b.h), kb = !TouchPad.active;
+    slab(b.x, b.y, b.w, b.h, { skew: 0.2, top: hv ? '#ffd76a' : '#34d399', bottom: hv ? '#e0a01a' : '#059669', edge: '#a7f3d0' });
+    text(`📨 Invitar · sala ${Net.code}${kb ? ' (I)' : ''}`, b.x + b.w / 2, b.y + b.h / 2 + 1, 15, INK, { body: true, weight: 800 });
+    if (showLink) {
+      const url = Net.inviteURL();
+      text(url ? `Invita con este link: ${url.replace(/^https?:\/\//, '')}` : `Tus amigos abren el juego, entran a "Jugar online" y eligen tu sala (código ${Net.code})`, W / 2, 672, 14, TEAL, { body: true, weight: 700 });
+    }
+  },
   modeselUpdate() {
+    this.inviteUpdate();
     for (const d of Devices.list) {
       const n = Devices.nav(d);
       let k = this.modeSel;
@@ -343,12 +372,14 @@ const APP = {
     if (r.party) wrapText('Reglas locas posibles: ' + PARTY.map(p => p.name).join(' · '), W / 2, 552, 1100, 13, 18, GOLD);
     text('←→↑↓ elegir · A / Enter: continuar · B / Esc: volver', W / 2, 694, 14, MUTED, { body: true, weight: 500 });
     sfButton(Net.role === 'host' ? '‹ Cerrar sala' : '‹ Volver', 40, 660, 150, 40, hover(40, 660, 150, 40));
+    this.inviteDraw(true);
   },
 
   // ---------------- SELECCIÓN DE PERSONAJES ----------------
   humanSlot(d) { return this.slots.findIndex(s => s.type === 'human' && s.dev === d); },
   newCPU(ready, i) { const c = randi(0, NCH() - 1); return { type: 'cpu', cur: c, ready, pick: CHAR_ORDER[c], level: this.cpuLevel, team: i === undefined ? 1 : i % 2 }; },
   charselUpdate() {
+    this.inviteUpdate();
     const sl = this.slots;
     const allReadyBefore = sl.some(s => s.type !== 'none') && sl.every(s => s.type === 'none' || s.ready);
     const navs = {}; for (const d of Devices.list) navs[d] = Devices.nav(d);
@@ -495,6 +526,7 @@ const APP = {
   charselDraw(opts = {}) {
     drawMenuBG(2);
     sfText(opts.title || (Net.role === 'host' ? 'Tu sala online' : 'Selección de personaje'), W / 2, 36, 44, PAPER);
+    if (!opts.title) this.inviteDraw(false);
     const ru = opts.rules || this.rules, mode = MODE_BY_ID[ru.mode] || MODES[0];
     text([mode.name, ru.teams || ru.mode === 'soccer' ? 'Equipos' : null, ru.party ? 'Modo Fiesta' : null].filter(Boolean).join(' · '), 40, 36, 15, TEAL, { align: 'left', body: true, weight: 700 });
     const sl = this.slots;
@@ -834,6 +866,12 @@ const APP = {
     const hosts = Net.hosts().filter(h => !h.sameTab);
     const n0 = hosts.length + 1;
     this.onSel = clamp(this.onSel, 0, n0 - 1);
+    if (Net.wantCode) {
+      const h = Net.hostByCode(Net.wantCode);
+      if (h) { const code = Net.wantCode; Net.wantCode = null; Audio8.sfx('confirm'); Toasts.push(`Entraste a la sala ${code}`); Net.join(h.peer, dev); return this.go('netroom'); }
+      this.inviteT = (this.inviteT || 0) + 1;
+      if (this.inviteT > 60 * 20) { Toasts.push(`No encontré la sala ${Net.wantCode}: quizá ya se cerró. Elige otra o crea la tuya.`); Net.wantCode = null; }
+    }
     const choose = i => {
       Audio8.sfx('confirm');
       if (i === 0) { Net.host(dev); this.slots = [{ type: 'human', dev, cur: 0, ready: false, edit: 0 }, { type: 'none' }, { type: 'none' }, { type: 'none' }]; this.modeBack = 'online'; return this.go('modesel'); }
@@ -877,7 +915,7 @@ const APP = {
       const lob = h.presence.lob || {}, sl = lob.sl || [];
       const used = sl.filter(x => x[0] !== 'n').length;
       const ph = lob.ph === 'lobby' ? 'eligiendo personajes' : lob.ph === 'res' ? 'viendo resultados' : 'peleando (entra a ver)';
-      return { label: `Sala de ${Net.nameOf(h.peer)}`, sub: `${used}/4 · ${ph}` };
+      return { label: `Sala de ${Net.nameOf(h.peer)}`, sub: `${h.presence.code ? 'código ' + h.presence.code + ' · ' : ''}${used}/4 · ${ph}` };
     }));
     rows.forEach((r, i) => {
       const y = 200 + i * 70, sel = i === this.onSel || hover(W / 2 - 300, y, 600, 58);
@@ -886,6 +924,7 @@ const APP = {
       text(r.sub, W / 2 + 270 + (sel ? 10 : 0), y + 40, 13, sel ? INK : MUTED, { align: 'right', body: true, weight: 600 });
     });
     if (!hosts.length) text('Todavía no hay salas abiertas: crea una o espera a que tus amigos abran el juego.', W / 2, 300, 15, MUTED, { body: true, weight: 500 });
+    if (Net.wantCode) { slab(W / 2 - 300, 128, 600, 44, { skew: 0.1, edge: GOLD }); text(`Buscando la sala ${Net.wantCode} de tu invitación…`, W / 2, 151, 17, GOLD, { body: true, weight: 700 }); }
     text('Todos abren este mismo link. Cada quien juega con su control o teclado desde su casa.', W / 2, 610, 14, MUTED, { body: true, weight: 500 });
     if (window.APYV_WEB && Net.user && Net.user.name) {
       const nm = `Tu nombre: ${Net.user.name()} · cámbialo aquí`;
