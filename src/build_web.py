@@ -1,13 +1,13 @@
 # Versión web (GitHub Pages): el mismo juego + Supabase (salas, salón de la fama) + adaptador js/webshim.js
 # Salida: web/index.html y web/config.js (este último solo se crea si no existe: ahí va la anon key)
-# WEB_FACES=1 incluye las fotos reales de las caras; por defecto la versión pública usa caras dibujadas.
+# Lleva las fotos de las caras (Daniel autorizó que sean públicas). WEB_FACES=0 las quita y quedan caras dibujadas.
 import re, pathlib, os
 root = pathlib.Path(__file__).parent
 out = pathlib.Path(os.environ.get('OUT') or (root / 'web')); out.mkdir(parents=True, exist_ok=True)
 html = (root / 'index.html').read_text()
 block = re.search(r'<!--SCRIPTS-->(.*?)<!--/SCRIPTS-->', html, re.S).group(1)
 srcs = re.findall(r'src="([^"]+)"', block)
-faces = os.environ.get('WEB_FACES') == '1'
+faces = os.environ.get('WEB_FACES') != '0'
 if not faces: srcs = [s for s in srcs if s != 'js/faces.js']
 js = []
 for s in ['js/webshim.js'] + srcs:

@@ -30,7 +30,7 @@ pantalla táctil) o en línea, cada quien desde su casa, con cámara y voz.
 
 ## Código
 
-`src/` tiene el código del juego (sin fotos de personas reales: la versión pública usa caras dibujadas).
+`src/` tiene el código del juego, con las fotos de las caras (`src/js/faces.js`). `WEB_FACES=0` genera una versión con caras dibujadas.
 Para regenerar el sitio desde la raíz del repositorio:
 
 ```sh

@@ -351,8 +351,11 @@ const APP = {
   charselUpdate() {
     const sl = this.slots;
     const allReadyBefore = sl.some(s => s.type !== 'none') && sl.every(s => s.type === 'none' || s.ready);
+    const navs = {}; for (const d of Devices.list) navs[d] = Devices.nav(d);
+    // un solo teclado: mientras nadie se une con las flechas, las flechas también mueven al jugador de WASD
+    if (navs.kb1 && navs.kb2 && this.humanSlot('kb2') < 0 && this.humanSlot('kb1') >= 0) for (const k of ['left', 'right', 'up', 'down']) if (navs.kb2[k]) { navs.kb1[k] = true; navs.kb2[k] = false; }
     for (const d of Devices.list) {
-      const n = Devices.nav(d);
+      const n = navs[d];
       let si = this.humanSlot(d);
       if (si < 0) {
         if (Net.role === 'host') continue; // en línea, cada quien juega desde su pantalla
@@ -367,6 +370,18 @@ const APP = {
       if (n.start && allReadyBefore) return this.toStages();
       if (S.edit !== si && (!sl[S.edit] || sl[S.edit].type !== 'cpu')) S.edit = si;
       const T = sl[S.edit];
+      // ya listo: con ←→ el cursor recorre los cuatro lugares para agregar, editar o quitar CPUs
+      if (T === S && S.ready) {
+        if (!(S.focus >= 0 && S.focus < 4)) S.focus = si;
+        const F = sl[S.focus];
+        if (n.left || n.right) { S.focus = (S.focus + (n.left ? 3 : 1)) % 4; Audio8.sfx('menu'); continue; }
+        if (F.type === 'cpu' && (n.up || n.down)) { F.level = clamp(F.level + (n.up ? 1 : -1), 1, AI_MAX); this.cpuLevel = F.level; Audio8.sfx('menu'); continue; }
+        if (n.shield && this.teamsOn()) { const X = F.type !== 'none' && !F.remote ? F : S; X.team = X.team ? 0 : 1; Audio8.sfx('menu'); continue; }
+        if (n.confirm && F.type === 'none') { sl[S.focus] = this.newCPU(false, S.focus); S.edit = S.focus; Audio8.sfx('confirm'); continue; }
+        if (n.confirm && F.type === 'cpu') { F.ready = false; S.edit = S.focus; Audio8.sfx('confirm'); continue; }
+        if (n.grab && F.type === 'cpu') { sl[S.focus] = { type: 'none' }; Audio8.sfx('back'); continue; }
+        if (n.back && S.focus !== si) { S.focus = si; Audio8.sfx('back'); continue; }
+      }
       if (!T.ready) {
         const N = NCH() + 1;
         if (n.left) { T.cur = (T.cur + N - 1) % N; Audio8.sfx('menu'); }
@@ -376,16 +391,17 @@ const APP = {
       }
       if (n.shield && this.teamsOn()) { T.team = T.team ? 0 : 1; Audio8.sfx('menu'); }
       if (n.confirm) {
-        if (!T.ready) { T.ready = true; T.pick = T.cur === NCH() ? pick(CHAR_ORDER) : CHAR_ORDER[T.cur]; Audio8.sfx('confirm'); if (S.edit !== si) S.edit = si; }
+        if (!T.ready) { T.ready = true; T.pick = T.cur === NCH() ? pick(CHAR_ORDER) : CHAR_ORDER[T.cur]; Audio8.sfx('confirm'); S.focus = S.edit; if (S.edit !== si) S.edit = si; }
       } else if (n.back) {
         Audio8.sfx('back');
-        if (S.edit !== si) S.edit = si;
+        // soltar la CPU que editaba: se queda con el personaje que tenía marcado (no se queda "eligiendo")
+        if (S.edit !== si) { if (!T.ready) { T.ready = true; T.pick = T.cur === NCH() ? pick(CHAR_ORDER) : CHAR_ORDER[T.cur]; } S.focus = S.edit; S.edit = si; }
         else if (S.ready) S.ready = false;
         else if (Net.role === 'host' && si === 0) return this.go('modesel'); // la sala sigue abierta; desde el modo se cierra
         else { sl[si] = { type: 'none' }; if (!sl.some(s => s.type === 'human')) { this.slots = sl.map(() => ({ type: 'none' })); return this.go('modesel'); } }
       } else if (n.jump && S.ready) {
         const free = sl.findIndex(s => s.type === 'none');
-        if (free >= 0) { sl[free] = this.newCPU(false, free); S.edit = free; Audio8.sfx('confirm'); }
+        if (free >= 0) { sl[free] = this.newCPU(false, free); S.edit = free; S.focus = free; Audio8.sfx('confirm'); }
       } else if (n.grab) {
         for (let i = 3; i >= 0; i--) if (sl[i].type === 'cpu') { sl[i] = { type: 'none' }; Audio8.sfx('back'); break; }
       }
@@ -508,15 +524,18 @@ const APP = {
     }
     // franja de especiales
     const hs = sl.find(s => s.type === 'human');
-    const T = hs && sl[hs.edit] && sl[hs.edit].type !== 'none' ? sl[hs.edit] : null;
+    const hint = this.slotHint(), fsl = hint && hs && hs.focus >= 0 ? sl[hs.focus] : null;
+    const T = fsl && fsl.type !== 'none' ? fsl : hs && sl[hs.edit] && sl[hs.edit].type !== 'none' ? sl[hs.edit] : null;
     const focusId = T ? (T.ready ? T.pick : CHAR_ORDER[T.cur]) : null;
     slab(40, 282, W - 80, 44, { skew: 0.4 });
     if (focusId) {
       const sp = SPECIALS[focusId];
       text(`${CHARS[focusId].blurb}   ·   B: ${sp.n.name}   →B: ${sp.s.name}   ↑B: ${sp.u.name}   ↓B: ${sp.d.name}   ★ ${sp.f.name}`, W / 2, 295, 14, '#e2e8f0', { body: true, weight: 600 });
       const ab = ABILITIES[focusId];
-      if (ab) text(`Habilidad · ${ab.name}: ${ab.desc}`, W / 2, 314, 13, GOLD, { body: true, weight: 600 });
-    } else text('Personaje aleatorio', W / 2, 304, 15, '#e2e8f0', { body: true, weight: 600 });
+      if (hint) text(hint, W / 2, 314, 13, TEAL, { body: true, weight: 700 });
+      else if (ab) text(`Habilidad · ${ab.name}: ${ab.desc}`, W / 2, 314, 13, GOLD, { body: true, weight: 600 });
+    } else if (hint) { text('Lugar libre', W / 2, 295, 14, '#e2e8f0', { body: true, weight: 600 }); text(hint, W / 2, 314, 13, TEAL, { body: true, weight: 700 }); }
+    else text('Personaje aleatorio', W / 2, 304, 15, '#e2e8f0', { body: true, weight: 600 });
     for (let i = 0; i < 4; i++) this.drawSlot(i);
     sfButton(this.screen === 'netroom' ? '‹ Salir' : '‹ Volver', 40, 660, 150, 40, hover(40, 660, 150, 40));
     const allReady = sl.some(s => s.type !== 'none') && sl.every(s => s.type === 'none' || s.ready);
@@ -527,7 +546,11 @@ const APP = {
       slab(-170, -25, 340, 50, { top: '#ffd76a', bottom: '#e0a01a', edge: '#fff3c4' });
       sfText('¡Listos! · Start', 0, 0, 34, INK, { stroke: null });
       ctx.restore();
-    } else text((Net.role === 'host' ? 'Tus amigos aparecen aquí al unirse · ←→ elegir · A confirmar · X/Y agregar CPU · ↑↓ nivel · B cerrar la sala' : '←→ elegir · A confirmar · B volver · X/Y agregar CPU · ↑↓ nivel de la CPU · LB/RB quitar CPU') + (this.teamsOn() ? ' · Escudo: cambiar de equipo' : ''), W / 2, 677, 14, MUTED, { body: true, weight: 500 });
+    } else {
+      const inSlots = sl.some((h, hi) => h.type === 'human' && !h.remote && h.ready && h.edit === hi);
+      text(inSlots ? '←→ moverte entre los lugares · A agregar o cambiar CPU · ↑↓ nivel · LB/RB quitar CPU · B regresar' + (this.teamsOn() ? ' · Escudo: equipo' : '')
+        : (Net.role === 'host' ? 'Tus amigos aparecen aquí al unirse · ←→ elegir · A confirmar · X/Y agregar CPU · ↑↓ nivel · B cerrar la sala' : '←→ elegir · A confirmar · B volver · luego ←→ para agregar CPUs') + (this.teamsOn() ? ' · Escudo: cambiar de equipo' : ''), W / 2, 677, 14, MUTED, { body: true, weight: 500 });
+    }
   },
   drawSlot(i) {
     const r = this.slotRect(i), s = this.slots[i], col = PLAYER_COLORS[i];
@@ -535,6 +558,7 @@ const APP = {
       slab(r.x, r.y, r.w, r.h, { skew: 0.08, top: 'rgba(20,24,34,.6)', bottom: 'rgba(8,10,16,.7)', edge: 'rgba(154,167,184,.25)' });
       sfText(PLAYER_TAGS[i], r.x + r.w / 2, r.y + 100, 70, withAlpha(col, 0.45), { stroke: null });
       text('Pulsa A / J para unirte', r.x + r.w / 2, r.y + 160, 16, '#cbd5e1', { body: true, weight: 600 });
+      if (this.slotFocusers(i).length) { this.drawSlotFocus(i); return; }
       text('X·Y / Espacio: agregar CPU', r.x + r.w / 2, r.y + 186, 14, MUTED, { body: true, weight: 500 });
       text('(o haz clic aquí)', r.x + r.w / 2, r.y + 208, 13, MUTED, { body: true });
       return;
@@ -588,6 +612,31 @@ const APP = {
     const status = s.ready ? '¡Listo!' : (s.type === 'cpu' ? 'Eligiendo CPU…' : 'Eligiendo…');
     slab(r.x + 16, r.y + r.h - 46, r.w - 32, 34, s.ready ? { top: '#34d399', bottom: '#059669', edge: '#a7f3d0' } : {});
     sfText(status, r.x + r.w / 2, r.y + r.h - 29, 26, s.ready ? INK : PAPER, { stroke: s.ready ? null : undefined });
+    this.drawSlotFocus(i);
+  },
+  // quién tiene el cursor de lugares aquí (jugadores de esta pantalla que ya están listos)
+  slotFocusers(i) {
+    if (this.screen !== 'charsel') return [];
+    return this.slots.map((h, hi) => ({ h, hi })).filter(({ h, hi }) => h.type === 'human' && !h.remote && h.ready && h.edit === hi && (h.focus >= 0 ? h.focus : hi) === i);
+  },
+  drawSlotFocus(i) {
+    const who = this.slotFocusers(i); if (!who.length) return;
+    const r = this.slotRect(i), s = this.slots[i], { hi } = who[0], col = PLAYER_COLORS[hi];
+    const own = s === who[0].h;
+    const pulse = reducedMotion ? 0 : Math.sin(this.t * 0.2) * 2;
+    slabPath(r.x - 5 - pulse, r.y - 5 - pulse, r.w + 10 + pulse * 2, r.h + 10 + pulse * 2, 0.08); ctx.lineWidth = 4; ctx.strokeStyle = col; ctx.stroke();
+    slabPath(r.x + r.w / 2 - 34, r.y - 13, 68, 22, 0.3); ctx.fillStyle = col; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.stroke();
+    sfText(who.map(w => PLAYER_TAGS[w.hi]).join(' ') + ' ▼', r.x + r.w / 2, r.y - 2, 17, INK, { stroke: null });
+    if (s.type === 'none') text('A: agregar CPU', r.x + r.w / 2, r.y + 232, 17, GOLD, { body: true, weight: 700 });
+  },
+  // qué hacen los botones con el cursor puesto en ese lugar (va en la franja de arriba)
+  slotHint() {
+    const sl = this.slots, h = sl.find((x, hi) => x.type === 'human' && !x.remote && x.ready && x.edit === hi);
+    if (!h || this.screen !== 'charsel') return null;
+    const f = sl[h.focus >= 0 ? h.focus : sl.indexOf(h)];
+    if (f.type === 'none') return '🎮 A: agregar una CPU aquí  ·  ←→ moverte entre lugares  ·  Start: ¡a pelear!';
+    if (f.type === 'cpu') return '🎮 A: cambiarle personaje  ·  ↑↓ nivel  ·  LB/RB (U): quitarla  ·  ←→ moverte  ·  Start: ¡a pelear!';
+    return '🎮 ←→ para agregar o cambiar CPUs  ·  B: cambiar tu personaje  ·  Start: ¡a pelear!';
   },
 
   // ---------------- ESCENARIOS Y REGLAS ----------------
