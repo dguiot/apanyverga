@@ -11,7 +11,7 @@ const { chromium } = require('/opt/node22/lib/node_modules/playwright');
   await page.evaluate(() => { for (let i = 0; i < 10; i++) step(); APP.firstDev = 'kb1'; APP.slots = [{ type: 'human', dev: 'kb1', cur: 0, ready: false, edit: 0 }, { type: 'none' }, { type: 'none' }, { type: 'none' }]; APP.go('charsel'); for (let i = 0; i < 5; i++) step(); });
   await key('ArrowRight', 2); // flechas mueven al jugador de WASD cuando nadie se unió con ellas
   let s = await st(); ok('las flechas eligen personaje del J1', s.sl[0] === 'human:?2', JSON.stringify(s.sl));
-  await key('KeyJ'); s = await st(); ok('J1 listo', s.sl[0] === 'human:daniel', JSON.stringify(s.sl));
+  await key('KeyJ'); s = await st(); const third = await page.evaluate(() => CHAR_ORDER[2]); ok('J1 listo', s.sl[0] === 'human:' + third, JSON.stringify(s.sl));
   await key('KeyD'); await key('KeyJ'); s = await st();
   ok('→ y A en un lugar vacío agrega una CPU para elegirle personaje', s.sl[1].startsWith('cpu:?') && s.edit === 1, JSON.stringify(s));
   await key('KeyD', 3); await key('KeyW'); await key('KeyJ'); s = await st();

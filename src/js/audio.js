@@ -170,13 +170,18 @@ const Audio8 = {
   // escritas nota por nota. 1 paso = semicorchea. Suenan con sintetizador actual:
   // metales y cuerdas filtrados, guitarra pulsada, bajo redondo y sala de reverberación.
   SONGS: {
+    // "Jarabe Robótico": french house (bombo en cada tiempo, filtro que se abre, todo bombea con el bombo,
+    // bajo que brinca de octava, acordes cortados y voz de robot) con mariachi encima: trompetas en terceras,
+    // violines, rasgueo de vihuela y su ¡ajúa!. Composición original, solo "al estilo".
     menu: {
-      title: 'El Golpazo', gain: 1.1, style: 'polka', bar: 8, sp: 0.1136, key: 'G', lead: 'trumpet', harm: true, grito: [[7, 2]],
-      chords: 'G G D7 D | G Am/D7 Gmaj7 G | C G Am/D7 D7 | G C D7 G',
-      mel: `D5:1 E5:1 F#5:2 G5:4 | D5:2 B4:2 G4:4 | E5:1 F#5:1 G5:2 A5:4 | F#5:2 D5:2 A4:4 |
-            B4:1 C5:1 D5:2 G5:2 F#5:2 | E5:2 C5:2 A4:2 F#4:2 | G4:2 B4:2 D5:2 F#5:2 | G5:2 r:6 |
-            G5:1 F#5:1 E5:1 D5:1 E5:2 C5:2 | B4:1 C5:1 D5:2 G4:4 | A4:1 B4:1 C5:2 E5:2 D5:2 | F#5:2 A5:2 D5:4 |
-            D5:1 E5:1 F#5:2 G5:4 | B5:2 A5:2 G5:2 E5:2 | D5:2 F#5:2 A5:2 C6:2 | B5:4 G5:2 r:2`,
+      title: 'Jarabe Robótico', gain: 1.15, style: 'house', bar: 16, sp: 0.0984, key: 'Aeo', lead: 'robo', pump: 0.42, grito: [[8, 0]],
+      filter: [420, 650, 1100, 2000, 20000, 20000, 20000, 20000, 20000, 20000, 20000, 20000, 20000, 20000, 20000, 20000],
+      secs: [{ from: 4, to: 8, lead: 'robo', harm: false }, { from: 8, to: 12, lead: 'trumpet', harm: true }, { from: 12, to: 16, lead: 'violin', harm: true }],
+      chords: 'Am F C G',
+      mel: `r:16 | r:16 | r:16 | r:16 |
+            A4:3 C5:3 E5:2 D5:2 C5:2 A4:4 | r:2 A4:2 C5:2 F5:3 E5:3 C5:4 | G4:3 C5:3 E5:2 G5:4 E5:2 D5:2 | D5:3 B4:3 G4:2 B4:2 D5:2 r:4 |
+            E5:2 A5:2 C6:4 B5:2 A5:2 E5:4 | F5:2 A5:2 C6:3 A5:1 G5:2 F5:2 A5:4 | E5:2 G5:2 C6:4 D6:2 C6:2 G5:4 | B5:2 A5:2 G5:2 D5:2 G5:4 B5:4 |
+            A5:6 G5:2 E5:4 C5:4 | F5:6 E5:2 C5:4 A4:4 | G5:4 E5:2 G5:2 C6:4 B5:4 | D6:4 B5:2 G5:2 A5:8`,
     },
     son: {
       title: 'Son del Golpazo', gain: 1.2, style: 'son', bar: 12, sp: 0.1, key: 'D', lead: 'trumpet', harm: true, up: 2, grito: [[7, 8]],
@@ -230,7 +235,7 @@ const Audio8 = {
             E5:4 D5:2 C5:2 G4:8 | A4:4 C5:4 F5:4 E5:4 | D5:4 G5:4 F5:2 E5:2 D5:4 | C5:12 r:4`,
     },
   },
-  BATTLE_SONGS: ['son', 'ranchera', 'balada', 'huapango', 'vals'],
+  BATTLE_SONGS: ['menu', 'son', 'ranchera', 'balada', 'huapango', 'vals'],
   TEMPO: 1.25, // más lento que antes: se oye la melodía y no cansa
   // Acompañamiento por estilo: paso del compás → golpes. B raíz, F quinta, O octava,
   // X raíz/quinta alternando por compás, S rasgueo, P colchón, A arpegio,
@@ -243,8 +248,26 @@ const Audio8 = {
     huapango: [{ 0: 'B S z', 3: 'S', 6: 'F S z', 8: 'S', 10: 'S z' }],
     waltz: [{ 0: 'X', 4: 'S h', 8: 'S h' }],
     march: [{ 0: 'B K', 4: 'S h', 8: 'F K', 12: 'S h', 14: 'N' }],
+    // Q bajo con "chirrido" (raíz) · W su octava · T acorde cortado · R subida de ruido · S rasgueo de vihuela
+    house: Array.from({ length: 16 }, (_, b) => {
+      const pat = {}, add = (st, code) => { pat[st] = pat[st] ? pat[st] + ' ' + code : code; };
+      const full = b >= 2, claps = b >= 4, vihuela = b >= 8;
+      for (let st = 0; st < 16; st++) {
+        if (st % 4 === 0) add(st, 'K');
+        if (st % 2 === 1) add(st, 'h');
+        if (full && st % 4 === 2) add(st, 'H');
+        if (claps && (st === 4 || st === 12)) add(st, 'C');
+        if ([0, 3, 4, 8, 10, 12].includes(st)) add(st, 'Q');
+        if ([6, 11, 14].includes(st)) add(st, 'W');
+        if (full && st % 4 === 2) add(st, 'T');
+        if (vihuela && st % 4 === 3) add(st, 'S');
+      }
+      if (b === 3 || b === 7) add(0, 'R');
+      if (b === 15) { add(13, 'N'); add(14, 'N'); add(15, 'N'); }
+      return pat;
+    }),
   },
-  KEYS: { G: [7, 'maj'], D: [2, 'maj'], F: [5, 'maj'], A: [9, 'maj'], C: [0, 'maj'], Am: [9, 'min'] },
+  KEYS: { G: [7, 'maj'], D: [2, 'maj'], F: [5, 'maj'], A: [9, 'maj'], C: [0, 'maj'], Am: [9, 'min'], Aeo: [9, 'aeo'] },
   midi(nm) {
     const m = /^([A-G])(#|b)?(\d)$/.exec(nm);
     if (!m) throw new Error('nota inválida ' + nm);
@@ -261,7 +284,7 @@ const Audio8 = {
   harmOf(n, ch, key, dur) {
     if (dur >= 2) for (const iv of [3, 4, 5]) if (ch.pcs.includes((n - iv + 120) % 12)) return n - iv;
     const [kr, mode] = this.KEYS[key];
-    const sc = (mode === 'min' ? [0, 2, 3, 5, 7, 8, 11] : [0, 2, 4, 5, 7, 9, 11]).map(x => (x + kr) % 12);
+    const sc = (mode === 'min' ? [0, 2, 3, 5, 7, 8, 11] : mode === 'aeo' ? [0, 2, 3, 5, 7, 8, 10] : [0, 2, 4, 5, 7, 9, 11]).map(x => (x + kr) % 12);
     const i = sc.indexOf(n % 12);
     if (i < 0) return n - 3;
     return n - ((sc[i] - sc[(i + 5) % 7] + 12) % 12);
@@ -296,6 +319,10 @@ const Audio8 = {
           else if (code === 'F' || code === 'X') e.push({ v: 'bass', n: bass(c.root + 7), d: 2 });
           else if (code === 'O') e.push({ v: 'bass', n: bass(c.root) + 12, d: 1 });
           else if (code === 'S') e.push({ v: 'strum', ch: c });
+          else if (code === 'Q') e.push({ v: 'sqb', n: bass(c.root), d: 1 });
+          else if (code === 'W') e.push({ v: 'sqb', n: bass(c.root) + 12, d: 1 });
+          else if (code === 'T') e.push({ v: 'stab', ch: c });
+          else if (code === 'R') e.push({ v: 'riser', d: L });
           else if (code === 'P') {
             e.push({ v: 'pad', ch: ch[0], d: split ? L / 2 : L });
             if (split) ev[b * L + L / 2].push({ v: 'pad', ch: ch[1], d: L / 2 });
@@ -324,6 +351,10 @@ const Audio8 = {
     lp.type = 'lowpass'; lp.frequency.value = 4600; lp.Q.value = 0.5;
     shelf.type = 'highshelf'; shelf.frequency.value = 3200; shelf.gain.value = -4;
     lp.connect(shelf); shelf.connect(sg);
+    // lo melódico: volumen que bombea con el bombo y filtro que se abre (french house); la batería no pasa por ahí
+    const melo = c.createGain(), sweep = c.createBiquadFilter();
+    sweep.type = 'lowpass'; sweep.frequency.value = 20000; sweep.Q.value = 1.1;
+    melo.connect(sweep); sweep.connect(lp);
     // eco para la balada
     const send = c.createGain(), dl = c.createDelay(1), fb = c.createGain(), wet = c.createGain();
     dl.delayTime.value = 0.3; fb.gain.value = 0.28; wet.gain.value = 0.4;
@@ -332,7 +363,7 @@ const Audio8 = {
     const rev = c.createGain(), conv = c.createConvolver(), rwet = c.createGain();
     conv.buffer = this.irBuffer(2.4); rwet.gain.value = 0.55;
     rev.connect(conv); conv.connect(rwet); rwet.connect(shelf);
-    return (this._bus = { ctx: c, input: lp, send, rev, delay: dl, song: sg });
+    return (this._bus = { ctx: c, input: melo, drums: lp, melo, sweep, send, rev, delay: dl, song: sg });
   },
   irBuffer(secs) {
     if (this._ir && this._ir.ctx === this.ctx) return this._ir.buf;
@@ -378,10 +409,25 @@ const Audio8 = {
     for (const osc of oscs) { osc.start(t); osc.stop(t + dur + rel + 0.05); }
   },
   // compatibilidad: el nombre viejo sigue sirviendo
+  robo(f, t, dur, vol) {
+    const c = this.ctx, bus = this.musBus();
+    const o1 = c.createOscillator(), o2 = c.createOscillator(), mix = c.createGain(), g = c.createGain();
+    o1.type = 'sawtooth'; o2.type = 'square'; o2.detune.value = 9;
+    for (const o of [o1, o2]) { o.frequency.setValueAtTime(f * 0.94, t); o.frequency.exponentialRampToValueAtTime(f, t + 0.045); }
+    const g2 = c.createGain(); g2.gain.value = 0.55; o1.connect(mix); o2.connect(g2); g2.connect(mix);
+    const open = t + Math.min(0.14, dur * 0.5);
+    const form = (a, b, q, amt) => { const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = q; bp.frequency.setValueAtTime(a, t); bp.frequency.linearRampToValueAtTime(b, open); const k = c.createGain(); k.gain.value = amt; mix.connect(bp); bp.connect(k); k.connect(g); };
+    form(360, 760, 6, 1); form(950, 1250, 8, 0.8); form(2500, 2700, 9, 0.35);
+    // vibrato después del ataque
+    if (dur > 0.2) { const lfo = c.createOscillator(), lg = c.createGain(); lfo.frequency.value = 5.6; lg.gain.setValueAtTime(0, t); lg.gain.linearRampToValueAtTime(f * 0.012, t + dur); lfo.connect(lg); lg.connect(o1.frequency); lg.connect(o2.frequency); lfo.start(t); lfo.stop(t + dur + 0.1); }
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + 0.012); g.gain.setValueAtTime(vol, t + dur); g.gain.linearRampToValueAtTime(0.0001, t + dur + 0.06);
+    g.connect(bus.input); const r = c.createGain(); r.gain.value = 0.18; g.connect(r); r.connect(bus.rev);
+    o1.start(t); o2.start(t); o1.stop(t + dur + 0.1); o2.stop(t + dur + 0.1);
+  },
   note(wave, f, t, dur, vol, o = {}) { this.syn(f, t, dur, vol, Object.assign({ waves: [[typeof wave === 'number' ? 'triangle' : wave, 0, 1]] }, o)); },
   voice(e, when, sp, tr) {
     const t = this.ctx.currentTime + when, hz = n => 440 * Math.pow(2, (n + tr - 69) / 12);
-    const mg = this.musBus().input, dur = (e.d || 1) * sp, h = !!e.h;
+    const mg = this.musBus().drums, dur = (e.d || 1) * sp, h = !!e.h;
     switch (e.v) {
       // metales suaves: dos sierras desafinadas con el filtro que abre al atacar
       case 'trumpet': this.syn(hz(e.n), t, dur * 0.92, h ? 0.05 : 0.085, { cut: 2200, cutK: 3.2, cutPeak: 1.8, cutT: 0.14, att: 0.025, dec: 0.12, sus: 0.72, rel: 0.12, scoop: h ? 0 : 0.02, vib: 0.009, rev: 0.28 }); break;
@@ -399,12 +445,45 @@ const Audio8 = {
         ns.sort((a, b) => a - b).forEach((n, i) => this.syn(hz(n), t + i * 0.014, sp * 0.9, 0.032, { waves: [['sawtooth', 0, 0.6], ['triangle', 0, 0.6]], cut: 520, cutK: 9, cutPeak: 5, cutT: 0.12, att: 0.003, dec: 0.12, sus: 0.25, rel: 0.1, rev: 0.2 }));
         break;
       }
+      // voz de robot (talkbox): sierra y cuadrada por dos formantes que se abren de "u" a "a"
+      case 'robo': this.robo(hz(e.n), t, dur * 0.9, 0.15); break;
+      // bajo con chirrido: el filtro resonante se cierra rápido
+      case 'sqb': {
+        const c = this.ctx, o = c.createOscillator(), sub = c.createOscillator(), f = c.createBiquadFilter(), g = c.createGain(), fr = hz(e.n), d2 = Math.max(0.09, sp * 1.6);
+        o.type = 'sawtooth'; o.frequency.setValueAtTime(fr, t); sub.type = 'sine'; sub.frequency.setValueAtTime(fr, t);
+        f.type = 'lowpass'; f.Q.value = 9; f.frequency.setValueAtTime(1900, t); f.frequency.exponentialRampToValueAtTime(240, t + 0.13);
+        g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.3, t + 0.004); g.gain.exponentialRampToValueAtTime(0.0008, t + d2);
+        const sg2 = c.createGain(); sg2.gain.value = 0.9;
+        o.connect(f); f.connect(g); sub.connect(sg2); sg2.connect(g); g.connect(this.musBus().input);
+        o.start(t); sub.start(t); o.stop(t + d2 + 0.03); sub.stop(t + d2 + 0.03);
+        break;
+      }
+      // acorde cortado de metales y cuerdas, como muestra de disco recortada
+      case 'stab': {
+        const ns = e.ch.pcs.map(pc => 60 + ((pc - 60 % 12 + 12) % 12)).sort((a, b) => a - b);
+        for (const n of ns) this.syn(hz(n), t, sp * 0.8, 0.058, { waves: [['sawtooth', -7, 0.5], ['sawtooth', 7, 0.5]], cut: 3200, cutK: 5, cutPeak: 2, cutT: 0.06, att: 0.003, dec: 0.06, sus: 0.45, rel: 0.06, rev: 0.15 });
+        break;
+      }
+      // subida de ruido al final de una sección
+      case 'riser': {
+        const c = this.ctx, s = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain(), d2 = dur;
+        s.buffer = this.noiseBuf; s.loop = true; f.type = 'bandpass'; f.Q.value = 1.4;
+        f.frequency.setValueAtTime(500, t); f.frequency.exponentialRampToValueAtTime(7000, t + d2);
+        g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.05, t + d2 * 0.95); g.gain.linearRampToValueAtTime(0.0001, t + d2);
+        s.connect(f); f.connect(g); g.connect(this.musBus().drums); s.start(t); s.stop(t + d2 + 0.02);
+        break;
+      }
       case 'pad': for (const pc of e.ch.pcs) this.syn(hz(55 + ((pc - 55 % 12 + 12) % 12)), t, dur * 0.98, 0.02, { cut: 1100, att: 0.35, dec: 0.4, sus: 0.85, rel: 0.5, rev: 0.6 }); break;
       case 'drum': {
         const rev = this.musBus().rev;
         const wet = amt => { const g = this.ctx.createGain(); g.gain.value = amt; g.connect(rev); return g; };
         switch (e.k) {
-          case 'K': this.tone('sine', 110, 42, 0.18, 0.5, when, mg); this.noise(0.012, 0.08, 3000, 0.8, when, 'bandpass', mg); break;
+          case 'K': {
+            this.tone('sine', 110, 42, 0.18, 0.5, when, mg); this.noise(0.012, 0.08, 3000, 0.8, when, 'bandpass', mg);
+            const pump = this.song && this.song.def.pump;
+            if (pump) { const g = this.musBus().melo.gain; g.cancelScheduledValues(t); g.setValueAtTime(1 - pump, t); g.linearRampToValueAtTime(1, t + sp * 3.4); }
+            break;
+          }
           case 'k': this.tone('sine', 100, 45, 0.12, 0.28, when, mg); break;
           case 'N': this.noise(0.12, 0.16, 1900, 0.8, when, 'bandpass', mg); this.noise(0.14, 0.08, 1900, 0.8, when, 'bandpass', wet(0.5)); this.tone('triangle', 190, 160, 0.06, 0.12, when, mg); break;
           case 'G': this.noise(0.18, 0.15, 1500, 0.7, when, 'bandpass', mg); this.noise(0.25, 0.1, 1500, 0.7, when, 'bandpass', wet(0.6)); break;
@@ -442,6 +521,8 @@ const Audio8 = {
       const bus = this.musBus(), d = this.song.def, t = this.ctx.currentTime;
       bus.delay.delayTime.setValueAtTime(Math.min(0.9, d.echo ? d.echo * d.sp * this.TEMPO : 0.3), t);
       bus.song.gain.setValueAtTime(d.gain || 1, t);
+      bus.sweep.frequency.cancelScheduledValues(t); bus.sweep.frequency.setValueAtTime(d.filter ? d.filter[0] : 20000, t);
+      bus.melo.gain.cancelScheduledValues(t); bus.melo.gain.setValueAtTime(1, t);
     }
   },
   // Pelea: una canción al azar (nunca la misma que la anterior); al terminar sigue otra.
@@ -475,8 +556,14 @@ const Audio8 = {
   },
   playStep(i, when, sp) {
     const S = this.song;
-    for (const e of S.ev[i]) this.voice(e, when, sp, S.tr);
     const L = S.def.bar;
+    // filtro que se abre compás a compás (y se queda abierto cuando llega al tope)
+    if (S.def.filter && i % L === 0) {
+      const b = i / L, F = S.def.filter, cur = F[b % F.length], nxt = F[(b + 1) % F.length], fq = this.musBus().sweep.frequency, t = this.ctx.currentTime + when;
+      fq.cancelScheduledValues(t); fq.setValueAtTime(cur, t);
+      if (nxt > cur) fq.exponentialRampToValueAtTime(nxt, t + L * sp);
+    }
+    for (const e of S.ev[i]) this.voice(e, when, sp, S.tr);
     if (S.def.grito && S.pass % 3 === 0) for (const [b, st] of S.def.grito) if (i === b * L + st) this.grito(when);
   },
 };

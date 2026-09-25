@@ -11,6 +11,20 @@
   /* videos de cámara y voz: ocultos, el juego los dibuja en el marcador */
   #av { position: fixed; left: 0; bottom: 0; width: 2px; height: 2px; overflow: hidden; opacity: 0.01; pointer-events: none; }
   #av video { width: 2px; height: 2px; }
+  /* ventanita de invitar a la sala */
+  #invite { position: fixed; inset: 0; z-index: 8; display: flex; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box; background: rgba(6,10,18,.72); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); font-family: 'Barlow', system-ui, sans-serif; }
+  #invite .inv-card { width: min(460px, 100%); box-sizing: border-box; padding: 20px 20px 18px; border-radius: 20px; background: #0f1624; border: 1px solid #2ec4b6; box-shadow: 0 18px 50px rgba(0,0,0,.55); color: #f4f6fa; }
+  #invite .inv-t { font: 800 26px/1.1 'Barlow Condensed', 'Barlow', system-ui, sans-serif; letter-spacing: .02em; text-transform: uppercase; }
+  #invite .inv-code { margin: 10px 0 12px; color: #cbd5e1; font-weight: 600; font-size: 15px; }
+  #invite .inv-code b { margin-left: 6px; color: #ffc53d; font: 800 24px 'Barlow Condensed', 'Barlow', system-ui, sans-serif; letter-spacing: .12em; }
+  #invite .inv-url { width: 100%; box-sizing: border-box; min-width: 0; padding: 12px 14px; border-radius: 12px; border: 1px solid #2a3547; background: #0b0f18; color: #f4f6fa; font: 600 15px 'Barlow', system-ui, sans-serif; text-overflow: ellipsis; }
+  #invite .inv-help { margin: 0; color: #e2e8f0; font-size: 15px; line-height: 1.4; }
+  #invite .inv-ok { min-height: 20px; margin: 10px 0 12px; color: #34d399; font-weight: 700; font-size: 14px; }
+  #invite .inv-ok.bad { color: #ffc53d; }
+  #invite .inv-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+  #invite .inv-btns button, #invite .inv-btns a { flex: 1 1 auto; min-width: 0; text-align: center; text-decoration: none; cursor: pointer; border-radius: 999px; border: 1px solid #2a3547; background: #161e2c; color: #f4f6fa; font: 700 15px 'Barlow', system-ui, sans-serif; padding: 11px 16px; white-space: nowrap; }
+  #invite .inv-btns .inv-main { background: #2ec4b6; border-color: #2ec4b6; color: #062a26; }
+  #invite .inv-btns button:focus-visible, #invite .inv-btns a:focus-visible { outline: 3px solid #ffc53d; outline-offset: 2px; }
   /* aviso de pantalla completa en iPhone */
   #iosfs { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); transform: translateX(-50%); z-index: 7; display: flex; align-items: center; gap: 10px; max-width: calc(100vw - 24px); box-sizing: border-box; padding: 10px 12px 10px 16px; border-radius: 16px; background: rgba(11,15,24,.94); border: 1px solid #2ec4b6; color: #f4f6fa; font: 600 14px/1.3 'Barlow', system-ui, sans-serif; box-shadow: 0 6px 24px rgba(0,0,0,.5); }
   #iosfs b { color: #ffc53d; }
@@ -35,6 +49,7 @@
 <script src="js/characters3.js"></script>
 <script src="js/movekits.js"></script>
 <script src="js/torero.js"></script>
+<script src="js/jarocho.js"></script>
 <script src="js/balance.js"></script>
 <script src="js/stages.js"></script>
 <script src="js/stages2.js"></script>

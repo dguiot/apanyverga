@@ -63,6 +63,20 @@
   /* videos de cámara y voz: ocultos, el juego los dibuja en el marcador */
   #av { position: fixed; left: 0; bottom: 0; width: 2px; height: 2px; overflow: hidden; opacity: 0.01; pointer-events: none; }
   #av video { width: 2px; height: 2px; }
+  /* ventanita de invitar a la sala */
+  #invite { position: fixed; inset: 0; z-index: 8; display: flex; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box; background: rgba(6,10,18,.72); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); font-family: 'Barlow', system-ui, sans-serif; }
+  #invite .inv-card { width: min(460px, 100%); box-sizing: border-box; padding: 20px 20px 18px; border-radius: 20px; background: #0f1624; border: 1px solid #2ec4b6; box-shadow: 0 18px 50px rgba(0,0,0,.55); color: #f4f6fa; }
+  #invite .inv-t { font: 800 26px/1.1 'Barlow Condensed', 'Barlow', system-ui, sans-serif; letter-spacing: .02em; text-transform: uppercase; }
+  #invite .inv-code { margin: 10px 0 12px; color: #cbd5e1; font-weight: 600; font-size: 15px; }
+  #invite .inv-code b { margin-left: 6px; color: #ffc53d; font: 800 24px 'Barlow Condensed', 'Barlow', system-ui, sans-serif; letter-spacing: .12em; }
+  #invite .inv-url { width: 100%; box-sizing: border-box; min-width: 0; padding: 12px 14px; border-radius: 12px; border: 1px solid #2a3547; background: #0b0f18; color: #f4f6fa; font: 600 15px 'Barlow', system-ui, sans-serif; text-overflow: ellipsis; }
+  #invite .inv-help { margin: 0; color: #e2e8f0; font-size: 15px; line-height: 1.4; }
+  #invite .inv-ok { min-height: 20px; margin: 10px 0 12px; color: #34d399; font-weight: 700; font-size: 14px; }
+  #invite .inv-ok.bad { color: #ffc53d; }
+  #invite .inv-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+  #invite .inv-btns button, #invite .inv-btns a { flex: 1 1 auto; min-width: 0; text-align: center; text-decoration: none; cursor: pointer; border-radius: 999px; border: 1px solid #2a3547; background: #161e2c; color: #f4f6fa; font: 700 15px 'Barlow', system-ui, sans-serif; padding: 11px 16px; white-space: nowrap; }
+  #invite .inv-btns .inv-main { background: #2ec4b6; border-color: #2ec4b6; color: #062a26; }
+  #invite .inv-btns button:focus-visible, #invite .inv-btns a:focus-visible { outline: 3px solid #ffc53d; outline-offset: 2px; }
   /* aviso de pantalla completa en iPhone */
   #iosfs { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); transform: translateX(-50%); z-index: 7; display: flex; align-items: center; gap: 10px; max-width: calc(100vw - 24px); box-sizing: border-box; padding: 10px 12px 10px 16px; border-radius: 16px; background: rgba(11,15,24,.94); border: 1px solid #2ec4b6; color: #f4f6fa; font: 600 14px/1.3 'Barlow', system-ui, sans-serif; box-shadow: 0 6px 24px rgba(0,0,0,.5); }
   #iosfs b { color: #ffc53d; }
@@ -1554,13 +1568,18 @@ const Audio8 = {
   // escritas nota por nota. 1 paso = semicorchea. Suenan con sintetizador actual:
   // metales y cuerdas filtrados, guitarra pulsada, bajo redondo y sala de reverberación.
   SONGS: {
+    // "Jarabe Robótico": french house (bombo en cada tiempo, filtro que se abre, todo bombea con el bombo,
+    // bajo que brinca de octava, acordes cortados y voz de robot) con mariachi encima: trompetas en terceras,
+    // violines, rasgueo de vihuela y su ¡ajúa!. Composición original, solo "al estilo".
     menu: {
-      title: 'El Golpazo', gain: 1.1, style: 'polka', bar: 8, sp: 0.1136, key: 'G', lead: 'trumpet', harm: true, grito: [[7, 2]],
-      chords: 'G G D7 D | G Am/D7 Gmaj7 G | C G Am/D7 D7 | G C D7 G',
-      mel: `D5:1 E5:1 F#5:2 G5:4 | D5:2 B4:2 G4:4 | E5:1 F#5:1 G5:2 A5:4 | F#5:2 D5:2 A4:4 |
-            B4:1 C5:1 D5:2 G5:2 F#5:2 | E5:2 C5:2 A4:2 F#4:2 | G4:2 B4:2 D5:2 F#5:2 | G5:2 r:6 |
-            G5:1 F#5:1 E5:1 D5:1 E5:2 C5:2 | B4:1 C5:1 D5:2 G4:4 | A4:1 B4:1 C5:2 E5:2 D5:2 | F#5:2 A5:2 D5:4 |
-            D5:1 E5:1 F#5:2 G5:4 | B5:2 A5:2 G5:2 E5:2 | D5:2 F#5:2 A5:2 C6:2 | B5:4 G5:2 r:2`,
+      title: 'Jarabe Robótico', gain: 1.15, style: 'house', bar: 16, sp: 0.0984, key: 'Aeo', lead: 'robo', pump: 0.42, grito: [[8, 0]],
+      filter: [420, 650, 1100, 2000, 20000, 20000, 20000, 20000, 20000, 20000, 20000, 20000, 20000, 20000, 20000, 20000],
+      secs: [{ from: 4, to: 8, lead: 'robo', harm: false }, { from: 8, to: 12, lead: 'trumpet', harm: true }, { from: 12, to: 16, lead: 'violin', harm: true }],
+      chords: 'Am F C G',
+      mel: `r:16 | r:16 | r:16 | r:16 |
+            A4:3 C5:3 E5:2 D5:2 C5:2 A4:4 | r:2 A4:2 C5:2 F5:3 E5:3 C5:4 | G4:3 C5:3 E5:2 G5:4 E5:2 D5:2 | D5:3 B4:3 G4:2 B4:2 D5:2 r:4 |
+            E5:2 A5:2 C6:4 B5:2 A5:2 E5:4 | F5:2 A5:2 C6:3 A5:1 G5:2 F5:2 A5:4 | E5:2 G5:2 C6:4 D6:2 C6:2 G5:4 | B5:2 A5:2 G5:2 D5:2 G5:4 B5:4 |
+            A5:6 G5:2 E5:4 C5:4 | F5:6 E5:2 C5:4 A4:4 | G5:4 E5:2 G5:2 C6:4 B5:4 | D6:4 B5:2 G5:2 A5:8`,
     },
     son: {
       title: 'Son del Golpazo', gain: 1.2, style: 'son', bar: 12, sp: 0.1, key: 'D', lead: 'trumpet', harm: true, up: 2, grito: [[7, 8]],
@@ -1614,7 +1633,7 @@ const Audio8 = {
             E5:4 D5:2 C5:2 G4:8 | A4:4 C5:4 F5:4 E5:4 | D5:4 G5:4 F5:2 E5:2 D5:4 | C5:12 r:4`,
     },
   },
-  BATTLE_SONGS: ['son', 'ranchera', 'balada', 'huapango', 'vals'],
+  BATTLE_SONGS: ['menu', 'son', 'ranchera', 'balada', 'huapango', 'vals'],
   TEMPO: 1.25, // más lento que antes: se oye la melodía y no cansa
   // Acompañamiento por estilo: paso del compás → golpes. B raíz, F quinta, O octava,
   // X raíz/quinta alternando por compás, S rasgueo, P colchón, A arpegio,
@@ -1627,8 +1646,26 @@ const Audio8 = {
     huapango: [{ 0: 'B S z', 3: 'S', 6: 'F S z', 8: 'S', 10: 'S z' }],
     waltz: [{ 0: 'X', 4: 'S h', 8: 'S h' }],
     march: [{ 0: 'B K', 4: 'S h', 8: 'F K', 12: 'S h', 14: 'N' }],
+    // Q bajo con "chirrido" (raíz) · W su octava · T acorde cortado · R subida de ruido · S rasgueo de vihuela
+    house: Array.from({ length: 16 }, (_, b) => {
+      const pat = {}, add = (st, code) => { pat[st] = pat[st] ? pat[st] + ' ' + code : code; };
+      const full = b >= 2, claps = b >= 4, vihuela = b >= 8;
+      for (let st = 0; st < 16; st++) {
+        if (st % 4 === 0) add(st, 'K');
+        if (st % 2 === 1) add(st, 'h');
+        if (full && st % 4 === 2) add(st, 'H');
+        if (claps && (st === 4 || st === 12)) add(st, 'C');
+        if ([0, 3, 4, 8, 10, 12].includes(st)) add(st, 'Q');
+        if ([6, 11, 14].includes(st)) add(st, 'W');
+        if (full && st % 4 === 2) add(st, 'T');
+        if (vihuela && st % 4 === 3) add(st, 'S');
+      }
+      if (b === 3 || b === 7) add(0, 'R');
+      if (b === 15) { add(13, 'N'); add(14, 'N'); add(15, 'N'); }
+      return pat;
+    }),
   },
-  KEYS: { G: [7, 'maj'], D: [2, 'maj'], F: [5, 'maj'], A: [9, 'maj'], C: [0, 'maj'], Am: [9, 'min'] },
+  KEYS: { G: [7, 'maj'], D: [2, 'maj'], F: [5, 'maj'], A: [9, 'maj'], C: [0, 'maj'], Am: [9, 'min'], Aeo: [9, 'aeo'] },
   midi(nm) {
     const m = /^([A-G])(#|b)?(\d)$/.exec(nm);
     if (!m) throw new Error('nota inválida ' + nm);
@@ -1645,7 +1682,7 @@ const Audio8 = {
   harmOf(n, ch, key, dur) {
     if (dur >= 2) for (const iv of [3, 4, 5]) if (ch.pcs.includes((n - iv + 120) % 12)) return n - iv;
     const [kr, mode] = this.KEYS[key];
-    const sc = (mode === 'min' ? [0, 2, 3, 5, 7, 8, 11] : [0, 2, 4, 5, 7, 9, 11]).map(x => (x + kr) % 12);
+    const sc = (mode === 'min' ? [0, 2, 3, 5, 7, 8, 11] : mode === 'aeo' ? [0, 2, 3, 5, 7, 8, 10] : [0, 2, 4, 5, 7, 9, 11]).map(x => (x + kr) % 12);
     const i = sc.indexOf(n % 12);
     if (i < 0) return n - 3;
     return n - ((sc[i] - sc[(i + 5) % 7] + 12) % 12);
@@ -1680,6 +1717,10 @@ const Audio8 = {
           else if (code === 'F' || code === 'X') e.push({ v: 'bass', n: bass(c.root + 7), d: 2 });
           else if (code === 'O') e.push({ v: 'bass', n: bass(c.root) + 12, d: 1 });
           else if (code === 'S') e.push({ v: 'strum', ch: c });
+          else if (code === 'Q') e.push({ v: 'sqb', n: bass(c.root), d: 1 });
+          else if (code === 'W') e.push({ v: 'sqb', n: bass(c.root) + 12, d: 1 });
+          else if (code === 'T') e.push({ v: 'stab', ch: c });
+          else if (code === 'R') e.push({ v: 'riser', d: L });
           else if (code === 'P') {
             e.push({ v: 'pad', ch: ch[0], d: split ? L / 2 : L });
             if (split) ev[b * L + L / 2].push({ v: 'pad', ch: ch[1], d: L / 2 });
@@ -1708,6 +1749,10 @@ const Audio8 = {
     lp.type = 'lowpass'; lp.frequency.value = 4600; lp.Q.value = 0.5;
     shelf.type = 'highshelf'; shelf.frequency.value = 3200; shelf.gain.value = -4;
     lp.connect(shelf); shelf.connect(sg);
+    // lo melódico: volumen que bombea con el bombo y filtro que se abre (french house); la batería no pasa por ahí
+    const melo = c.createGain(), sweep = c.createBiquadFilter();
+    sweep.type = 'lowpass'; sweep.frequency.value = 20000; sweep.Q.value = 1.1;
+    melo.connect(sweep); sweep.connect(lp);
     // eco para la balada
     const send = c.createGain(), dl = c.createDelay(1), fb = c.createGain(), wet = c.createGain();
     dl.delayTime.value = 0.3; fb.gain.value = 0.28; wet.gain.value = 0.4;
@@ -1716,7 +1761,7 @@ const Audio8 = {
     const rev = c.createGain(), conv = c.createConvolver(), rwet = c.createGain();
     conv.buffer = this.irBuffer(2.4); rwet.gain.value = 0.55;
     rev.connect(conv); conv.connect(rwet); rwet.connect(shelf);
-    return (this._bus = { ctx: c, input: lp, send, rev, delay: dl, song: sg });
+    return (this._bus = { ctx: c, input: melo, drums: lp, melo, sweep, send, rev, delay: dl, song: sg });
   },
   irBuffer(secs) {
     if (this._ir && this._ir.ctx === this.ctx) return this._ir.buf;
@@ -1762,10 +1807,25 @@ const Audio8 = {
     for (const osc of oscs) { osc.start(t); osc.stop(t + dur + rel + 0.05); }
   },
   // compatibilidad: el nombre viejo sigue sirviendo
+  robo(f, t, dur, vol) {
+    const c = this.ctx, bus = this.musBus();
+    const o1 = c.createOscillator(), o2 = c.createOscillator(), mix = c.createGain(), g = c.createGain();
+    o1.type = 'sawtooth'; o2.type = 'square'; o2.detune.value = 9;
+    for (const o of [o1, o2]) { o.frequency.setValueAtTime(f * 0.94, t); o.frequency.exponentialRampToValueAtTime(f, t + 0.045); }
+    const g2 = c.createGain(); g2.gain.value = 0.55; o1.connect(mix); o2.connect(g2); g2.connect(mix);
+    const open = t + Math.min(0.14, dur * 0.5);
+    const form = (a, b, q, amt) => { const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = q; bp.frequency.setValueAtTime(a, t); bp.frequency.linearRampToValueAtTime(b, open); const k = c.createGain(); k.gain.value = amt; mix.connect(bp); bp.connect(k); k.connect(g); };
+    form(360, 760, 6, 1); form(950, 1250, 8, 0.8); form(2500, 2700, 9, 0.35);
+    // vibrato después del ataque
+    if (dur > 0.2) { const lfo = c.createOscillator(), lg = c.createGain(); lfo.frequency.value = 5.6; lg.gain.setValueAtTime(0, t); lg.gain.linearRampToValueAtTime(f * 0.012, t + dur); lfo.connect(lg); lg.connect(o1.frequency); lg.connect(o2.frequency); lfo.start(t); lfo.stop(t + dur + 0.1); }
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + 0.012); g.gain.setValueAtTime(vol, t + dur); g.gain.linearRampToValueAtTime(0.0001, t + dur + 0.06);
+    g.connect(bus.input); const r = c.createGain(); r.gain.value = 0.18; g.connect(r); r.connect(bus.rev);
+    o1.start(t); o2.start(t); o1.stop(t + dur + 0.1); o2.stop(t + dur + 0.1);
+  },
   note(wave, f, t, dur, vol, o = {}) { this.syn(f, t, dur, vol, Object.assign({ waves: [[typeof wave === 'number' ? 'triangle' : wave, 0, 1]] }, o)); },
   voice(e, when, sp, tr) {
     const t = this.ctx.currentTime + when, hz = n => 440 * Math.pow(2, (n + tr - 69) / 12);
-    const mg = this.musBus().input, dur = (e.d || 1) * sp, h = !!e.h;
+    const mg = this.musBus().drums, dur = (e.d || 1) * sp, h = !!e.h;
     switch (e.v) {
       // metales suaves: dos sierras desafinadas con el filtro que abre al atacar
       case 'trumpet': this.syn(hz(e.n), t, dur * 0.92, h ? 0.05 : 0.085, { cut: 2200, cutK: 3.2, cutPeak: 1.8, cutT: 0.14, att: 0.025, dec: 0.12, sus: 0.72, rel: 0.12, scoop: h ? 0 : 0.02, vib: 0.009, rev: 0.28 }); break;
@@ -1783,12 +1843,45 @@ const Audio8 = {
         ns.sort((a, b) => a - b).forEach((n, i) => this.syn(hz(n), t + i * 0.014, sp * 0.9, 0.032, { waves: [['sawtooth', 0, 0.6], ['triangle', 0, 0.6]], cut: 520, cutK: 9, cutPeak: 5, cutT: 0.12, att: 0.003, dec: 0.12, sus: 0.25, rel: 0.1, rev: 0.2 }));
         break;
       }
+      // voz de robot (talkbox): sierra y cuadrada por dos formantes que se abren de "u" a "a"
+      case 'robo': this.robo(hz(e.n), t, dur * 0.9, 0.15); break;
+      // bajo con chirrido: el filtro resonante se cierra rápido
+      case 'sqb': {
+        const c = this.ctx, o = c.createOscillator(), sub = c.createOscillator(), f = c.createBiquadFilter(), g = c.createGain(), fr = hz(e.n), d2 = Math.max(0.09, sp * 1.6);
+        o.type = 'sawtooth'; o.frequency.setValueAtTime(fr, t); sub.type = 'sine'; sub.frequency.setValueAtTime(fr, t);
+        f.type = 'lowpass'; f.Q.value = 9; f.frequency.setValueAtTime(1900, t); f.frequency.exponentialRampToValueAtTime(240, t + 0.13);
+        g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.3, t + 0.004); g.gain.exponentialRampToValueAtTime(0.0008, t + d2);
+        const sg2 = c.createGain(); sg2.gain.value = 0.9;
+        o.connect(f); f.connect(g); sub.connect(sg2); sg2.connect(g); g.connect(this.musBus().input);
+        o.start(t); sub.start(t); o.stop(t + d2 + 0.03); sub.stop(t + d2 + 0.03);
+        break;
+      }
+      // acorde cortado de metales y cuerdas, como muestra de disco recortada
+      case 'stab': {
+        const ns = e.ch.pcs.map(pc => 60 + ((pc - 60 % 12 + 12) % 12)).sort((a, b) => a - b);
+        for (const n of ns) this.syn(hz(n), t, sp * 0.8, 0.058, { waves: [['sawtooth', -7, 0.5], ['sawtooth', 7, 0.5]], cut: 3200, cutK: 5, cutPeak: 2, cutT: 0.06, att: 0.003, dec: 0.06, sus: 0.45, rel: 0.06, rev: 0.15 });
+        break;
+      }
+      // subida de ruido al final de una sección
+      case 'riser': {
+        const c = this.ctx, s = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain(), d2 = dur;
+        s.buffer = this.noiseBuf; s.loop = true; f.type = 'bandpass'; f.Q.value = 1.4;
+        f.frequency.setValueAtTime(500, t); f.frequency.exponentialRampToValueAtTime(7000, t + d2);
+        g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.05, t + d2 * 0.95); g.gain.linearRampToValueAtTime(0.0001, t + d2);
+        s.connect(f); f.connect(g); g.connect(this.musBus().drums); s.start(t); s.stop(t + d2 + 0.02);
+        break;
+      }
       case 'pad': for (const pc of e.ch.pcs) this.syn(hz(55 + ((pc - 55 % 12 + 12) % 12)), t, dur * 0.98, 0.02, { cut: 1100, att: 0.35, dec: 0.4, sus: 0.85, rel: 0.5, rev: 0.6 }); break;
       case 'drum': {
         const rev = this.musBus().rev;
         const wet = amt => { const g = this.ctx.createGain(); g.gain.value = amt; g.connect(rev); return g; };
         switch (e.k) {
-          case 'K': this.tone('sine', 110, 42, 0.18, 0.5, when, mg); this.noise(0.012, 0.08, 3000, 0.8, when, 'bandpass', mg); break;
+          case 'K': {
+            this.tone('sine', 110, 42, 0.18, 0.5, when, mg); this.noise(0.012, 0.08, 3000, 0.8, when, 'bandpass', mg);
+            const pump = this.song && this.song.def.pump;
+            if (pump) { const g = this.musBus().melo.gain; g.cancelScheduledValues(t); g.setValueAtTime(1 - pump, t); g.linearRampToValueAtTime(1, t + sp * 3.4); }
+            break;
+          }
           case 'k': this.tone('sine', 100, 45, 0.12, 0.28, when, mg); break;
           case 'N': this.noise(0.12, 0.16, 1900, 0.8, when, 'bandpass', mg); this.noise(0.14, 0.08, 1900, 0.8, when, 'bandpass', wet(0.5)); this.tone('triangle', 190, 160, 0.06, 0.12, when, mg); break;
           case 'G': this.noise(0.18, 0.15, 1500, 0.7, when, 'bandpass', mg); this.noise(0.25, 0.1, 1500, 0.7, when, 'bandpass', wet(0.6)); break;
@@ -1826,6 +1919,8 @@ const Audio8 = {
       const bus = this.musBus(), d = this.song.def, t = this.ctx.currentTime;
       bus.delay.delayTime.setValueAtTime(Math.min(0.9, d.echo ? d.echo * d.sp * this.TEMPO : 0.3), t);
       bus.song.gain.setValueAtTime(d.gain || 1, t);
+      bus.sweep.frequency.cancelScheduledValues(t); bus.sweep.frequency.setValueAtTime(d.filter ? d.filter[0] : 20000, t);
+      bus.melo.gain.cancelScheduledValues(t); bus.melo.gain.setValueAtTime(1, t);
     }
   },
   // Pelea: una canción al azar (nunca la misma que la anterior); al terminar sigue otra.
@@ -1859,8 +1954,14 @@ const Audio8 = {
   },
   playStep(i, when, sp) {
     const S = this.song;
-    for (const e of S.ev[i]) this.voice(e, when, sp, S.tr);
     const L = S.def.bar;
+    // filtro que se abre compás a compás (y se queda abierto cuando llega al tope)
+    if (S.def.filter && i % L === 0) {
+      const b = i / L, F = S.def.filter, cur = F[b % F.length], nxt = F[(b + 1) % F.length], fq = this.musBus().sweep.frequency, t = this.ctx.currentTime + when;
+      fq.cancelScheduledValues(t); fq.setValueAtTime(cur, t);
+      if (nxt > cur) fq.exponentialRampToValueAtTime(nxt, t + L * sp);
+    }
+    for (const e of S.ev[i]) this.voice(e, when, sp, S.tr);
     if (S.def.grito && S.pass % 3 === 0) for (const [b, st] of S.def.grito) if (i === b * L + st) this.grito(when);
   },
 };
@@ -5529,6 +5630,172 @@ STYLE.puentin = {
 STANCES.torero = (t) => { const s = Math.sin(t * 1.8); return { bodyY: -Math.abs(s) * 0.8, lean: -0.06, armF: [0.55 + s * 0.04, 0.9], armB: [-0.35, 2.3], legF: [0.22, -0.2], legB: [-0.2, -0.12], head: -0.1 + s * 0.04 }; };
 FIGHT_STYLE.puentin = 'torero';
 RUN_STYLE.torero = { lean: 0.28, amp: 0.9 };
+
+// ---- js/jarocho.js ----
+// ============================================================
+//  CHILAZO, EL CHILE JAROCHO
+//  Antes era un chile luchador (antifaz, cinturón de campeón y botas).
+//  Ahora es un jalapeño de Veracruz vestido de jarocho: sombrero de palma,
+//  paliacate rojo al cuello, camisa blanca con alforzas, pantalón blanco y
+//  botines de tacón para el zapateado. Pelea igual que antes.
+// ============================================================
+Object.assign(LOOKS.chilazo, {
+  jarocho: 1, skin: '#3f9142', pepper: '#3f9142', pepper2: '#1f5e2a',
+  top: '#f4efe8', top2: '#d9d2c4', sleeve: 'long', pants: '#f4efe8',
+  feet: 'boot', shoe: '#f7f2e8', sole: '#5a3a22', heel: 1, bootH: 0, wrap: null,
+  hat: '#e9d6a4', hat2: '#b99a5c', hatBand: '#18181c', scarf: '#c1121f',
+  stem: '#4d7f2c', stem2: '#86b94f', accent: '#c1121f', lips: '#5a1010',
+});
+
+// el mismo cuerpo de chile (tronco y cabeza en una pieza), ahora verde y vestido
+function pepperPath(c, W, H, wob, p) {
+  c.beginPath();
+  c.moveTo(0, -H - p);
+  c.bezierCurveTo(W * 0.72 + p, -H - 1 - p, W * 1.02 + p, -H * 0.86, W * 1.04 + p, -H * 0.62);
+  c.bezierCurveTo(W * 1.08 + p, -H * 0.3, W * 0.9 + p, -2, W * 0.5 + p, 10 + p * 0.5);
+  c.quadraticCurveTo(W * 0.05, 22 + p, -W * 0.62 + wob, 27 + p);
+  c.quadraticCurveTo(-W * 1.32 - p, 26 + p, -W * 1.18 - p, 12);
+  c.bezierCurveTo(-W * 0.98 - p, 2, -W * 1.06 - p, -H * 0.32, -W * 1.0 - p, -H * 0.6);
+  c.bezierCurveTo(-W * 0.98 - p, -H * 0.88, -W * 0.72 - p, -H - 1 - p, 0, -H - p);
+  c.closePath();
+}
+// sombrero jarocho de palma: ala ancha y plana, copa baja con pellizco y cinta negra
+function drawJarochoHat(c, L, cx, cy, s, OUT) {
+  c.save(); c.translate(cx, cy); c.scale(s, s);
+  const brim = pad => { c.beginPath(); c.ellipse(0, 0, 34 + pad, 6.5 + pad, 0, 0, TAU); };
+  const crown = pad => { c.beginPath(); c.moveTo(-17 - pad, 1); c.bezierCurveTo(-18 - pad, -14 - pad, -9, -19 - pad, -3, -15 - pad); c.quadraticCurveTo(0, -12.5 - pad, 3, -15 - pad); c.bezierCurveTo(9, -19 - pad, 18 + pad, -14 - pad, 17 + pad, 1); c.closePath(); };
+  brim(1.6); c.fillStyle = OUT; c.fill(); crown(1.6); c.fill();
+  const gb = c.createLinearGradient(0, -6, 0, 7); gb.addColorStop(0, shade(L.hat, 0.12)); gb.addColorStop(1, L.hat2);
+  brim(0); c.fillStyle = gb; c.fill();
+  const gc = c.createLinearGradient(-17, 0, 17, 0); gc.addColorStop(0, L.hat2); gc.addColorStop(0.6, L.hat); gc.addColorStop(1, shade(L.hat, 0.1));
+  crown(0); c.fillStyle = gc; c.fill();
+  // tejido de palma
+  c.save(); crown(0); c.clip(); c.strokeStyle = 'rgba(120,90,40,.28)'; c.lineWidth = 0.8;
+  for (let x = -18; x < 18; x += 3.2) { c.beginPath(); c.moveTo(x, 2); c.lineTo(x + 5, -20); c.stroke(); }
+  c.restore();
+  c.strokeStyle = 'rgba(120,90,40,.3)'; c.lineWidth = 0.8;
+  for (const r of [0.62, 0.82]) { c.beginPath(); c.ellipse(0, 0, 34 * r, 6.5 * r, 0, Math.PI * 0.05, Math.PI * 0.95); c.stroke(); }
+  // cinta negra
+  c.fillStyle = L.hatBand; c.beginPath(); c.moveTo(-17, -1); c.quadraticCurveTo(0, 2, 17, -1); c.lineTo(17.3, -4.6); c.quadraticCurveTo(0, -1.8, -17.3, -4.6); c.closePath(); c.fill();
+  c.fillStyle = 'rgba(255,255,255,.28)'; c.beginPath(); c.ellipse(8, -12, 4, 1.4, -0.3, 0, TAU); c.fill();
+  c.restore();
+}
+// paliacate rojo anudado al frente, con motitas blancas
+function drawPaliacate(c, L, x0, x1, y, knotX, OUT) {
+  c.save(); c.lineCap = 'round'; c.lineJoin = 'round';
+  c.strokeStyle = OUT; c.lineWidth = 8.5; c.beginPath(); c.moveTo(x0, y + 1); c.quadraticCurveTo((x0 + x1) / 2, y + 5, x1, y); c.stroke();
+  c.strokeStyle = L.scarf; c.lineWidth = 6.2; c.stroke();
+  // puntas que cuelgan del nudo
+  const tri = pad => { c.beginPath(); c.moveTo(knotX - 5 - pad, y + 1); c.lineTo(knotX + 7 + pad, y + 1); c.lineTo(knotX + 2, y + 15 + pad * 1.6); c.closePath(); };
+  tri(1.6); c.fillStyle = OUT; c.fill(); tri(0); c.fillStyle = shade(L.scarf, -0.08); c.fill();
+  c.fillStyle = OUT; c.beginPath(); c.arc(knotX + 1, y + 1.5, 4.6, 0, TAU); c.fill();
+  c.fillStyle = shade(L.scarf, 0.1); c.beginPath(); c.arc(knotX + 1, y + 1.5, 3.3, 0, TAU); c.fill();
+  c.fillStyle = 'rgba(255,255,255,.85)';
+  for (const [dx, dy] of [[-14, 3], [-6, 4], [10, 2.5], [17, 1.5], [1, 7], [3, 11]]) { c.beginPath(); c.arc(knotX + dx, y + dy, 0.9, 0, TAU); c.fill(); }
+  c.restore();
+}
+function drawPepperJarocho(c, id, L, pose, hx, hy, OUT, opt) {
+  const T = SK.torso, H = T + SK.neck + SK.headRY * 1.9, W = L.build.chest, face = pose.face || 'normal';
+  const wob = Math.sin((typeof performance !== 'undefined' ? performance.now() : 0) / 300) * 0.6;
+  c.save(); c.translate(hx, hy); c.rotate(pose.lean);
+  pepperPath(c, W, H, wob, OUTW + 0.3); c.fillStyle = OUT; c.fill();
+  pepperPath(c, W, H, wob, 0);
+  const g = c.createLinearGradient(-W * 1.1, 0, W * 1.1, 0);
+  g.addColorStop(0, L.pepper2); g.addColorStop(0.45, L.pepper); g.addColorStop(0.8, shade(L.pepper, 0.16)); g.addColorStop(1, shade(L.pepper, -0.06));
+  c.fillStyle = g; c.fill();
+  c.save(); pepperPath(c, W, H, wob, 0); c.clip();
+  // brillo encerado del jalapeño y sus rayitas de corcho
+  c.fillStyle = 'rgba(255,255,255,.3)'; c.beginPath(); c.ellipse(W * 0.58, -H * 0.62, 2.4, H * 0.14, 0.12, 0, TAU); c.fill();
+  c.strokeStyle = 'rgba(210,200,150,.35)'; c.lineWidth = 0.9; c.lineCap = 'round';
+  for (const [x, y] of [[-W * 0.55, -H * 0.8], [-W * 0.35, -H * 0.86], [-W * 0.7, -H * 0.66]]) { c.beginPath(); c.moveTo(x, y); c.lineTo(x + 3, y - 1.5); c.stroke(); }
+  // camisa blanca (guayabera): del cuello al dobladillo, deja ver la punta verde del chile
+  const cy = -H * 0.45, hem = 9;
+  const shirt = () => { c.beginPath(); c.moveTo(-W * 1.5, cy); c.quadraticCurveTo(0, cy + 4, W * 1.5, cy - 1); c.lineTo(W * 1.5, hem - 2); c.quadraticCurveTo(0, hem + 6, -W * 1.5, hem); c.closePath(); };
+  shirt();
+  const gs = c.createLinearGradient(-W * 1.1, 0, W * 1.1, 0); gs.addColorStop(0, L.top2); gs.addColorStop(0.5, L.top); gs.addColorStop(1, shade(L.top, 0.04));
+  c.fillStyle = gs; c.fill();
+  c.strokeStyle = 'rgba(40,40,50,.35)'; c.lineWidth = 1; c.beginPath(); c.moveTo(-W * 1.5, hem); c.quadraticCurveTo(0, hem + 6, W * 1.5, hem - 2); c.stroke();
+  // alforzas y botonadura
+  const bx = W * 0.22;
+  c.strokeStyle = 'rgba(120,110,95,.45)'; c.lineWidth = 0.8;
+  for (const dx of [-9, -6, 7, 10]) { c.beginPath(); c.moveTo(bx + dx, cy + 6); c.lineTo(bx + dx - 1, hem - 2); c.stroke(); }
+  c.strokeStyle = 'rgba(120,110,95,.55)'; c.beginPath(); c.moveTo(bx, cy + 4); c.lineTo(bx - 1, hem + 1); c.stroke();
+  c.fillStyle = '#e5ddc9'; for (let i = 0; i < 4; i++) { const y = cy + 9 + i * ((hem - cy - 12) / 3); c.beginPath(); c.arc(bx + 1.8, y, 1.3, 0, TAU); c.fill(); }
+  c.fillStyle = 'rgba(0,0,0,.08)'; c.fillRect(-W * 1.5, cy, W * 3, 3);
+  c.restore();
+  // paliacate al cuello
+  drawPaliacate(c, L, -W * 1.02, W * 1.06, cy - 1, W * 0.3, OUT);
+  // ojos (sin antifaz), cejas y bigotazo
+  const angry = face === 'angry', hurt = face === 'hurt' || face === 'ko', happy = face === 'happy', sad = face === 'sad', out = face === 'ko' || face === 'dizzy';
+  const ey = -H * 0.7;
+  for (const ex of [W * 0.05, W * 0.62]) {
+    if (out) { c.strokeStyle = '#10131a'; c.lineWidth = 1.7; c.beginPath(); c.moveTo(ex - 2.4, ey - 2.4); c.lineTo(ex + 2.4, ey + 2); c.moveTo(ex + 2.4, ey - 2.4); c.lineTo(ex - 2.4, ey + 2); c.stroke(); continue; }
+    c.fillStyle = OUT; c.beginPath(); c.ellipse(ex, ey - 0.5, 4.6, angry || hurt ? 2.6 : 3.8, 0, 0, TAU); c.fill();
+    c.fillStyle = '#f4efe8'; c.beginPath(); c.ellipse(ex, ey - 0.5, 3.6, angry || hurt ? 1.7 : 2.9, 0, 0, TAU); c.fill();
+    c.fillStyle = '#10131a'; c.beginPath(); c.ellipse(ex + 0.9, ey - 0.3, 1.5, angry || hurt ? 1.3 : 1.9, 0, 0, TAU); c.fill();
+    c.fillStyle = '#fff'; c.beginPath(); c.arc(ex + 1.4, ey - 1.2, 0.6, 0, TAU); c.fill();
+  }
+  c.strokeStyle = '#10131a'; c.lineWidth = 1.8; c.lineCap = 'round';
+  c.beginPath();
+  if (angry) { c.moveTo(-W * 0.3, ey - 7); c.lineTo(W * 0.3, ey - 4.5); c.moveTo(W * 0.4, ey - 4.5); c.lineTo(W * 0.98, ey - 7.5); }
+  else if (sad) { c.moveTo(-W * 0.28, ey - 5); c.lineTo(W * 0.28, ey - 7); c.moveTo(W * 0.4, ey - 7); c.lineTo(W * 0.95, ey - 5); }
+  else { c.moveTo(-W * 0.26, ey - 6.5); c.quadraticCurveTo(W * 0.05, ey - 8.5, W * 0.3, ey - 6.5); c.moveTo(W * 0.38, ey - 6.5); c.quadraticCurveTo(W * 0.62, ey - 8.5, W * 0.92, ey - 6.5); }
+  c.stroke();
+  const my = ey + 12, mx = W * 0.38;
+  c.fillStyle = '#10131a'; c.beginPath(); c.moveTo(mx - 11, my + 1); c.quadraticCurveTo(mx - 6, my - 6.5, mx, my - 3.5); c.quadraticCurveTo(mx + 6, my - 6.5, mx + 11, my + 1); c.quadraticCurveTo(mx + 5, my - 1.5, mx, my - 1); c.quadraticCurveTo(mx - 5, my - 1.5, mx - 11, my + 1); c.fill();
+  c.strokeStyle = L.lips; c.lineWidth = 1.7; c.beginPath();
+  if (hurt) { c.fillStyle = '#2a0808'; c.ellipse(mx, my + 3, 2.8, 2.4, 0, 0, TAU); c.fill(); }
+  else if (happy || angry) { c.fillStyle = '#2a0808'; c.moveTo(mx - 4, my + 1); c.quadraticCurveTo(mx, my + (angry ? 4 : 6), mx + 4, my + 1); c.closePath(); c.fill(); if (angry) { c.fillStyle = '#f4efe8'; c.fillRect(mx - 3, my + 1, 6, 1.4); } }
+  else { c.moveTo(mx - 3.5, my + 2); c.quadraticCurveTo(mx, my + (sad ? 0.5 : 3.6), mx + 3.5, my + 1.8); c.stroke(); }
+  // sombrero y el rabito del chile que se asoma por arriba
+  drawJarochoHat(c, L, W * 0.12, -H * 0.9, 1, OUT);
+  c.strokeStyle = OUT; c.lineWidth = 5.6; c.lineCap = 'round';
+  c.beginPath(); c.moveTo(W * 0.1, -H * 0.9 - 14); c.quadraticCurveTo(W * 0.05, -H * 0.9 - 24, -W * 0.5, -H * 0.9 - 26 + wob); c.stroke();
+  c.strokeStyle = L.stem2; c.lineWidth = 3.2; c.stroke();
+  c.restore();
+}
+const _bodyPlanJarocho0 = drawBodyPlan;
+drawBodyPlan = function (c, id, L, pose, hx, hy, OUT, opt) {
+  if (L.plan === 'pepper' && L.jarocho) return drawPepperJarocho(c, id, L, pose, hx, hy, OUT, opt);
+  return _bodyPlanJarocho0(c, id, L, pose, hx, hy, OUT, opt);
+};
+
+// retrato (marcador y menús): cabeza de jalapeño con sombrero y bigote
+HEADS3.chile = function (c, L, face, OUT) {
+  const RX = SK.headRX, RY = SK.headRY, angry = face === 'angry', hurt = face === 'hurt' || face === 'ko', happy = face === 'happy', sad = face === 'sad', out = face === 'ko' || face === 'dizzy';
+  const path = pad => { c.beginPath(); c.moveTo(-RX * 1.0 - pad, RY * 0.5); c.bezierCurveTo(-RX * 1.15 - pad, -RY * 0.9 - pad, RX * 1.15 + pad, -RY * 1.05 - pad, RX * 1.02 + pad, RY * 0.45); c.quadraticCurveTo(RX * 0.8 + pad, RY * 1.05 + pad, 0, RY * 1.1 + pad); c.quadraticCurveTo(-RX * 0.8 - pad, RY * 1.05 + pad, -RX * 1.0 - pad, RY * 0.5); c.closePath(); };
+  path(1.6); c.fillStyle = OUT; c.fill();
+  path(0); const g = c.createLinearGradient(-RX, 0, RX, 0); g.addColorStop(0, L.pepper2); g.addColorStop(0.6, L.pepper); g.addColorStop(1, shade(L.pepper, 0.15)); c.fillStyle = g; c.fill();
+  c.fillStyle = 'rgba(255,255,255,.28)'; c.beginPath(); c.ellipse(RX * 0.62, -RY * 0.1, 1.8, RY * 0.3, 0.1, 0, TAU); c.fill();
+  // paliacate en el cuello del retrato
+  c.save(); path(0); c.clip();
+  c.fillStyle = L.scarf; c.beginPath(); c.moveTo(-RX * 1.2, RY * 0.78); c.quadraticCurveTo(0, RY * 0.9, RX * 1.2, RY * 0.76); c.lineTo(RX * 1.2, RY * 1.3); c.lineTo(-RX * 1.2, RY * 1.3); c.closePath(); c.fill();
+  c.restore();
+  const ey = -RY * 0.12;
+  for (const ex of [RX * 0.02, RX * 0.62]) {
+    if (out) { c.strokeStyle = '#10131a'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(ex - 2, ey - 2.5); c.lineTo(ex + 2, ey + 1.5); c.moveTo(ex + 2, ey - 2.5); c.lineTo(ex - 2, ey + 1.5); c.stroke(); continue; }
+    c.fillStyle = OUT; c.beginPath(); c.ellipse(ex, ey - 0.6, 4.2, angry || hurt ? 2.4 : 3.5, 0, 0, TAU); c.fill();
+    c.fillStyle = '#f4efe8'; c.beginPath(); c.ellipse(ex, ey - 0.6, 3.2, angry || hurt ? 1.5 : 2.6, 0, 0, TAU); c.fill();
+    c.fillStyle = '#10131a'; c.beginPath(); c.ellipse(ex + 0.8, ey - 0.5, 1.4, angry || hurt ? 1.2 : 1.7, 0, 0, TAU); c.fill();
+  }
+  if (angry) { c.strokeStyle = '#10131a'; c.lineWidth = 1.8; c.beginPath(); c.moveTo(-RX * 0.3, ey - 6); c.lineTo(RX * 0.3, ey - 3.5); c.moveTo(RX * 0.35, ey - 3.5); c.lineTo(RX * 0.95, ey - 6); c.stroke(); }
+  const my = RY * 0.5, mx = RX * 0.35;
+  c.fillStyle = '#10131a'; c.beginPath(); c.moveTo(mx - 9, my); c.quadraticCurveTo(mx - 4, my - 6, mx, my - 3); c.quadraticCurveTo(mx + 4, my - 6, mx + 9, my); c.quadraticCurveTo(mx + 4, my - 2, mx, my - 1.2); c.quadraticCurveTo(mx - 4, my - 2, mx - 9, my); c.fill();
+  c.strokeStyle = L.lips; c.lineWidth = 1.6; c.beginPath();
+  if (hurt) { c.fillStyle = '#2a0808'; c.ellipse(mx, my + 2.5, 2.4, 2, 0, 0, TAU); c.fill(); }
+  else if (happy) { c.arc(mx, my, 3.2, 0.15 * Math.PI, 0.85 * Math.PI); c.stroke(); }
+  else { c.moveTo(mx - 3, my + 1.6); c.quadraticCurveTo(mx, my + (sad ? 0 : 2.8), mx + 3, my + 1.4); c.stroke(); }
+  drawJarochoHat(c, L, RX * 0.1, -RY * 0.72, 0.82, OUT);
+  c.strokeStyle = OUT; c.lineWidth = 5; c.lineCap = 'round';
+  c.beginPath(); c.moveTo(RX * 0.08, -RY * 0.72 - 12); c.quadraticCurveTo(0, -RY * 0.72 - 20, -RX * 0.9, -RY * 0.72 - 21); c.stroke();
+  c.strokeStyle = L.stem2; c.lineWidth = 2.8; c.stroke();
+};
+
+// nombre, descripción y especiales con sabor jarocho (los golpes no cambian)
+Object.assign(CHARS.chilazo, { title: 'El Chile Jarocho', blurb: 'Jalapeño de Veracruz: echa lumbre, avienta salsa y se lanza con todo.' });
+SPECIALS.chilazo.s.name = 'Embestida Jarocha';
+SPECIALS.chilazo.u.name = 'Salto de La Bamba';
+SPECIALS.chilazo.d.name = 'Salsa Veracruzana';
 
 // ---- js/balance.js ----
 // ============================================================
@@ -10651,18 +10918,29 @@ const Net = {
     if (!window.APYV_WEB || !this.code) return null;
     try { return location.origin + location.pathname + '?sala=' + this.code; } catch (e) { return null; }
   },
-  inviteText() {
-    const who = this.user && this.user.name ? this.user.name() : '', url = this.inviteURL();
-    return url ? `¡Vente a jugar A pan y verga${who ? ' con ' + who : ''}! Entra directo a mi sala: ${url}`
+  // el mensaje va sin el link: el link viaja aparte para que la app lo muestre como vista previa
+  inviteMsg() {
+    let who = this.user && this.user.name ? this.user.name() : '';
+    if (/^Jugador\b/.test(who)) who = ''; // nombre de relleno: mejor sin nombre
+    const url = this.inviteURL();
+    return url ? `¡Vente a jugar A pan y verga${who ? ' con ' + who : ''}! Entra directo a mi sala:`
       : `¡Vente a jugar A pan y verga! Abre el juego (el link que te compartí), entra a "Jugar online" y elige mi sala · código ${this.code}`;
   },
-  // compartir (celular) o copiar el link; si el navegador no deja, queda escrito en pantalla
-  async invite() {
-    const text = this.inviteText(), url = this.inviteURL();
-    try { if (navigator.share && url) { await navigator.share({ title: 'A pan y verga', text, url }); return 'share'; } } catch (e) { if (e && e.name === 'AbortError') return 'abort'; }
-    try { if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(text); Toasts.push(url ? '📋 Link de invitación copiado: pégalo en WhatsApp' : '📋 Invitación copiada: pégala en WhatsApp'); return 'copy'; } } catch (e) { /* sin portapapeles */ }
-    Toasts.push(url ? 'Comparte este link: ' + url : `Diles que elijan tu sala · código ${this.code}`);
-    return 'show';
+  inviteText() { const url = this.inviteURL(); return url ? this.inviteMsg() + ' ' + url : this.inviteMsg(); },
+  // Se llama DENTRO del toque, clic o tecla: el navegador solo deja compartir o copiar durante el gesto.
+  // Celular: la hoja nativa para elegir la app (WhatsApp, Mensajes…; ahí mismo está "Copiar").
+  // PC/Mac: se copia el link y se abre la ventanita de invitación con más opciones.
+  invite() {
+    const url = this.inviteURL(), msg = this.inviteMsg();
+    const mobile = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || TouchPad.active;
+    if (mobile && navigator.share) {
+      let p;
+      try { p = navigator.share(url ? { title: 'A pan y verga', text: msg, url } : { title: 'A pan y verga', text: msg }); } catch (e) { p = Promise.reject(e); }
+      Promise.resolve(p).then(() => {}, e => { if (!e || e.name !== 'AbortError') InviteBox.open(copyText(this.inviteText())); });
+      return 'share';
+    }
+    InviteBox.open(copyText(this.inviteText()));
+    return 'copy';
   },
   guestsOf(peer) { return this.peers().filter(p => !p.sameTab && p.presence && p.presence.g === 'golpazo' && p.presence.role === 'guest' && p.presence.join === peer); },
   nameOf(peer) {
@@ -10904,6 +11182,61 @@ const Net = {
     return { mode: MODE_BY_ID[e.m] ? e.m : 'stock', draw: !!e.d, stage: e.s, teams: !!e.t, winTeam: e.w === undefined ? -1 : e.w, goals: e.go || null, party: e.pa || null,
       ranked: e.r.map(a => ({ port: a[0], id: CHAR_ORDER[a[1]] || 'nacho', cpu: !!a[2], color: PLAYER_COLORS[a[0]], kos: a[3], falls: a[4], dealt: a[5], sd: a[6], score: a[7], stocks: a[8], team: a[9] || 0, win: !!a[10], label: a[11] || null })) };
   },
+};
+
+// Copiar texto dentro de un gesto. Primero a la antigua (funciona sin permiso de portapapeles y dentro
+// de iframes); si no se puede, con el portapapeles moderno.
+function copyText(text) {
+  let ok = false;
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0';
+    document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, text.length);
+    ok = document.execCommand('copy'); ta.remove();
+  } catch (e) { ok = false; }
+  try { canvas.focus({ preventScroll: true }); } catch (e) { /* nada */ }
+  if (ok) return Promise.resolve(true);
+  if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text).then(() => true, () => false);
+  return Promise.resolve(false);
+}
+
+// Ventanita de invitación (PC/Mac, o si el celular no pudo abrir su hoja de compartir)
+const InviteBox = {
+  el: null,
+  isOpen() { return !!this.el; },
+  open(copied) {
+    this.close();
+    const url = Net.inviteURL(), el = this.el = document.createElement('div');
+    el.id = 'invite';
+    el.innerHTML = '<div class="inv-card" role="dialog" aria-modal="true" aria-labelledby="inv-t">'
+      + '<div class="inv-t" id="inv-t">📨 Invita a tu sala</div>'
+      + '<div class="inv-code">Código de sala <b></b></div>'
+      + (url ? '<input class="inv-url" readonly aria-label="Link de invitación">' : '<p class="inv-help"></p>')
+      + '<div class="inv-ok" aria-live="polite"></div>'
+      + '<div class="inv-btns"><button data-a="copy" class="inv-main">📋 Copiar ' + (url ? 'link' : 'invitación') + '</button>'
+      + (navigator.share ? '<button data-a="share">Compartir…</button>' : '')
+      + (url ? '<a data-a="wa" target="_blank" rel="noopener">WhatsApp</a>' : '')
+      + '<button data-a="close">Listo</button></div></div>';
+    el.querySelector('.inv-code b').textContent = Net.code || '';
+    if (url) { const inp = el.querySelector('.inv-url'); inp.value = url; inp.addEventListener('focus', () => inp.select()); el.querySelector('[data-a=wa]').href = 'https://wa.me/?text=' + encodeURIComponent(Net.inviteText()); }
+    else el.querySelector('.inv-help').textContent = Net.inviteMsg();
+    const say = ok => { const o = el.querySelector('.inv-ok'); if (!o) return; o.textContent = ok ? '✓ Copiado: pégalo en WhatsApp, iMessage o correo' : 'Selecciona el link y cópialo (Ctrl+C / ⌘C)'; o.classList.toggle('bad', !ok); };
+    Promise.resolve(copied).then(say);
+    el.addEventListener('click', e => {
+      if (e.target === el) return this.close(); // clic afuera
+      const b = e.target.closest('[data-a]'); if (!b) return;
+      if (b.dataset.a === 'copy') copyText(Net.inviteText()).then(say);
+      if (b.dataset.a === 'share') { const m = Net.inviteMsg(); try { navigator.share(url ? { title: 'A pan y verga', text: m, url } : { title: 'A pan y verga', text: m }).catch(() => {}); } catch (err) { /* sin compartir */ } }
+      if (b.dataset.a === 'close') this.close();
+    });
+    // las teclas se quedan en la ventanita (el juego no reacciona detrás); Esc la cierra
+    el.addEventListener('keydown', e => { if (e.key === 'Escape') this.close(); e.stopPropagation(); });
+    el.addEventListener('keyup', e => e.stopPropagation());
+    document.body.appendChild(el);
+    const first = el.querySelector('[data-a=close]'); try { first.focus({ preventScroll: true }); } catch (e) { /* nada */ }
+    Audio8.sfx('confirm');
+  },
+  close() { if (!this.el) return; this.el.remove(); this.el = null; try { canvas.focus({ preventScroll: true }); } catch (e) { /* nada */ } },
 };
 
 // ---- js/avchat.js ----
@@ -11599,6 +11932,10 @@ function logo(x, y, s = 1) {
   ctx.fillStyle = '#f3e3c3'; ctx.fillText(GAME_TAGLINE, 24, 134);
   ctx.restore();
 }
+// Orden fijo de la portada y de la selección: las caras de persona repartidas entre los demás
+// (en la selección quedan tres por fila, nunca dos juntas). Los que se agreguen después van al final.
+const ROSTER = ['torito', 'daniel', 'chilazo', 'nicole', 'dino', 'mariachi', 'nacho', 'axo', 'puentin', 'chispa', 'michi', 'robes', 'luchador', 'pablo', 'chupa'];
+CHAR_ORDER.sort((a, b) => (ROSTER.includes(a) ? ROSTER.indexOf(a) : 99) - (ROSTER.includes(b) ? ROSTER.indexOf(b) : 99));
 const NCH = () => CHAR_ORDER.length; // la tarjeta NCH() es "Aleatorio"
 function lineupX(i) { const n = CHAR_ORDER.length, sp = Math.min(215, (W - 150) / (n - 1)); return W / 2 + (i - (n - 1) / 2) * sp; }
 function lineup(y, scale) {
@@ -11695,7 +12032,7 @@ const APP = {
       slab(sx, sy, 46, 40, { skew: 0.2 });
       text(Audio8.muted ? '🔇' : '🔊', sx + 23, sy + 21, 18, PAPER, { body: true });
       // el navegador todavía no deja sonar (con control de juego pasa siempre: sus botones no cuentan como gesto)
-      if (!Audio8.ready && Audio8.soundMode() !== 'off' && !avButtonShown()) {
+      if (!Audio8.ready && Audio8.soundMode() !== 'off' && ['title', 'main', 'online'].includes(this.screen)) {
         const touchy = TouchPad.active || (window.matchMedia && matchMedia('(pointer: coarse)').matches);
         const msg = touchy ? 'Toca la pantalla para activar el sonido' : 'Haz clic o pulsa una tecla para activar el sonido';
         const a = 0.75 + 0.25 * Math.sin(this.t / 9);
@@ -11722,16 +12059,12 @@ const APP = {
   titleDraw() {
     drawMenuBG();
     logo(W / 2, 150, 1);
-    sfText(CHAR_ORDER.map(id => CHARS[id].name).join(' · '), W / 2, 318, 22, MUTED, { keepCase: true, weight: 500 });
     // piso
     const fl = ctx.createLinearGradient(0, 560, 0, H);
     fl.addColorStop(0, 'rgba(230,57,70,.18)'); fl.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = fl; ctx.fillRect(0, 560, W, H - 560);
-    const big = CHAR_ORDER.length <= 5;
-    lineup(590, big ? 1.55 : 1.12);
-    // con 14 personajes los nombres largos se enciman: van en dos filas escalonadas y se achican si hace falta
-    const sp = CHAR_ORDER.length > 1 ? lineupX(1) - lineupX(0) : 200;
-    CHAR_ORDER.forEach((id, i) => { const nm = CHARS[id].name, two = !big && sp < 130; sfText(nm, lineupX(i), 620 + (two && i % 2 ? 22 : 0), fitSize(nm, (two ? sp * 2 : sp) - 10, big ? 30 : 22), PAPER); });
+    // sin nombres: la fila de personajes habla sola
+    lineup(612, CHAR_ORDER.length <= 5 ? 1.55 : 1.22);
     const focused = !document.hasFocus || document.hasFocus();
     if (Math.floor(this.t / 30) % 2 === 0 || reducedMotion) sfText(TouchPad.active || (window.matchMedia && matchMedia('(pointer: coarse)').matches) ? 'Toca para jugar' : focused ? 'Presiona Start · Enter · A' : 'Haz clic aquí para jugar', W / 2, 668, 34, GOLD);
     const np = padInfo.length;
@@ -11802,11 +12135,10 @@ const APP = {
   // arriba a la izquierda en la selección de personajes, abajo a la derecha al elegir el modo
   // (arriba a la derecha van la cámara y el sonido)
   inviteRect() { return this.screen === 'modesel' ? { x: W - 290, y: 648, w: 250, h: 40 } : { x: 118, y: 14, w: 250, h: 40 }; },
-  inviteUpdate() {
-    if (Net.role !== 'host' || !Net.code) return;
-    const b = this.inviteRect();
-    if (clickIn(b.x, b.y, b.w, b.h) || keyEdge('kb1', 'KeyI')) { Audio8.sfx('confirm'); Net.invite(); Pointer.clicked = false; }
-  },
+  inviteShown() { return Net.role === 'host' && !!Net.code && ['modesel', 'charsel'].includes(this.screen); },
+  inviteHit(x, y) { if (!this.inviteShown()) return false; const b = this.inviteRect(); return x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h; },
+  // el clic en el botón se atiende en su propio evento (ver abajo): aquí solo se evita que atraviese al menú
+  inviteUpdate() { if (Pointer.clicked && this.inviteHit(Pointer.x, Pointer.y)) Pointer.clicked = false; },
   inviteDraw(showLink) {
     if (Net.role !== 'host' || !Net.code) return;
     const b = this.inviteRect(), hv = hover(b.x, b.y, b.w, b.h), kb = !TouchPad.active;
@@ -12790,6 +13122,10 @@ function drawModeIcon(id, x, y, on) {
   c.restore();
 }
 
+// Invitar se atiende dentro del gesto (clic, toque o tecla I): solo así el navegador deja compartir o copiar
+canvas.addEventListener('click', e => { const p = toLogical(e); if (!InviteBox.isOpen() && APP.inviteHit(p.x, p.y)) Net.invite(); });
+window.addEventListener('keydown', e => { if (e.code === 'KeyI' && !e.repeat && !InviteBox.isOpen() && APP.inviteShown()) Net.invite(); });
+
 // ---- js/fame.js ----
 // ============================================================
 //  SALÓN DE LA FAMA: estadísticas por CUENTA (no por personaje).
@@ -13031,7 +13367,9 @@ function step() {
   if (Pointer.clicked && avButtonShown()) { const b = AV_BTN; if (hover(b.x, b.y, b.w, b.h)) { AV.click(b); Pointer.clicked = false; } }
   if (AV.on && keyEdge('kb1', 'KeyM')) { AV.setMic(!AV.mic); Toasts.push(AV.mic ? '🎤 Micrófono abierto' : '🔇 Micrófono silenciado'); }
   try { AV.tick(); } catch (e) { console.error(e); }
-  try { APP.update(); } catch (e) { console.error(e); }
+  // con la ventanita de invitar abierta el juego espera; B o Esc la cierran
+  if (InviteBox.isOpen()) { for (const d of Devices.list) { const n = Devices.nav(d); if (n.back || n.start) InviteBox.close(); } }
+  else try { APP.update(); } catch (e) { console.error(e); }
   Audio8.tick();
   endFrameKeys();
   Pointer.clicked = false;

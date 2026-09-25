@@ -77,6 +77,10 @@ function logo(x, y, s = 1) {
   ctx.fillStyle = '#f3e3c3'; ctx.fillText(GAME_TAGLINE, 24, 134);
   ctx.restore();
 }
+// Orden fijo de la portada y de la selección: las caras de persona repartidas entre los demás
+// (en la selección quedan tres por fila, nunca dos juntas). Los que se agreguen después van al final.
+const ROSTER = ['torito', 'daniel', 'chilazo', 'nicole', 'dino', 'mariachi', 'nacho', 'axo', 'puentin', 'chispa', 'michi', 'robes', 'luchador', 'pablo', 'chupa'];
+CHAR_ORDER.sort((a, b) => (ROSTER.includes(a) ? ROSTER.indexOf(a) : 99) - (ROSTER.includes(b) ? ROSTER.indexOf(b) : 99));
 const NCH = () => CHAR_ORDER.length; // la tarjeta NCH() es "Aleatorio"
 function lineupX(i) { const n = CHAR_ORDER.length, sp = Math.min(215, (W - 150) / (n - 1)); return W / 2 + (i - (n - 1) / 2) * sp; }
 function lineup(y, scale) {
@@ -173,7 +177,7 @@ const APP = {
       slab(sx, sy, 46, 40, { skew: 0.2 });
       text(Audio8.muted ? '🔇' : '🔊', sx + 23, sy + 21, 18, PAPER, { body: true });
       // el navegador todavía no deja sonar (con control de juego pasa siempre: sus botones no cuentan como gesto)
-      if (!Audio8.ready && Audio8.soundMode() !== 'off' && !avButtonShown()) {
+      if (!Audio8.ready && Audio8.soundMode() !== 'off' && ['title', 'main', 'online'].includes(this.screen)) {
         const touchy = TouchPad.active || (window.matchMedia && matchMedia('(pointer: coarse)').matches);
         const msg = touchy ? 'Toca la pantalla para activar el sonido' : 'Haz clic o pulsa una tecla para activar el sonido';
         const a = 0.75 + 0.25 * Math.sin(this.t / 9);
@@ -200,16 +204,12 @@ const APP = {
   titleDraw() {
     drawMenuBG();
     logo(W / 2, 150, 1);
-    sfText(CHAR_ORDER.map(id => CHARS[id].name).join(' · '), W / 2, 318, 22, MUTED, { keepCase: true, weight: 500 });
     // piso
     const fl = ctx.createLinearGradient(0, 560, 0, H);
     fl.addColorStop(0, 'rgba(230,57,70,.18)'); fl.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = fl; ctx.fillRect(0, 560, W, H - 560);
-    const big = CHAR_ORDER.length <= 5;
-    lineup(590, big ? 1.55 : 1.12);
-    // con 14 personajes los nombres largos se enciman: van en dos filas escalonadas y se achican si hace falta
-    const sp = CHAR_ORDER.length > 1 ? lineupX(1) - lineupX(0) : 200;
-    CHAR_ORDER.forEach((id, i) => { const nm = CHARS[id].name, two = !big && sp < 130; sfText(nm, lineupX(i), 620 + (two && i % 2 ? 22 : 0), fitSize(nm, (two ? sp * 2 : sp) - 10, big ? 30 : 22), PAPER); });
+    // sin nombres: la fila de personajes habla sola
+    lineup(612, CHAR_ORDER.length <= 5 ? 1.55 : 1.22);
     const focused = !document.hasFocus || document.hasFocus();
     if (Math.floor(this.t / 30) % 2 === 0 || reducedMotion) sfText(TouchPad.active || (window.matchMedia && matchMedia('(pointer: coarse)').matches) ? 'Toca para jugar' : focused ? 'Presiona Start · Enter · A' : 'Haz clic aquí para jugar', W / 2, 668, 34, GOLD);
     const np = padInfo.length;
@@ -280,11 +280,10 @@ const APP = {
   // arriba a la izquierda en la selección de personajes, abajo a la derecha al elegir el modo
   // (arriba a la derecha van la cámara y el sonido)
   inviteRect() { return this.screen === 'modesel' ? { x: W - 290, y: 648, w: 250, h: 40 } : { x: 118, y: 14, w: 250, h: 40 }; },
-  inviteUpdate() {
-    if (Net.role !== 'host' || !Net.code) return;
-    const b = this.inviteRect();
-    if (clickIn(b.x, b.y, b.w, b.h) || keyEdge('kb1', 'KeyI')) { Audio8.sfx('confirm'); Net.invite(); Pointer.clicked = false; }
-  },
+  inviteShown() { return Net.role === 'host' && !!Net.code && ['modesel', 'charsel'].includes(this.screen); },
+  inviteHit(x, y) { if (!this.inviteShown()) return false; const b = this.inviteRect(); return x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h; },
+  // el clic en el botón se atiende en su propio evento (ver abajo): aquí solo se evita que atraviese al menú
+  inviteUpdate() { if (Pointer.clicked && this.inviteHit(Pointer.x, Pointer.y)) Pointer.clicked = false; },
   inviteDraw(showLink) {
     if (Net.role !== 'host' || !Net.code) return;
     const b = this.inviteRect(), hv = hover(b.x, b.y, b.w, b.h), kb = !TouchPad.active;
@@ -1267,3 +1266,7 @@ function drawModeIcon(id, x, y, on) {
   }
   c.restore();
 }
+
+// Invitar se atiende dentro del gesto (clic, toque o tecla I): solo así el navegador deja compartir o copiar
+canvas.addEventListener('click', e => { const p = toLogical(e); if (!InviteBox.isOpen() && APP.inviteHit(p.x, p.y)) Net.invite(); });
+window.addEventListener('keydown', e => { if (e.code === 'KeyI' && !e.repeat && !InviteBox.isOpen() && APP.inviteShown()) Net.invite(); });

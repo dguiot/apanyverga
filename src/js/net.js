@@ -81,18 +81,29 @@ const Net = {
     if (!window.APYV_WEB || !this.code) return null;
     try { return location.origin + location.pathname + '?sala=' + this.code; } catch (e) { return null; }
   },
-  inviteText() {
-    const who = this.user && this.user.name ? this.user.name() : '', url = this.inviteURL();
-    return url ? `¡Vente a jugar A pan y verga${who ? ' con ' + who : ''}! Entra directo a mi sala: ${url}`
+  // el mensaje va sin el link: el link viaja aparte para que la app lo muestre como vista previa
+  inviteMsg() {
+    let who = this.user && this.user.name ? this.user.name() : '';
+    if (/^Jugador\b/.test(who)) who = ''; // nombre de relleno: mejor sin nombre
+    const url = this.inviteURL();
+    return url ? `¡Vente a jugar A pan y verga${who ? ' con ' + who : ''}! Entra directo a mi sala:`
       : `¡Vente a jugar A pan y verga! Abre el juego (el link que te compartí), entra a "Jugar online" y elige mi sala · código ${this.code}`;
   },
-  // compartir (celular) o copiar el link; si el navegador no deja, queda escrito en pantalla
-  async invite() {
-    const text = this.inviteText(), url = this.inviteURL();
-    try { if (navigator.share && url) { await navigator.share({ title: 'A pan y verga', text, url }); return 'share'; } } catch (e) { if (e && e.name === 'AbortError') return 'abort'; }
-    try { if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(text); Toasts.push(url ? '📋 Link de invitación copiado: pégalo en WhatsApp' : '📋 Invitación copiada: pégala en WhatsApp'); return 'copy'; } } catch (e) { /* sin portapapeles */ }
-    Toasts.push(url ? 'Comparte este link: ' + url : `Diles que elijan tu sala · código ${this.code}`);
-    return 'show';
+  inviteText() { const url = this.inviteURL(); return url ? this.inviteMsg() + ' ' + url : this.inviteMsg(); },
+  // Se llama DENTRO del toque, clic o tecla: el navegador solo deja compartir o copiar durante el gesto.
+  // Celular: la hoja nativa para elegir la app (WhatsApp, Mensajes…; ahí mismo está "Copiar").
+  // PC/Mac: se copia el link y se abre la ventanita de invitación con más opciones.
+  invite() {
+    const url = this.inviteURL(), msg = this.inviteMsg();
+    const mobile = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || TouchPad.active;
+    if (mobile && navigator.share) {
+      let p;
+      try { p = navigator.share(url ? { title: 'A pan y verga', text: msg, url } : { title: 'A pan y verga', text: msg }); } catch (e) { p = Promise.reject(e); }
+      Promise.resolve(p).then(() => {}, e => { if (!e || e.name !== 'AbortError') InviteBox.open(copyText(this.inviteText())); });
+      return 'share';
+    }
+    InviteBox.open(copyText(this.inviteText()));
+    return 'copy';
   },
   guestsOf(peer) { return this.peers().filter(p => !p.sameTab && p.presence && p.presence.g === 'golpazo' && p.presence.role === 'guest' && p.presence.join === peer); },
   nameOf(peer) {
@@ -334,4 +345,59 @@ const Net = {
     return { mode: MODE_BY_ID[e.m] ? e.m : 'stock', draw: !!e.d, stage: e.s, teams: !!e.t, winTeam: e.w === undefined ? -1 : e.w, goals: e.go || null, party: e.pa || null,
       ranked: e.r.map(a => ({ port: a[0], id: CHAR_ORDER[a[1]] || 'nacho', cpu: !!a[2], color: PLAYER_COLORS[a[0]], kos: a[3], falls: a[4], dealt: a[5], sd: a[6], score: a[7], stocks: a[8], team: a[9] || 0, win: !!a[10], label: a[11] || null })) };
   },
+};
+
+// Copiar texto dentro de un gesto. Primero a la antigua (funciona sin permiso de portapapeles y dentro
+// de iframes); si no se puede, con el portapapeles moderno.
+function copyText(text) {
+  let ok = false;
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0';
+    document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, text.length);
+    ok = document.execCommand('copy'); ta.remove();
+  } catch (e) { ok = false; }
+  try { canvas.focus({ preventScroll: true }); } catch (e) { /* nada */ }
+  if (ok) return Promise.resolve(true);
+  if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text).then(() => true, () => false);
+  return Promise.resolve(false);
+}
+
+// Ventanita de invitación (PC/Mac, o si el celular no pudo abrir su hoja de compartir)
+const InviteBox = {
+  el: null,
+  isOpen() { return !!this.el; },
+  open(copied) {
+    this.close();
+    const url = Net.inviteURL(), el = this.el = document.createElement('div');
+    el.id = 'invite';
+    el.innerHTML = '<div class="inv-card" role="dialog" aria-modal="true" aria-labelledby="inv-t">'
+      + '<div class="inv-t" id="inv-t">📨 Invita a tu sala</div>'
+      + '<div class="inv-code">Código de sala <b></b></div>'
+      + (url ? '<input class="inv-url" readonly aria-label="Link de invitación">' : '<p class="inv-help"></p>')
+      + '<div class="inv-ok" aria-live="polite"></div>'
+      + '<div class="inv-btns"><button data-a="copy" class="inv-main">📋 Copiar ' + (url ? 'link' : 'invitación') + '</button>'
+      + (navigator.share ? '<button data-a="share">Compartir…</button>' : '')
+      + (url ? '<a data-a="wa" target="_blank" rel="noopener">WhatsApp</a>' : '')
+      + '<button data-a="close">Listo</button></div></div>';
+    el.querySelector('.inv-code b').textContent = Net.code || '';
+    if (url) { const inp = el.querySelector('.inv-url'); inp.value = url; inp.addEventListener('focus', () => inp.select()); el.querySelector('[data-a=wa]').href = 'https://wa.me/?text=' + encodeURIComponent(Net.inviteText()); }
+    else el.querySelector('.inv-help').textContent = Net.inviteMsg();
+    const say = ok => { const o = el.querySelector('.inv-ok'); if (!o) return; o.textContent = ok ? '✓ Copiado: pégalo en WhatsApp, iMessage o correo' : 'Selecciona el link y cópialo (Ctrl+C / ⌘C)'; o.classList.toggle('bad', !ok); };
+    Promise.resolve(copied).then(say);
+    el.addEventListener('click', e => {
+      if (e.target === el) return this.close(); // clic afuera
+      const b = e.target.closest('[data-a]'); if (!b) return;
+      if (b.dataset.a === 'copy') copyText(Net.inviteText()).then(say);
+      if (b.dataset.a === 'share') { const m = Net.inviteMsg(); try { navigator.share(url ? { title: 'A pan y verga', text: m, url } : { title: 'A pan y verga', text: m }).catch(() => {}); } catch (err) { /* sin compartir */ } }
+      if (b.dataset.a === 'close') this.close();
+    });
+    // las teclas se quedan en la ventanita (el juego no reacciona detrás); Esc la cierra
+    el.addEventListener('keydown', e => { if (e.key === 'Escape') this.close(); e.stopPropagation(); });
+    el.addEventListener('keyup', e => e.stopPropagation());
+    document.body.appendChild(el);
+    const first = el.querySelector('[data-a=close]'); try { first.focus({ preventScroll: true }); } catch (e) { /* nada */ }
+    Audio8.sfx('confirm');
+  },
+  close() { if (!this.el) return; this.el.remove(); this.el = null; try { canvas.focus({ preventScroll: true }); } catch (e) { /* nada */ } },
 };
