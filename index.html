@@ -59,6 +59,14 @@
   body { margin: 0; background: var(--ground); display: flex; align-items: center; justify-content: center; overflow: hidden; touch-action: none; }
   canvas { display: block; background: #081a2e; image-rendering: auto; outline: none; max-width: 100%; }
   canvas:focus-visible { box-shadow: 0 0 0 3px #2ec4b6; }
+  /* mantener presionado un botón en pantalla no debe abrir la lupa, el menú ni seleccionar nada */
+  canvas { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  body { -webkit-tap-highlight-color: transparent; }
+  /* iPhone en Safari: la página se puede deslizar para que Safari esconda sus barras; el juego queda fijo */
+  html.iosroll, html.iosroll body { height: auto; }
+  html.iosroll body { min-height: 300vh; overflow: visible; display: block; }
+  html.iosroll:not(.fight) body { touch-action: pan-y; }
+  html.iosroll #game { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); }
   body { box-sizing: border-box; }
   /* videos de cámara y voz: ocultos, el juego los dibuja en el marcador */
   #av { position: fixed; left: 0; bottom: 0; width: 2px; height: 2px; overflow: hidden; opacity: 0.01; pointer-events: none; }
@@ -81,6 +89,11 @@
   #iosfs { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); transform: translateX(-50%); z-index: 7; display: flex; align-items: center; gap: 10px; max-width: calc(100vw - 24px); box-sizing: border-box; padding: 10px 12px 10px 16px; border-radius: 16px; background: rgba(11,15,24,.94); border: 1px solid #2ec4b6; color: #f4f6fa; font: 600 14px/1.3 'Barlow', system-ui, sans-serif; box-shadow: 0 6px 24px rgba(0,0,0,.5); }
   #iosfs b { color: #ffc53d; }
   #iosfs button { flex: 0 0 auto; border: 0; border-radius: 999px; width: 32px; height: 32px; background: #1f2a3a; color: #f4f6fa; font-size: 16px; }
+  #iosfs.swipe { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: auto; width: min(600px, calc(100vw - 24px)); padding: 8px 8px 8px 10px; border-width: 2px; border-color: #ffc53d; }
+  #iosfs.swipe > span { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  #iosfs.swipe i { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 999px; background: #ffc53d; color: #1a1300; font: 800 22px/1 'Barlow', system-ui, sans-serif; font-style: normal; animation: iosup 1.1s ease-in-out infinite; }
+  @keyframes iosup { 0%, 100% { transform: translateY(5px); } 50% { transform: translateY(-5px); } }
+  @media (prefers-reduced-motion: reduce) { #iosfs.swipe i { animation: none; } }
 </style>
 <canvas id="game" tabindex="0" aria-label="A pan y verga: juego de peleas para hasta 4 jugadores. Usa un control o el teclado."></canvas>
 <!--SCRIPTS-->
@@ -1229,50 +1242,119 @@ const TouchPad = {
     if (!best && Math.hypot(x - L.pause.x, y - L.pause.y) < L.pause.r * 1.8) best = { a: 'start' };
     return best;
   },
-  // ---------- toques ----------
-  down(e) {
-    if (e.pointerType !== 'touch') return;
-    if (e.target && e.target.closest && e.target.closest('#av, #iosfs')) return; // botones de la voz y del aviso: no son la palanca
-    if (!this.active) { this.active = true; this.setup(); }
-    if (!this.shown()) return;
-    const x = e.clientX, y = e.clientY;
+  // ---------- dedos ----------
+  // Cada dedo tiene clave 'p<pointerId>' (Pointer Events) o 't<identifier>' (Touch Events) y un papel:
+  // palanca, botón o nada. En cuanto llega un TouchEvent de verdad mandan los TouchEvents: iOS Safari manda
+  // pointercancel falsos a un dedo que sigue apoyado cuando otro se mueve rápido (soltaba la palanca o el
+  // escudo a media pelea) y a veces pierde el pointerup; la lista e.touches siempre dice qué dedos siguen ahí.
+  fingers: new Map(),            // clave -> { x, y, gone }  (gone: momento en que se canceló, 0 si sigue)
+  tapped: new Set(),             // botones tocados desde la última lectura: un toque rapidísimo igual cuenta
+  te: false,                     // ya llegaron TouchEvents: los Pointer Events táctiles se ignoran
+  GRACE: 140,                    // ms que un dedo cancelado conserva su papel por si iOS lo "reinicia"
+  start(k, x, y) {
+    const now = performance.now(), near = this.L.u * 0.14;
+    // iOS cancela todos los dedos y los vuelve a empezar: el dedo que reaparece donde estaba hereda su papel
+    for (const [ok, f] of this.fingers) if (f.gone && Math.hypot(f.x - x, f.y - y) < near) { this.rekey(ok, k, x, y); return; }
     const b = this.hitButton(x, y);
-    if (b) { this.held.set(e.pointerId, b.a); this.pressT[b.a] = performance.now(); if (navigator.vibrate) try { navigator.vibrate(8); } catch (er) { /* sin vibración */ } }
-    else if (x < this.L.vw * 0.46 && !this.stick) this.stick = { id: e.pointerId, cx: x, cy: y, x, y };
-    e.preventDefault();
+    if (b) {
+      this.fingers.set(k, { x, y, gone: 0 });
+      this.held.set(k, b.a); this.tapped.add(b.a); this.pressT[b.a] = now;
+      if (navigator.vibrate) try { navigator.vibrate(8); } catch (er) { /* sin vibración */ }
+    } else if (x < this.L.vw * 0.46) {
+      // un solo pulgar izquierdo: el dedo nuevo siempre es la palanca (si quedó una vieja colgada, se va)
+      if (this.stick) this.drop(this.stick.key);
+      this.fingers.set(k, { x, y, gone: 0 });
+      this.stick = { key: k, cx: x, cy: y, x, y };
+    }
   },
-  move(e) {
-    if (e.pointerType !== 'touch' || !this.shown()) return;
-    const x = e.clientX, y = e.clientY;
-    if (this.stick && this.stick.id === e.pointerId) {
+  moveTo(k, x, y) {
+    const f = this.fingers.get(k); if (!f) return;
+    f.x = x; f.y = y;
+    if (this.stick && this.stick.key === k) {
       this.stick.x = x; this.stick.y = y;
       // la palanca sigue al dedo: si se sale del círculo, el centro lo alcanza
       const R = this.L.R, dx = x - this.stick.cx, dy = y - this.stick.cy, d = Math.hypot(dx, dy), max = R * 1.2;
       if (d > max) { this.stick.cx += dx * (1 - max / d); this.stick.cy += dy * (1 - max / d); }
-    } else if (this.held.has(e.pointerId)) {
+    } else if (this.held.has(k)) {
       // deslizar el dedo entre botones cambia de botón
       const b = this.hitButton(x, y);
-      if (b && b.a !== 'start' && b.a !== this.held.get(e.pointerId)) { this.held.set(e.pointerId, b.a); this.pressT[b.a] = performance.now(); }
+      if (b && b.a !== 'start' && b.a !== this.held.get(k)) { this.held.set(k, b.a); this.tapped.add(b.a); this.pressT[b.a] = performance.now(); }
     }
+  },
+  // cancelled: el navegador dice que "canceló" el dedo; puede ser mentira, así que se espera un poco antes de soltarlo
+  end(k, cancelled) {
+    const f = this.fingers.get(k); if (!f) return;
+    if (cancelled) { if (!f.gone) f.gone = performance.now(); } else this.drop(k);
+  },
+  drop(k) {
+    this.fingers.delete(k); this.held.delete(k);
+    if (this.stick && this.stick.key === k) this.stick = null;
+  },
+  rekey(old, k, x, y) {
+    const f = this.fingers.get(old); this.fingers.delete(old); f.gone = 0; this.fingers.set(k, f);
+    if (this.held.has(old)) { const a = this.held.get(old); this.held.delete(old); this.held.set(k, a); }
+    if (this.stick && this.stick.key === old) this.stick.key = k;
+    this.moveTo(k, x, y);
+  },
+  expire() {
+    const now = performance.now();
+    for (const [k, f] of [...this.fingers]) if (f.gone && now - f.gone > this.GRACE) this.drop(k);
+  },
+  onUi(e) { return !!(e.target && e.target.closest && e.target.closest('#av, #iosfs, #invite')); }, // botones de la voz y avisos: no son la palanca
+  activate() { if (!this.active) { this.active = true; this.setup(); } },
+  // ---------- Pointer Events (navegadores sin Touch Events) ----------
+  down(e) {
+    if (e.pointerType !== 'touch' || this.onUi(e)) return;
+    this.activate();
+    if (this.te || !this.shown()) return;
+    this.start('p' + e.pointerId, e.clientX, e.clientY);
+    e.preventDefault();
+  },
+  move(e) {
+    if (e.pointerType !== 'touch' || this.te || !this.shown()) return;
+    this.moveTo('p' + e.pointerId, e.clientX, e.clientY);
     e.preventDefault();
   },
   up(e) {
     if (e.pointerType !== 'touch') return;
-    if (this.stick && this.stick.id === e.pointerId) this.stick = null;
-    this.held.delete(e.pointerId);
+    if (!this.te) this.end('p' + e.pointerId, e.type === 'pointercancel');
     // soltar el dedo sí cuenta como gesto para el navegador: aquí se puede pedir pantalla completa
-    this.tryFullscreen();
+    if (e.type === 'pointerup') this.tryFullscreen();
   },
-  release() { this.stick = null; this.held.clear(); },
+  // ---------- Touch Events (la verdad en iPhone y Android) ----------
+  touch(e) {
+    if (!this.te) { this.te = true; this.release(); } // lo que anotaron los Pointer Events se rehace con los dedos reales
+    const ui = this.onUi(e);
+    if (e.type === 'touchstart' && !ui) this.activate();
+    if (!this.active) return;
+    const on = this.shown();
+    for (const t of e.changedTouches) {
+      const k = 't' + t.identifier;
+      if (e.type === 'touchstart') { if (on && !ui) this.start(k, t.clientX, t.clientY); }
+      else if (e.type === 'touchmove') this.moveTo(k, t.clientX, t.clientY);
+      else this.end(k, e.type === 'touchcancel');
+    }
+    // la lista de dedos apoyados manda: el que ya no está se suelta (con gracia), el que sí está se actualiza
+    const live = new Set();
+    for (const t of e.touches) { const k = 't' + t.identifier; live.add(k); const f = this.fingers.get(k); if (f && !f.gone) this.moveTo(k, t.clientX, t.clientY); }
+    for (const [k, f] of this.fingers) if (!live.has(k) && !f.gone) f.gone = performance.now();
+    // en la pelea ningún toque es del navegador: ni desplazar, ni zoom, ni lupa, ni menú de "mantener presionado"
+    if (on && !ui && e.cancelable && e.type !== 'touchend') e.preventDefault();
+    if (e.type === 'touchend') this.tryFullscreen();
+  },
+  release() { this.stick = null; this.held.clear(); this.fingers.clear(); this.tapped.clear(); },
   read() {
     const s = blankState();
-    if (!this.shown() || !this.L) return s;
+    if (!this.shown() || !this.L) { if (this.fingers.size || this.tapped.size) this.release(); return s; }
+    this.expire();
     if (this.stick) {
       let x = (this.stick.x - this.stick.cx) / this.L.R, y = (this.stick.y - this.stick.cy) / this.L.R;
       const m = Math.hypot(x, y); if (m > 1) { x /= m; y /= m; }
       s.x = Math.abs(x) < 0.16 ? 0 : x; s.y = Math.abs(y) < 0.16 ? 0 : y;
     }
     for (const a of this.held.values()) s[a] = true;
+    for (const a of this.tapped) s[a] = true;
+    this.tapped.clear();
     s.tapJump = false; // en pantalla táctil saltar es con su botón: subir la palanca no salta sola
     s.any = s.attack || s.special || s.jump || s.shield || s.grab || s.start;
     return s;
@@ -1364,23 +1446,40 @@ window.addEventListener('pointerdown', e => TouchPad.down(e), { capture: true, p
 window.addEventListener('pointermove', e => TouchPad.move(e), { capture: true, passive: false });
 window.addEventListener('pointerup', e => TouchPad.up(e), { capture: true });
 window.addEventListener('pointercancel', e => TouchPad.up(e), { capture: true });
+for (const t of ['touchstart', 'touchmove', 'touchend', 'touchcancel']) window.addEventListener(t, e => TouchPad.touch(e), { capture: true, passive: false });
 window.addEventListener('blur', () => TouchPad.release());
+document.addEventListener('visibilitychange', () => { if (document.hidden) TouchPad.release(); });
+window.addEventListener('pagehide', () => TouchPad.release());
 window.addEventListener('resize', () => TouchPad.onResize());
 document.addEventListener('fullscreenchange', () => TouchPad.onFsChange());
 document.addEventListener('webkitfullscreenchange', () => TouchPad.onFsChange());
 // quién es "el ratón" en los menús: con pantalla táctil es la palanca en pantalla
 function pointerDev() { return TouchPad.active ? 'touch' : 'kb1'; }
 
-// iPhone: Safari no deja poner una página en pantalla completa; la única forma es abrirla desde el ícono
-// de inicio (el manifest la abre sin barras y de lado). Aviso en los menús, se cierra con ✕ y no vuelve.
+// iPhone: Safari no deja poner una página en pantalla completa. Hay dos salidas y el aviso de los menús las dice:
+//  · deslizar la página hacia arriba esconde las barras (de lado, Safari las quita del todo). Para eso, solo en
+//    este caso, la página tiene espacio para desplazarse y el juego queda fijo en medio (html.iosroll). En la
+//    pelea (html.fight) ningún toque desplaza nada, así que las barras no regresan solas.
+//  · abrirla desde el ícono de inicio: el manifest la abre sin barras y de lado, para siempre.
 const IOSFS = {
-  el: null, shownState: null,
-  want() {
+  el: null, shownState: null, swipeOff: false, roll: null, fight: null,
+  mode() {
     if (!window.APYV_WEB || TouchPad.fsSupported() || TouchPad.isStandalone()) return false;
-    const coarse = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || TouchPad.active;
-    if (!coarse || ['battle', 'netview', 'demo', 'vs'].includes(APP.screen)) return false;
-    try { if (localStorage.getItem('apyv-iosfs') === '1') return false; } catch (e) { /* sin almacenamiento */ }
-    return true;
+    return !!((window.matchMedia && matchMedia('(pointer: coarse)').matches) || TouchPad.active);
+  },
+  // de lado y sin barras, la ventana mide lo mismo que el lado corto de la pantalla
+  barsShown() {
+    const short = Math.min(screen.width || 0, screen.height || 0);
+    return TouchPad.landscape() && short > 0 && window.innerHeight < short - 24;
+  },
+  want() {
+    const m = this.mode(), fight = ['battle', 'netview'].includes(APP.screen), root = document.documentElement;
+    if (m !== this.roll) { this.roll = m; root.classList.toggle('iosroll', m); }
+    if (fight !== this.fight) { this.fight = fight; root.classList.toggle('fight', fight); }
+    if (!m || fight || ['demo', 'vs'].includes(APP.screen)) return '';
+    if (!this.swipeOff && this.barsShown()) return 'swipe';
+    try { if (localStorage.getItem('apyv-iosfs') === '1') return ''; } catch (e) { /* sin almacenamiento */ }
+    return 'home';
   },
   update() {
     const on = this.want();
@@ -1388,11 +1487,21 @@ const IOSFS = {
     this.shownState = on;
     if (on && !this.el) {
       const el = this.el = document.createElement('div'); el.id = 'iosfs';
-      el.innerHTML = '<span>📱 <b>Pantalla completa en iPhone:</b> toca <b>Compartir ⬆︎</b> → <b>Agregar a inicio</b> y abre el juego desde el ícono.</span><button aria-label="Cerrar">✕</button>';
-      el.querySelector('button').addEventListener('click', () => { try { localStorage.setItem('apyv-iosfs', '1'); } catch (e) { /* nada */ } this.shownState = null; this.el.remove(); this.el = null; });
+      el.innerHTML = '<span></span><button aria-label="Cerrar">✕</button>';
+      el.querySelector('button').addEventListener('click', () => {
+        if (this.shownState === 'swipe') this.swipeOff = true; // el de deslizar vuelve la próxima vez que abras el juego
+        else try { localStorage.setItem('apyv-iosfs', '1'); } catch (e) { /* nada */ }
+        this.shownState = null; this.el.style.display = 'none';
+      });
       document.body.appendChild(el);
     }
-    if (this.el) this.el.style.display = on ? '' : 'none';
+    if (!this.el) return;
+    this.el.style.display = on ? '' : 'none';
+    if (!on) return;
+    this.el.className = on;
+    this.el.querySelector('span').innerHTML = on === 'swipe'
+      ? '<i aria-hidden="true">↑</i><span><b>Desliza hacia arriba aquí</b> para esconder las barras de Safari. Sin barras siempre: <b>Compartir ⬆︎ → Agregar a inicio</b>.</span>'
+      : '📱 <b>Pantalla completa en iPhone:</b> toca <b>Compartir ⬆︎</b> → <b>Agregar a inicio</b> y abre el juego desde el ícono.';
   },
 };
 
@@ -10677,7 +10786,10 @@ class AIBrain {
     const dx = gx - f.x, dy = gy - f.y, adx = Math.abs(dx);
     const range = 80 * f.size();
     const safeX = x => x > st.left + 30 && x < st.right - 30;
-    const face = sign(dx) || f.face;
+    // encimados (o el rival justo arriba o abajo): "hacia el rival" cambia de signo cada cuadro y la CPU se
+    // quedaba girando de lado a lado sin avanzar. Ahí conserva hacia dónde ve y no camina
+    const stack = adx < 10 * f.size() + 6;
+    const face = stack ? f.face : sign(dx) || f.face, toward = stack ? 0 : sign(dx);
 
     if (!f.grounded && f.state === 'air' && !f.airUsed.dodge && tgt && tgt.state === 'attack' && dist(tgt.x, tgt.y, f.x, f.y) < 120 && Math.random() < L.dodge * 0.25) { press('shield'); return s; }
     // el torero espera la embestida con la verónica: la saca antes de que llegue el golpe
@@ -10715,11 +10827,16 @@ class AIBrain {
 
     // ---------- edge-guard: el rival está fuera ----------
     const tOff = tgt.x < st.left - 20 || tgt.x > st.right + 20 || (tgt.y > st.top + 30 && !tgt.grounded);
-    if (tOff && L.edgeguard > 0 && Math.random() < L.edgeguard) {
+    // la decisión de cuidar la orilla dura medio segundo: sorteada cada cuadro, la CPU corría de ida y vuelta junto al borde
+    if (!tOff) this.egT = 0;
+    else if (!(this.egT > 0)) { this.eg = L.edgeguard > 0 && Math.random() < L.edgeguard; this.egT = 30; }
+    this.egT--;
+    if (tOff && this.eg) {
       const side = tgt.x < 0 ? -1 : 1, edgeX = side < 0 ? st.left : st.right;
       if (f.grounded) {
-        const standX = edgeX - side * 40;
-        s.x = Math.abs(standX - f.x) > 20 ? sign(standX - f.x) : 0;
+        const standX = edgeX - side * 40, gap = standX - f.x;
+        // de lejos corre; ya cerca camina, para no pasarse y dar la vuelta una y otra vez
+        s.x = Math.abs(gap) > 20 ? sign(gap) * (Math.abs(gap) > 90 ? 1 : 0.5) : 0;
         // salta a interceptar si viene por arriba del borde y cerca
         if (Math.abs(tgt.x - edgeX) < 200 && tgt.y < st.top + 60 && Math.abs(f.x - standX) < 40 && this.jumpCd <= 0 && f.percent < 150) { press('jump'); s.x = side * 0.5; this.jumpCd = 40; }
         return s;
@@ -10743,7 +10860,7 @@ class AIBrain {
     const vulnerable = ['land', 'down', 'dizzy', 'helpless'].includes(tgt.state) || (tgt.state === 'attack' && tgt.move && tgt.move.f > (tgt.move.def.dur * 0.6));
     if (vulnerable && adx < range * 1.6 && Math.abs(dy) < 60 && f.grounded && Math.random() < L.punish && this.cool <= 0) {
       this.cool = L.react;
-      if (sign(dx) !== f.face) { s.x = face * 0.4; return s; }
+      if (face !== f.face) { s.x = face * 0.4; return s; }
       if (tgt.percent > 90 || tgt.state === 'dizzy') { flickX(face); press('attack'); } else if (Math.random() < 0.22) press('grab'); else { s.x = face * 0.6; press('attack'); }
       return s;
     }
@@ -10759,19 +10876,21 @@ class AIBrain {
     }
 
     if (adx > range || Math.abs(dy) > 90) {
-      s.x = sign(dx) * (f.grounded ? L.speed : 1);
+      s.x = toward * (f.grounded ? L.speed : 1);
+      // el rival casi justo arriba o abajo: acercarse caminando (corriendo se pasaba de largo y daba la vuelta)
+      if (f.grounded && Math.abs(dy) > 90 && adx < 70) s.x = toward * 0.35;
       if (!f.grounded && !safeX(f.x + sign(dx) * 80) && !(tgt.x > st.left && tgt.x < st.right)) s.x = sign(-f.x);
       if (f.grounded && !safeX(f.x + sign(dx) * 60) && !(tgt.x > st.left && tgt.x < st.right)) s.x = 0;
-      if (dy < -110 && (f.grounded || f.vy > 0) && this.jumpCd <= 0 && adx < 260) { press('jump'); this.jumpCd = 30 - L.t * 15; }
+      if (dy < -90 && (f.grounded || f.vy > 0) && this.jumpCd <= 0 && adx < 260) { press('jump'); this.jumpCd = 30 - L.t * 15; } // más arriba que el alcance: brinca (entre 90 y 110 se quedaba abajo)
       if (dy > 80 && f.grounded && f.surface && f.surface.plat && adx < 200 && Math.random() < 0.08) { s.y = 1; this.ctrl.flickY = 0; this.ctrl.flickDirY = 1; }
       if (!f.grounded && f.vy > 0 && dy > 60 && Math.random() < 0.05 + L.t * 0.1) s.y = 1;
       if (Math.random() < 0.004 && f.grounded) press('jump');
       // a nivel alto, retrocede un poco para espaciar (baile)
-      if (L.t > 0.6 && adx < range * 1.4 && tgt.state === 'attack' && f.grounded && Math.random() < 0.3) s.x = -sign(dx);
+      if (L.t > 0.6 && adx < range * 1.4 && tgt.state === 'attack' && f.grounded && Math.random() < 0.3) s.x = -toward;
       return s;
     }
     // ---------- en rango ----------
-    if (this.cool > 0) { if (Math.random() < 0.3) s.x = sign(dx) * 0.3; return s; }
+    if (this.cool > 0) { if (Math.random() < 0.3) s.x = toward * 0.3; return s; }
     if (Math.random() > L.aggro) { this.cool = randi(4, 12); return s; }
     this.cool = L.react + randi(0, Math.round(8 * (1 - L.t)));
     const killPct = 110 - (tgt.weight() - 100) * 0.8;

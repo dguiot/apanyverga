@@ -202,7 +202,10 @@ class AIBrain {
     const dx = gx - f.x, dy = gy - f.y, adx = Math.abs(dx);
     const range = 80 * f.size();
     const safeX = x => x > st.left + 30 && x < st.right - 30;
-    const face = sign(dx) || f.face;
+    // encimados (o el rival justo arriba o abajo): "hacia el rival" cambia de signo cada cuadro y la CPU se
+    // quedaba girando de lado a lado sin avanzar. Ahí conserva hacia dónde ve y no camina
+    const stack = adx < 10 * f.size() + 6;
+    const face = stack ? f.face : sign(dx) || f.face, toward = stack ? 0 : sign(dx);
 
     if (!f.grounded && f.state === 'air' && !f.airUsed.dodge && tgt && tgt.state === 'attack' && dist(tgt.x, tgt.y, f.x, f.y) < 120 && Math.random() < L.dodge * 0.25) { press('shield'); return s; }
     // el torero espera la embestida con la verónica: la saca antes de que llegue el golpe
@@ -240,11 +243,16 @@ class AIBrain {
 
     // ---------- edge-guard: el rival está fuera ----------
     const tOff = tgt.x < st.left - 20 || tgt.x > st.right + 20 || (tgt.y > st.top + 30 && !tgt.grounded);
-    if (tOff && L.edgeguard > 0 && Math.random() < L.edgeguard) {
+    // la decisión de cuidar la orilla dura medio segundo: sorteada cada cuadro, la CPU corría de ida y vuelta junto al borde
+    if (!tOff) this.egT = 0;
+    else if (!(this.egT > 0)) { this.eg = L.edgeguard > 0 && Math.random() < L.edgeguard; this.egT = 30; }
+    this.egT--;
+    if (tOff && this.eg) {
       const side = tgt.x < 0 ? -1 : 1, edgeX = side < 0 ? st.left : st.right;
       if (f.grounded) {
-        const standX = edgeX - side * 40;
-        s.x = Math.abs(standX - f.x) > 20 ? sign(standX - f.x) : 0;
+        const standX = edgeX - side * 40, gap = standX - f.x;
+        // de lejos corre; ya cerca camina, para no pasarse y dar la vuelta una y otra vez
+        s.x = Math.abs(gap) > 20 ? sign(gap) * (Math.abs(gap) > 90 ? 1 : 0.5) : 0;
         // salta a interceptar si viene por arriba del borde y cerca
         if (Math.abs(tgt.x - edgeX) < 200 && tgt.y < st.top + 60 && Math.abs(f.x - standX) < 40 && this.jumpCd <= 0 && f.percent < 150) { press('jump'); s.x = side * 0.5; this.jumpCd = 40; }
         return s;
@@ -268,7 +276,7 @@ class AIBrain {
     const vulnerable = ['land', 'down', 'dizzy', 'helpless'].includes(tgt.state) || (tgt.state === 'attack' && tgt.move && tgt.move.f > (tgt.move.def.dur * 0.6));
     if (vulnerable && adx < range * 1.6 && Math.abs(dy) < 60 && f.grounded && Math.random() < L.punish && this.cool <= 0) {
       this.cool = L.react;
-      if (sign(dx) !== f.face) { s.x = face * 0.4; return s; }
+      if (face !== f.face) { s.x = face * 0.4; return s; }
       if (tgt.percent > 90 || tgt.state === 'dizzy') { flickX(face); press('attack'); } else if (Math.random() < 0.22) press('grab'); else { s.x = face * 0.6; press('attack'); }
       return s;
     }
@@ -284,19 +292,21 @@ class AIBrain {
     }
 
     if (adx > range || Math.abs(dy) > 90) {
-      s.x = sign(dx) * (f.grounded ? L.speed : 1);
+      s.x = toward * (f.grounded ? L.speed : 1);
+      // el rival casi justo arriba o abajo: acercarse caminando (corriendo se pasaba de largo y daba la vuelta)
+      if (f.grounded && Math.abs(dy) > 90 && adx < 70) s.x = toward * 0.35;
       if (!f.grounded && !safeX(f.x + sign(dx) * 80) && !(tgt.x > st.left && tgt.x < st.right)) s.x = sign(-f.x);
       if (f.grounded && !safeX(f.x + sign(dx) * 60) && !(tgt.x > st.left && tgt.x < st.right)) s.x = 0;
-      if (dy < -110 && (f.grounded || f.vy > 0) && this.jumpCd <= 0 && adx < 260) { press('jump'); this.jumpCd = 30 - L.t * 15; }
+      if (dy < -90 && (f.grounded || f.vy > 0) && this.jumpCd <= 0 && adx < 260) { press('jump'); this.jumpCd = 30 - L.t * 15; } // más arriba que el alcance: brinca (entre 90 y 110 se quedaba abajo)
       if (dy > 80 && f.grounded && f.surface && f.surface.plat && adx < 200 && Math.random() < 0.08) { s.y = 1; this.ctrl.flickY = 0; this.ctrl.flickDirY = 1; }
       if (!f.grounded && f.vy > 0 && dy > 60 && Math.random() < 0.05 + L.t * 0.1) s.y = 1;
       if (Math.random() < 0.004 && f.grounded) press('jump');
       // a nivel alto, retrocede un poco para espaciar (baile)
-      if (L.t > 0.6 && adx < range * 1.4 && tgt.state === 'attack' && f.grounded && Math.random() < 0.3) s.x = -sign(dx);
+      if (L.t > 0.6 && adx < range * 1.4 && tgt.state === 'attack' && f.grounded && Math.random() < 0.3) s.x = -toward;
       return s;
     }
     // ---------- en rango ----------
-    if (this.cool > 0) { if (Math.random() < 0.3) s.x = sign(dx) * 0.3; return s; }
+    if (this.cool > 0) { if (Math.random() < 0.3) s.x = toward * 0.3; return s; }
     if (Math.random() > L.aggro) { this.cool = randi(4, 12); return s; }
     this.cool = L.react + randi(0, Math.round(8 * (1 - L.t)));
     const killPct = 110 - (tgt.weight() - 100) * 0.8;

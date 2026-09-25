@@ -7,6 +7,10 @@ pantalla táctil) o en línea, cada quien desde su casa, con cámara y voz.
 
 **Jugar:** https://dguiot.github.io/apanyverga/ (compu y celular).
 
+**iPhone:** Safari no deja que una página se ponga en pantalla completa. Desliza la página hacia
+arriba en el menú para esconder las barras, o mejor: *Compartir → Agregar a inicio* y abre el juego
+desde el ícono (así abre sin barras y de lado, siempre).
+
 ## Cómo funciona la versión web
 
 - `index.html` es el juego completo en un solo archivo (se genera; no se edita a mano).
