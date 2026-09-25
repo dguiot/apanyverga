@@ -255,19 +255,50 @@ const Devices = {
   pads: [],
   share: null, // { dev, full }: el único teclado en juego también lee el otro esquema
   poll() {
+    this.frame++;
     this.pads = readPads();
     this.share = typeof kbShareNow === 'function' ? kbShareNow() : null;
     const want = ['kb1', 'kb2', ...(TouchPad.active ? ['touch'] : []), ...padInfo.map(p => 'pad' + p.index)];
     this.list = want;
+    const raw = [];
     for (const d of want) {
       if (!this.ctrls[d]) this.ctrls[d] = new Controller(d);
-      this.ctrls[d].update(Capture.active ? blankState() : readDevice(d, this.pads));
+      const st = Capture.active ? blankState() : readDevice(d, this.pads);
+      this.ctrls[d].update(st); raw.push([d, st]);
     }
+    // 'local': todo lo de este aparato junto. En línea hay un solo jugador por pantalla y juega con lo que
+    // agarre (control, teclado o pantalla); antes quedaba amarrado a lo que usó para entrar a la sala
+    (this.ctrls.local || (this.ctrls.local = new Controller('local'))).update(this.merge(raw));
     keysTapped.clear();
   },
+  lastLocal: null, // el último aparato que se usó (a ese le toca vibrar)
+  merge(raw) {
+    const s = blankState(); let best = 0, bestC = 0, lead = null;
+    for (const [d, q] of raw) {
+      const m = Math.hypot(q.x, q.y), mc = Math.hypot(q.cx || 0, q.cy || 0);
+      if (m > best) { best = m; s.x = q.x; s.y = q.y; lead = q; }
+      if (mc > bestC) { bestC = mc; s.cx = q.cx; s.cy = q.cy; }
+      let used = m > 0.3 || mc > 0.3;
+      for (const b of BUTTONS) if (q[b]) { s[b] = true; used = true; }
+      if (used) this.lastLocal = d;
+    }
+    if (lead) { s.tapJump = lead.tapJump; s.digital = lead.digital; } // subir para saltar y "todo o nada" según quien mueve
+    s.any = BUTTONS.some(b => s[b]);
+    return s;
+  },
   // flancos de navegación de menú, con auto-repetición
+  // una vez por cuadro (la auto-repetición cuenta cuadros): si alguien más la pide, recibe lo mismo,
+  // menos lo que el foco de botones ya usó (focus.js)
+  frame: 0, _navT: -1, _nav: {},
   nav(dev) {
     const c = this.ctrls[dev]; if (!c || Capture.active) return {};
+    if (this._navT !== this.frame) { this._navT = this.frame; this._nav = {}; }
+    const out = Object.assign({}, this._nav[dev] || (this._nav[dev] = this.navCalc(c, dev)));
+    const eat = typeof UIFocus !== 'undefined' && UIFocus.eaten(dev);
+    if (eat) for (const k of eat) out[k] = false;
+    return out;
+  },
+  navCalc(c, dev) {
     const out = {};
     const dirs = [['left', c.x < -0.6], ['right', c.x > 0.6], ['up', c.y < -0.6], ['down', c.y > 0.6]];
     c._rep = c._rep || {};
@@ -304,7 +335,10 @@ const Rumble = {
     try { const all = navigator.getGamepads ? navigator.getGamepads() : []; for (const p of all) if (p && p.index === idx) return p; } catch (e) { /* vetado */ }
     return null;
   },
+  // 'local' vibra en el último aparato que se usó (o en el primer control conectado)
+  resolve(dev) { return dev === 'local' ? Devices.lastLocal && Devices.lastLocal !== 'kb1' && Devices.lastLocal !== 'kb2' ? Devices.lastLocal : Devices.list.find(d => d.startsWith('pad')) || null : dev; },
   canRumble(dev) {
+    dev = this.resolve(dev);
     if (dev === 'touch') return !!navigator.vibrate;
     const p = this.pad(dev);
     return !!(p && ((p.vibrationActuator && p.vibrationActuator.playEffect) || (p.hapticActuators && p.hapticActuators[0])));
@@ -312,7 +346,8 @@ const Rumble = {
   // strong: motor grande (grave), weak: motor chico (agudo), ms: duración, trig: gatillos Xbox (Edge/Chrome en Windows)
   play(dev, strong, weak, ms, trig) {
     if (!this.on || !dev || typeof dev !== 'string') return false;
-    if (!dev.startsWith('pad') && dev !== 'touch') return false;
+    dev = this.resolve(dev);
+    if (!dev || (!dev.startsWith('pad') && dev !== 'touch')) return false;
     strong = clamp(strong, 0, 1); weak = clamp(weak, 0, 1); ms = Math.round(clamp(ms, 20, 1500));
     const now = performance.now(), power = Math.max(strong, weak), c = this.cur[dev];
     if (c && now < c.until && power < c.power) return false;

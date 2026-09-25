@@ -10,6 +10,7 @@ function devLabel(d) {
   if (d === 'kb1') return 'Teclado 1';
   if (d === 'kb2') return 'Teclado 2';
   if (d === 'touch') return 'Pantalla táctil';
+  if (d === 'local') return 'Tú · control o teclado';
   if (d.startsWith('net:')) return d.slice(4);
   const p = padInfo.find(p => 'pad' + p.index === d);
   return p ? shortPadName(p.id) : 'Control';
@@ -185,6 +186,64 @@ const APP = {
         ctx.globalAlpha = a; text('🔈 ' + msg, sx - 202, sy + 21, 15, '#ffe8a3', { body: true, weight: 700 }); ctx.globalAlpha = 1;
       }
     }
+    UIFocus.draw(); // el marco del botón que tiene el control, encima de todo
+  },
+
+  // ---------------- el control llega a todos los botones (focus.js) ----------------
+  // El cursor propio de cada pantalla: sus casillas (items), dónde está (cur), cómo moverlo (sel),
+  // qué direcciones usa siempre (own) y qué botones anotados ya cubre él (hide).
+  // false: esta pantalla (o este control) no usa el foco.
+  focusNative(d) {
+    const R = (x, y, w, h) => ({ x, y, w, h });
+    const grid = k => k === 'left' || k === 'right'; // en las rejillas ←→ recorre y da la vuelta
+    const cardsR = () => { const c = []; for (let i = 0; i <= NCH(); i++) c.push(this.cardRect(i)); return c; };
+    switch (this.screen) {
+      case 'title': case 'results': return { items: [] };
+      case 'fame': return { items: [], own: k => k === 'up' || k === 'down' }; // ↑↓ recorre la tabla
+      case 'main': { const it = this.mainOptions().map((o, i) => R(W / 2 - 230, this.mainY(i), 460, 50)); return { items: it, cur: it[this.menuSel], sel: i => { this.menuSel = i; } }; }
+      case 'online': {
+        if (!Net.ok) return { items: [] };
+        const n0 = Net.hosts().filter(h => !h.sameTab).length + 1, it = [];
+        for (let i = 0; i < n0; i++) it.push(R(W / 2 - 300, 200 + i * 70, 600, 58));
+        return { items: it, cur: it[clamp(this.onSel, 0, n0 - 1)], sel: i => { this.onSel = i; } };
+      }
+      case 'modesel': {
+        const it = MODES.map((m, i) => this.modeRect(i)).concat([0, 1, 2].map(i => this.toggleRect(i)));
+        return { items: it, cur: it[this.modeSel], own: grid, sel: k => { this.modeSel = k; if (k < MODES.length) this.rules.mode = MODES[k].id; } };
+      }
+      case 'charsel': {
+        const si = this.humanSlot(Net.role === 'host' ? 'local' : d);
+        if (si < 0) return false; // quien no se ha unido: A lo une
+        const S = this.slots[si], T = this.slots[S.edit] || S, cards = cardsR();
+        const slots = [0, 1, 2, 3].map(i => this.slotRect(i)), bodies = slots.map(r => R(r.x, r.y, r.w, r.h - 100));
+        if (T === S && S.ready) {
+          const fi = S.focus >= 0 && S.focus < 4 ? S.focus : si, F = this.slots[fi];
+          return { items: slots, cur: slots[fi], hide: cards.concat(bodies), sel: i => { S.focus = i; }, own: k => grid(k) || (F.type === 'cpu' && !F.remote && (k === 'up' || k === 'down')) };
+        }
+        return { items: cards, cur: cards[clamp(T.cur, 0, NCH())], sel: i => { T.cur = i; }, own: k => grid(k) || (T.type === 'cpu' && (k === 'up' || k === 'down')) };
+      }
+      case 'netroom': {
+        const g = Net.guest, cards = cardsR();
+        if (g.rdy) return { items: [], hide: cards };
+        return { items: cards, cur: cards[clamp(g.ch, 0, NCH())], own: grid, sel: i => { g.ch = i; Net.set({ ch: g.ch, rdy: g.rdy, tm: g.tm }); } };
+      }
+      case 'stagesel': {
+        const rows = this.ruleRows(), cards = [], idx = [];
+        STAGE_INFO.forEach((s, i) => { if (!this.stageLocked(i)) { cards.push(this.stageRect(i)); idx.push(i); } });
+        const rr = rows.map((row, i) => R(W / 2 - 290, this.ruleY(i) - 2, 580, 38));
+        const arrows = rows.flatMap((row, i) => [R(W / 2 + 10, this.ruleY(i), 50, 34), R(W / 2 + 210, this.ruleY(i), 50, 34)]);
+        const cur = this.stageRow === 0 ? cards[Math.max(0, idx.indexOf(this.stageSel))] : rr[this.stageRow - 1];
+        return { items: cards.concat(rr), cur, hide: arrows, own: grid,
+          sel: k => { if (k < cards.length) { this.stageSel = idx[k]; this.stageRow = 0; } else this.stageRow = k - cards.length + 1; } };
+      }
+      case 'binds': {
+        const B = this.bind, devs = Devices.list.map((x, i) => R(40, 120 + i * 62, 330, 52)), rows = this.bindRows(Devices.list[clamp(B.dev, 0, Devices.list.length - 1)]).map((r, i) => R(410, 116 + i * 40, 830, 36));
+        if (B.col === 0) return { items: devs, cur: devs[clamp(B.dev, 0, devs.length - 1)], hide: rows, own: k => k === 'right', sel: i => { B.dev = i; } };
+        return { items: rows, cur: rows[clamp(B.row, 0, rows.length - 1)], hide: devs, own: k => k === 'left', sel: i => { B.row = i; } };
+      }
+      case 'controls': { const it = [R(W / 2 - 280, 76, 270, 44), R(W / 2 + 10, 76, 270, 44)]; return { items: it, cur: it[this.ctrlTab], own: grid, sel: i => { this.ctrlTab = i; } }; }
+      default: return false;
+    }
   },
 
   // ---------------- TÍTULO ----------------
@@ -244,7 +303,8 @@ const APP = {
   mainChoose(i) {
     Audio8.sfx('confirm');
     if (i === 0) {
-      if (!this.slots.some(s => s.type === 'human')) this.slots = [{ type: 'human', dev: this.firstDev || 'kb1', cur: 0, ready: false, edit: 0 }, { type: 'none' }, { type: 'none' }, { type: 'none' }];
+      // lugares que quedaron de una sala en línea (invitados, el aparato "local") no sirven aquí
+      if (!this.slots.some(s => s.type === 'human') || this.slots.some(s => s.remote || s.dev === 'local')) this.slots = [{ type: 'human', dev: this.firstDev || 'kb1', cur: 0, ready: false, edit: 0 }, { type: 'none' }, { type: 'none' }, { type: 'none' }];
       this.modeBack = 'main'; this.go('modesel');
     }
     if (i === 1) { this.onSel = 0; this.go('online'); }
@@ -388,10 +448,12 @@ const APP = {
     this.inviteUpdate();
     const sl = this.slots;
     const allReadyBefore = sl.some(s => s.type !== 'none') && sl.every(s => s.type === 'none' || s.ready);
-    const navs = {}; for (const d of Devices.list) navs[d] = Devices.nav(d);
+    // en línea el anfitrión es uno solo y lo mueve cualquier cosa conectada (el aparato "local")
+    const devList = Net.role === 'host' ? ['local'] : Devices.list;
+    const navs = {}; for (const d of devList) navs[d] = Devices.nav(d);
     // un solo teclado: mientras nadie se une con las flechas, las flechas también mueven al jugador de WASD
     if (navs.kb1 && navs.kb2 && this.humanSlot('kb2') < 0 && this.humanSlot('kb1') >= 0) for (const k of ['left', 'right', 'up', 'down']) if (navs.kb2[k]) { navs.kb1[k] = true; navs.kb2[k] = false; }
-    for (const d of Devices.list) {
+    for (const d of devList) {
       const n = navs[d];
       let si = this.humanSlot(d);
       if (si < 0) {
@@ -773,22 +835,31 @@ const APP = {
   stageselDraw() {
     drawMenuBG(3);
     sfText('Elige el escenario', W / 2, 40, 44, PAPER);
+    // la primera vez que se dibuja un escenario pinta y guarda sus capas (hasta medio segundo cada uno):
+    // una vista previa nueva por cuadro. Antes salían las 8 juntas y el juego se congelaba casi 2 s aquí
+    let fresh = 0;
     STAGE_INFO.forEach((info, i) => {
       const r = this.stageRect(i), sel = i === this.stageSel, locked = this.stageLocked(i), wide = r.cols >= 3, narrow = r.cols === 4;
-      if (!this.previews[info.id]) this.previews[info.id] = makeStage(info.id, { soccer: info.id === 'stadium' && this.rules.mode === 'soccer' });
-      const st = this.previews[info.id]; st.t++;
-      for (const s of st.surfaces()) if (s.move) { const p = s.move(st.t, s); s.x = p[0]; s.y = p[1]; }
+      const pk = info.id + (info.id === 'stadium' && this.rules.mode === 'soccer' ? ':futbol' : ''); // el estadio de Fútbol lleva porterías
+      if (!this.previews[pk]) this.previews[pk] = makeStage(info.id, { soccer: pk !== info.id });
+      const st = this.previews[pk], ready = st.shown || fresh++ === 0;
+      if (ready) {
+        st.shown = true; st.t++;
+        for (const s of st.surfaces()) if (s.move) { const p = s.move(st.t, s); s.x = p[0]; s.y = p[1]; }
+      }
       ctx.save(); ctx.translate(0, sel ? -6 : 0);
       if (locked) ctx.globalAlpha = 0.35;
       slab(r.x, r.y, r.w, r.h, { skew: 0.1, edge: sel ? (this.stageRow === 0 ? GOLD : TEAL) : undefined, lw: sel ? 4 : 2 });
       // vista previa: a lo ancho (4 escenarios) o a la izquierda (rejilla de 6)
       const pw = narrow ? 124 : wide ? 190 : r.w - 16, ph = wide ? r.h - 16 : 164;
       ctx.save(); slabPath(r.x + 8, r.y + 8, pw, ph, 0.1); ctx.clip();
-      ctx.translate(r.x + 8, r.y + 8); ctx.scale(pw / W, ph / H);
-      const z = info.big ? 0.36 : 0.62;
-      st.drawBG(ctx, { x: 0, y: -150, z: 1 });
-      ctx.translate(W / 2, H / 2 + 60); ctx.scale(z * (wide ? 1.35 : 1), z * (wide ? 1.35 : 1)); ctx.translate(0, info.big ? 40 : 100);
-      st.drawStage(ctx); st.drawFG(ctx);
+      if (ready) {
+        ctx.translate(r.x + 8, r.y + 8); ctx.scale(pw / W, ph / H);
+        const z = info.big ? 0.36 : 0.62;
+        st.drawBG(ctx, { x: 0, y: -150, z: 1 });
+        ctx.translate(W / 2, H / 2 + 60); ctx.scale(z * (wide ? 1.35 : 1), z * (wide ? 1.35 : 1)); ctx.translate(0, info.big ? 40 : 100);
+        st.drawStage(ctx); st.drawFG(ctx);
+      } else { ctx.fillStyle = 'rgba(255,255,255,.06)'; ctx.fillRect(r.x + 8, r.y + 8, pw, ph); } // un instante, mientras se pinta
       ctx.restore();
       if (wide) {
         const tx = r.x + pw + 22, tw = r.w - pw - 34;
@@ -876,7 +947,6 @@ const APP = {
   // ---------------- ONLINE: buscar o crear sala ----------------
   onSel: 0,
   onlineUpdate() {
-    const dev = this.firstDev || 'kb1';
     if (!Net.ok) {
       for (const d of Devices.list) { const n = Devices.nav(d); if (n.back || n.confirm || n.start) { Audio8.sfx('back'); return this.go('main'); } }
       if (clickIn(40, 660, 170, 44)) this.go('main');
@@ -887,14 +957,14 @@ const APP = {
     this.onSel = clamp(this.onSel, 0, n0 - 1);
     if (Net.wantCode) {
       const h = Net.hostByCode(Net.wantCode);
-      if (h) { const code = Net.wantCode; Net.wantCode = null; Audio8.sfx('confirm'); Toasts.push(`Entraste a la sala ${code}`); Net.join(h.peer, dev); return this.go('netroom'); }
+      if (h) { const code = Net.wantCode; Net.wantCode = null; Audio8.sfx('confirm'); Toasts.push(`Entraste a la sala ${code}`); Net.join(h.peer); return this.go('netroom'); }
       this.inviteT = (this.inviteT || 0) + 1;
       if (this.inviteT > 60 * 20) { Toasts.push(`No encontré la sala ${Net.wantCode}: quizá ya se cerró. Elige otra o crea la tuya.`); Net.wantCode = null; }
     }
     const choose = i => {
       Audio8.sfx('confirm');
-      if (i === 0) { Net.host(dev); this.slots = [{ type: 'human', dev, cur: 0, ready: false, edit: 0 }, { type: 'none' }, { type: 'none' }, { type: 'none' }]; this.modeBack = 'online'; return this.go('modesel'); }
-      const h = hosts[i - 1]; Net.join(h.peer, dev); this.go('netroom');
+      if (i === 0) { Net.host(); this.slots = [{ type: 'human', dev: 'local', cur: 0, ready: false, edit: 0 }, { type: 'none' }, { type: 'none' }, { type: 'none' }]; this.modeBack = 'online'; return this.go('modesel'); }
+      const h = hosts[i - 1]; Net.join(h.peer); this.go('netroom');
     };
     for (const d of Devices.list) {
       const n = Devices.nav(d);

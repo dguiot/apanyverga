@@ -5,6 +5,7 @@ const { chromium } = require('/opt/node22/lib/node_modules/playwright');
 const { spawn } = require('child_process');
 (async () => {
   const srv = spawn('python3', ['-m', 'http.server', '8771'], { cwd: process.cwd() + '/web', stdio: 'ignore' });
+  process.on('exit', () => { try { srv.kill(); } catch (e) { /* ya cerrado */ } }); // si la prueba truena, que no quede un servidor huérfano
   await new Promise(r => setTimeout(r, 900));
   const browser = await chromium.launch({ args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--autoplay-policy=no-user-gesture-required'] });
   const mkCtx = async opts => { const c = await browser.newContext(Object.assign({ permissions: ['camera', 'microphone'] }, opts)); await c.addInitScript({ path: 'mocksupa.js' }); await c.route('**/config.js', r => r.fulfill({ contentType: 'text/javascript', body: 'window.APYV_CONFIG = { client: window.__mockClient, ice: [] };' })); return c; };
@@ -32,7 +33,8 @@ const { spawn } = require('child_process');
   await P.evaluate(() => APP.go('online'));
   await waitFor(P, () => Net.hosts().some(h => !h.sameTab), 6000);
   await tapL(640, 200 + 70 + 29); await P.waitForTimeout(900);
-  ok('entra como invitado tocando la sala', await P.evaluate(() => APP.screen) === 'netroom' && await P.evaluate(() => Net.localDev) === 'touch', await P.evaluate(() => APP.screen + ' ' + Net.localDev));
+  // en línea juega con todo lo de su aparato (la pantalla táctil incluida): 'local'
+  ok('entra como invitado tocando la sala', await P.evaluate(() => APP.screen) === 'netroom' && await P.evaluate(() => Net.localDev) === 'local', await P.evaluate(() => APP.screen + ' ' + Net.localDev));
   await P.evaluate(() => { const r = APP.cardRect(2); window.__c = [r.x + r.w / 2, r.y + r.h / 2]; }); await tapL(...await P.evaluate(() => window.__c)); await P.waitForTimeout(700);
   ok('elige personaje tocando su tarjeta', await waitFor(A, () => APP.slots.some(s => s.remote && s.ready), 5000), await A.evaluate(() => APP.slots.map(s => s.type + ':' + (s.pick || '-')).join(' ')));
   // la voz en el celular: sin cámara ni franja de caras

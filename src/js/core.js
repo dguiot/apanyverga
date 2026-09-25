@@ -104,7 +104,8 @@ canvas.addEventListener('pointermove', e => { const p = toLogical(e); Pointer.x 
 canvas.addEventListener('pointerdown', e => { try { canvas.focus({ preventScroll: true }); window.focus(); } catch (er) { /* sin foco */ } const p = toLogical(e); Pointer.x = p.x; Pointer.y = p.y; Pointer.down = true; Pointer.clicked = true; Audio8.unlock(); });
 window.addEventListener('pointerup', () => { Pointer.down = false; });
 function hover(x, y, w, h) { return Pointer.x >= x && Pointer.x <= x + w && Pointer.y >= y && Pointer.y <= y + h; }
-function clickIn(x, y, w, h) { return Pointer.clicked && hover(x, y, w, h); }
+// cada botón que una pantalla revisa aquí queda anotado para que el control también llegue a él (focus.js)
+function clickIn(x, y, w, h) { if (typeof UIFocus !== 'undefined') UIFocus.rec(x, y, w, h); return Pointer.clicked && hover(x, y, w, h); }
 
 // ---------- Avisos flotantes ----------
 const Toasts = {

@@ -120,15 +120,15 @@ const Net = {
   },
 
   // ---------- papel de anfitrión ----------
-  host(dev) {
-    this.role = 'host'; this.localDev = dev; this.hostPeer = this.myPeer();
+  host() {
+    this.role = 'host'; this.localDev = 'local'; this.hostPeer = this.myPeer(); // un jugador por pantalla: juega con todo lo conectado
     this.lob = { ph: 'lobby', ep: (this.lob.ep || 0) + 1 };
     if (!this.code) this.code = roomCode(); // el mismo en toda la visita: el link que ya mandaste sigue sirviendo
     this.set({ role: 'host', code: this.code, join: null, lob: null, st: null, inp: null });
     this.lastLobJSON = '';
   },
-  join(peer, dev) {
-    this.role = 'guest'; this.hostPeer = peer; this.localDev = TouchPad.active && !/^pad/.test(dev) ? 'touch' : dev;
+  join(peer) {
+    this.role = 'guest'; this.hostPeer = peer; this.localDev = 'local'; // igual que el anfitrión: todo lo conectado
     this.guest = { ch: randi(0, CHAR_ORDER.length - 1), rdy: 0, tm: -1, cnt: BUTTONS.map(() => 0) };
     this.lastSnap = null; this.lastEv = 0; this.view = null; this.lostHostT = 0;
     this.set({ role: 'guest', join: peer, ch: this.guest.ch, rdy: 0, tm: -1, lob: null, st: null });

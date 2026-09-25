@@ -4,6 +4,7 @@ const { chromium } = require('/opt/node22/lib/node_modules/playwright');
 const { spawn } = require('child_process');
 (async () => {
   const srv = spawn('python3', ['-m', 'http.server', '8767'], { cwd: process.cwd(), stdio: 'ignore' });
+  process.on('exit', () => { try { srv.kill(); } catch (e) { /* ya cerrado */ } }); // si la prueba truena, que no quede un servidor huérfano
   await new Promise(r => setTimeout(r, 800));
   const browser = await chromium.launch({ args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--disable-features=WebRtcHideLocalIpsWithMdns', '--autoplay-policy=no-user-gesture-required'] });
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 860 }, permissions: ['camera', 'microphone'] });

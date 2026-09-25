@@ -3,6 +3,7 @@ const { chromium } = require('/opt/node22/lib/node_modules/playwright');
 const { spawn } = require('child_process');
 (async () => {
   const srv = spawn('python3', ['-m', 'http.server', '8772'], { cwd: process.cwd() + '/web', stdio: 'ignore' });
+  process.on('exit', () => { try { srv.kill(); } catch (e) { /* ya cerrado */ } }); // si la prueba truena, que no quede un servidor huérfano
   await new Promise(r => setTimeout(r, 900));
   const browser = await chromium.launch();
   const ctx = await browser.newContext({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
