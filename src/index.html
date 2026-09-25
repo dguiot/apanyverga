@@ -1,0 +1,61 @@
+<meta charset="utf-8">
+<title>A pan y verga</title>
+<link rel="stylesheet" href="fonts/inline.css">
+<style>
+  :root { --ground: #060d18; --ink: #10131a; color-scheme: dark; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--ground); display: flex; align-items: center; justify-content: center; overflow: hidden; touch-action: none; }
+  canvas { display: block; background: #081a2e; image-rendering: auto; outline: none; max-width: 100%; }
+  canvas:focus-visible { box-shadow: 0 0 0 3px #2ec4b6; }
+  body { box-sizing: border-box; }
+  /* franja de cámara y voz */
+  #av { position: fixed; left: 0; right: 0; bottom: 0; display: flex; align-items: stretch; gap: 12px; padding: 8px 16px; box-sizing: border-box; background: #0b0f18; border-top: 1px solid #1f2a3a; font-family: 'Barlow', system-ui, sans-serif; }
+  .av-tiles { flex: 1; min-width: 0; display: flex; gap: 10px; justify-content: center; overflow: hidden; }
+  .av-tile { position: relative; flex: 0 1 auto; height: 100%; aspect-ratio: 4 / 3; min-width: 0; border-radius: 16px; overflow: hidden; background: #141b28; border: 2px solid rgba(46,196,182,.75); }
+  .av-tile video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .av-tile video.me { transform: scaleX(-1); }
+  .av-tile.off video { visibility: hidden; }
+  .av-nm { position: absolute; left: 8px; right: 8px; bottom: 6px; color: #f4f6fa; font-weight: 700; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 3px rgba(0,0,0,.9); }
+  .av-st { position: absolute; right: 8px; top: 6px; color: #cbd5e1; font-size: 12px; text-shadow: 0 1px 3px rgba(0,0,0,.9); }
+  .av-ctl { flex: 0 0 auto; display: flex; flex-direction: column; justify-content: center; gap: 6px; }
+  .av-ctl button { border-radius: 999px; border: 1px solid #2a3547; background: #161e2c; color: #f4f6fa; font: 600 13px 'Barlow', system-ui, sans-serif; padding: 6px 14px; cursor: pointer; white-space: nowrap; }
+  .av-ctl button:hover { border-color: #2ec4b6; }
+  .av-ctl button[data-a=off] { color: #ffb4bb; }
+</style>
+<canvas id="game" tabindex="0" aria-label="A pan y verga: juego de peleas para hasta 4 jugadores. Usa un control o el teclado."></canvas>
+<!--SCRIPTS-->
+<script src="js/core.js"></script>
+<script src="js/art.js"></script>
+<script src="js/input.js"></script>
+<script src="js/touch.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/faces.js"></script>
+<script src="js/draw.js"></script>
+<script src="js/draw2.js"></script>
+<script src="js/draw3.js"></script>
+<script src="js/characters.js"></script>
+<script src="js/characters2.js"></script>
+<script src="js/abilities.js"></script>
+<script src="js/anim.js"></script>
+<script src="js/styles.js"></script>
+<script src="js/characters3.js"></script>
+<script src="js/movekits.js"></script>
+<script src="js/balance.js"></script>
+<script src="js/stages.js"></script>
+<script src="js/stages2.js"></script>
+<script src="js/scenery.js"></script>
+<script src="js/scenery2.js"></script>
+<script src="js/stages3.js"></script>
+<script src="js/stagemech.js"></script>
+<script src="js/combat.js"></script>
+<script src="js/items.js"></script>
+<script src="js/modes.js"></script>
+<script src="js/fighter.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/net.js"></script>
+<script src="js/avchat.js"></script>
+<script src="js/battle.js"></script>
+<script src="js/menus.js"></script>
+<script src="js/fame.js"></script>
+<script src="js/main.js"></script>
+<!--/SCRIPTS-->

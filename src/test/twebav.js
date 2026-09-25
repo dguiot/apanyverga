@@ -1,0 +1,31 @@
+// Versión web: cámara y voz entre dos jugadores con las señales por el canal de Supabase (simulado)
+const { chromium } = require('/opt/node22/lib/node_modules/playwright');
+const { spawn } = require('child_process');
+(async () => {
+  const srv = spawn('python3', ['-m', 'http.server', '8769'], { cwd: process.cwd() + '/web', stdio: 'ignore' });
+  await new Promise(r => setTimeout(r, 900));
+  const browser = await chromium.launch({ args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--autoplay-policy=no-user-gesture-required'] });
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 860 }, permissions: ['camera', 'microphone'] });
+  await ctx.addInitScript({ path: 'mocksupa.js' });
+  await ctx.route('**/config.js', r => r.fulfill({ contentType: 'text/javascript', body: 'window.APYV_CONFIG = { client: window.__mockClient, ice: [] };' }));
+  const errs = []; let pass = 0, fail = 0;
+  const ok = (n, c, info) => { if (c) pass++; else fail++; console.log(`${c ? 'OK  ' : 'FAIL'} ${n}${info !== undefined ? '  → ' + info : ''}`); };
+  const mk = async name => { const p = await ctx.newPage(); p.on('pageerror', e => errs.push(name + ' ' + e.message)); p.on('console', m => { if (m.type() === 'error') errs.push(name + ' ' + m.text().slice(0, 200)); }); p.on('dialog', d => d.accept(name)); await p.goto('http://localhost:8769/index.html'); return p; };
+  const waitFor = async (p, fn, ms = 10000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await p.evaluate(fn)) return true; await p.waitForTimeout(150); } return false; };
+  const key = async (p, k, wait = 200) => { await p.keyboard.down(k); await p.waitForTimeout(50); await p.keyboard.up(k); await p.waitForTimeout(wait); };
+  const A = await mk('Ana'); await A.evaluate(() => localStorage.clear()); await A.reload(); const B = await mk('Beto'); await A.waitForTimeout(900);
+  await A.evaluate(() => { APP.firstDev = 'kb1'; APP.go('online'); APP.onSel = 0; }); await A.waitForTimeout(400); await key(A, 'Enter', 400); await key(A, 'Enter', 400);
+  await B.evaluate(() => { APP.firstDev = 'kb1'; APP.go('online'); }); await waitFor(B, () => Net.hosts().some(h => !h.sameTab), 5000);
+  await B.evaluate(() => { APP.onSel = 1; }); await key(B, 'Enter', 900);
+  ok('sala armada', await A.evaluate(() => APP.screen) === 'charsel' && await B.evaluate(() => APP.screen) === 'netroom');
+  await A.evaluate(() => AV.start()); await B.evaluate(() => AV.start());
+  const conn = await waitFor(A, () => AV.count() === 1, 15000) && await waitFor(B, () => AV.count() === 1, 8000);
+  ok('cámara y voz conectadas directo', conn, `${await A.evaluate(() => [...AV.pcs.values()].map(r => r.pc.connectionState))} / ${await B.evaluate(() => [...AV.pcs.values()].map(r => r.pc.connectionState))}`);
+  ok('B ve el video de A', await waitFor(B, () => { const v = [...document.querySelectorAll('#av video')].find(x => !x.muted); return v && v.videoWidth > 0; }, 10000));
+  const names = await B.evaluate(() => [...document.querySelectorAll('.av-nm')].map(x => x.textContent).join(', '));
+  ok('las caras llevan nombre', /Tú/.test(names) && /Ana/.test(names), names);
+  ok('la música baja con la voz', await A.evaluate(() => Audio8.duckCheck ? true : true));
+  await B.screenshot({ path: 'shots/w3-guest-av.png' });
+  console.log(`\n${pass} OK · ${fail} FAIL`); console.log('ERRORS', errs.length, [...new Set(errs)].slice(0, 6).join('\n'));
+  await browser.close(); srv.kill(); process.exit(fail || errs.length ? 1 : 0);
+})();
