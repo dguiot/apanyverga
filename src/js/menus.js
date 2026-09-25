@@ -154,21 +154,28 @@ const APP = {
     if (avButtonShown()) {
       const b = AV_BTN, on = AV.on, hv = hover(b.x, b.y, b.w, b.h);
       slab(b.x, b.y, b.w, b.h, { skew: 0.2, top: on ? '#34d399' : hv ? '#ffd76a' : undefined, bottom: on ? '#059669' : hv ? '#e0a01a' : undefined, edge: on ? '#a7f3d0' : undefined });
-      text(AV.starting ? 'Pidiendo permiso…' : on ? `🎥 En vivo · ${AV.count() + 1}` : '🎥 Cámara y voz', b.x + b.w / 2, b.y + b.h / 2 + 1, 15, on || hv ? INK : PAPER, { body: true, weight: 700 });
+      if (on) {
+        // prendido: micrófono · cámara · salir
+        const sg = AV.segs(b), lab = { mic: AV.mic ? '🎤' : '🔇', cam: AV.cam ? '📷' : '🚫', off: `✕ Salir · ${AV.count() + 1}` };
+        for (const q of sg) { if (hover(q.x, q.y, q.w, q.h)) { ctx.fillStyle = 'rgba(255,255,255,.28)'; ctx.fillRect(q.x + 4, q.y + 4, q.w - 8, q.h - 8); } text(lab[q.a], q.x + q.w / 2, q.y + q.h / 2 + 1, q.a === 'off' ? 14 : 17, INK, { body: true, weight: 700 }); }
+        ctx.strokeStyle = 'rgba(6,40,30,.45)'; ctx.lineWidth = 1.5; for (const q of sg.slice(1)) { ctx.beginPath(); ctx.moveTo(q.x, q.y + 8); ctx.lineTo(q.x, q.y + q.h - 8); ctx.stroke(); }
+      } else text(AV.starting ? 'Pidiendo permiso…' : '🎥 Cámara y voz', b.x + b.w / 2, b.y + b.h / 2 + 1, 15, hv ? INK : PAPER, { body: true, weight: 700 });
       if (AV.err && performance.now() - AV.errT < 12000) {
         slab(W - 452, 62, 420, 96, { skew: 0.05, edge: '#ff9f1c' });
         wrapText(AV.err, W - 242, 82, 380, 14, 19, '#f1f5f9');
       }
     }
     TouchPad.draw();
+    IOSFS.update();
     Toasts.draw();
     const sx = W - 58, sy = 14;
-    if (!['battle', 'demo', 'vs'].includes(this.screen)) {
+    if (!['battle', 'demo', 'vs', 'netview'].includes(this.screen)) {
       slab(sx, sy, 46, 40, { skew: 0.2 });
       text(Audio8.muted ? '🔇' : '🔊', sx + 23, sy + 21, 18, PAPER, { body: true });
       // el navegador todavía no deja sonar (con control de juego pasa siempre: sus botones no cuentan como gesto)
       if (!Audio8.ready && Audio8.soundMode() !== 'off' && !avButtonShown()) {
-        const msg = TouchPad.active ? 'Toca la pantalla para activar el sonido' : 'Haz clic o pulsa una tecla para activar el sonido';
+        const touchy = TouchPad.active || (window.matchMedia && matchMedia('(pointer: coarse)').matches);
+        const msg = touchy ? 'Toca la pantalla para activar el sonido' : 'Haz clic o pulsa una tecla para activar el sonido';
         const a = 0.75 + 0.25 * Math.sin(this.t / 9);
         slab(sx - 392, sy + 2, 380, 36, { skew: 0.2, edge: '#ffbe0b' });
         ctx.globalAlpha = a; text('🔈 ' + msg, sx - 202, sy + 21, 15, '#ffe8a3', { body: true, weight: 700 }); ctx.globalAlpha = 1;
@@ -584,6 +591,12 @@ const APP = {
         : (Net.role === 'host' ? 'Tus amigos aparecen aquí al unirse · ←→ elegir · A confirmar · X/Y agregar CPU · ↑↓ nivel · B cerrar la sala' : '←→ elegir · A confirmar · B volver · luego ←→ para agregar CPUs') + (this.teamsOn() ? ' · Escudo: cambiar de equipo' : ''), W / 2, 677, 14, MUTED, { body: true, weight: 500 });
     }
   },
+  // de quién es la cámara de una tarjeta: el invitado por su conexión; el anfitrión (o quien juega aquí) por la propia
+  slotPeer(s) {
+    if (this.screen === 'netroom') return s.mine ? Net.myPeer() : s.peer || null;
+    if (Net.role !== 'host') return null;
+    return s.remote || (this.slots.find(x => x.type === 'human' && !x.remote) === s ? Net.myPeer() : null);
+  },
   drawSlot(i) {
     const r = this.slotRect(i), s = this.slots[i], col = PLAYER_COLORS[i];
     if (s.type === 'none') {
@@ -616,7 +629,14 @@ const APP = {
     }
     slabPath(r.x + 14, r.y + 12, 66, 28, 0.3); ctx.fillStyle = col; ctx.fill();
     sfText(s.type === 'cpu' ? 'CPU' : PLAYER_TAGS[i], r.x + 47, r.y + 26, 24, INK, { stroke: null });
-    text(s.type === 'cpu' ? '' : devLabel(s.dev), r.x + r.w - 18, r.y + 26, 13, '#cbd5e1', { align: 'right', body: true, weight: 600 });
+    // con cámara y voz: su cara en vivo en la esquina de su tarjeta
+    const cam = s.type === 'human' && typeof AV !== 'undefined' ? AV.videoFor(this.slotPeer(s)) : null;
+    if (cam) {
+      const cx = r.x + r.w - 84, cy = r.y + 8, cw2 = 72, ch2 = 50;
+      ctx.save(); roundRect(ctx, cx, cy, cw2, ch2, 10); ctx.clip(); drawVideoCover(ctx, cam.v, cx, cy, cw2, ch2, cam.mirror); ctx.restore();
+      roundRect(ctx, cx, cy, cw2, ch2, 10); ctx.lineWidth = 2; ctx.strokeStyle = col; ctx.stroke();
+      ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.arc(cx + 9, cy + 9, 3.5, 0, TAU); ctx.fill();
+    } else text(s.type === 'cpu' ? '' : devLabel(s.dev), r.x + r.w - 18, r.y + 26, 13, '#cbd5e1', { align: 'right', body: true, weight: 600 });
     sfText(id ? CHARS[id].name : 'Aleatorio', r.x + 220, r.y + 70, 36, PAPER);
     if (id) {
       text(CHARS[id].title, r.x + 220, r.y + 96, 13, MUTED, { body: true, weight: 600 });
@@ -944,7 +964,8 @@ const APP = {
       if (a[0] === 'h') {
         if (a[1] && a[1] === me) return { type: 'human', dev: 'net:Tú', cur: g.ch, ready: !!g.rdy, pick: g.rdy ? (CHAR_ORDER[a[4]] || CHAR_ORDER[g.ch] || null) : null, edit: i, mine: true, team: g.tm >= 0 ? g.tm : (a[5] || 0) };
         const nm = a[1] ? Net.nameOf(a[1]) : Net.nameOf(Net.hostPeer);
-        return { type: 'human', dev: 'net:' + nm, cur: a[2], ready: !!a[3], pick: CHAR_ORDER[a[4]] || null, edit: i, team: a[5] || 0 };
+        const first = sl.findIndex(x => x[0] === 'h' && !x[1]) === i;
+        return { type: 'human', dev: 'net:' + nm, cur: a[2], ready: !!a[3], pick: CHAR_ORDER[a[4]] || null, edit: i, team: a[5] || 0, peer: a[1] || (first ? Net.hostPeer : null) };
       }
       return { type: 'none' };
     });
@@ -990,8 +1011,9 @@ const APP = {
   netviewDraw() {
     if (Net.view) Net.view.draw();
     if (!Net.lastSnap) { ctx.fillStyle = 'rgba(6,8,14,.7)'; ctx.fillRect(0, 0, W, H); sfText('Conectando con el anfitrión…', W / 2, H / 2, 44, GOLD); }
-    slab(16, 14, 250, 32, { skew: 0.3 });
-    text(`● ONLINE · sala de ${Net.nameOf(Net.hostPeer)}`, 141, 31, 13, TEAL, { body: true, weight: 700 });
+    const oy = hudOnTop() ? H - 46 : 14;
+    slab(16, oy, 250, 32, { skew: 0.3 });
+    text(`● ONLINE · sala de ${Net.nameOf(Net.hostPeer)}`, 141, oy + 17, 13, TEAL, { body: true, weight: 700 });
   },
 
   // ---------------- CONFIGURAR BOTONES ----------------

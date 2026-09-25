@@ -32,7 +32,8 @@ function step() {
   Devices.poll();
   try { Net.tick(); } catch (e) { console.error(e); }
   if (Pointer.clicked && APP.screen !== 'battle' && hover(W - 58, 14, 44, 44)) { Audio8.setMuted(!Audio8.muted); Pointer.clicked = false; }
-  if (Pointer.clicked && avButtonShown()) { const b = AV_BTN; if (hover(b.x, b.y, b.w, b.h)) { AV.toggle(); Pointer.clicked = false; } }
+  if (Pointer.clicked && avButtonShown()) { const b = AV_BTN; if (hover(b.x, b.y, b.w, b.h)) { AV.click(b); Pointer.clicked = false; } }
+  if (AV.on && keyEdge('kb1', 'KeyM')) { AV.setMic(!AV.mic); Toasts.push(AV.mic ? '🎤 Micrófono abierto' : '🔇 Micrófono silenciado'); }
   try { AV.tick(); } catch (e) { console.error(e); }
   try { APP.update(); } catch (e) { console.error(e); }
   Audio8.tick();

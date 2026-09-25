@@ -117,7 +117,7 @@ const Net = {
     this.lastLobJSON = '';
   },
   join(peer, dev) {
-    this.role = 'guest'; this.hostPeer = peer; this.localDev = dev;
+    this.role = 'guest'; this.hostPeer = peer; this.localDev = TouchPad.active && !/^pad/.test(dev) ? 'touch' : dev;
     this.guest = { ch: randi(0, CHAR_ORDER.length - 1), rdy: 0, tm: -1, cnt: BUTTONS.map(() => 0) };
     this.lastSnap = null; this.lastEv = 0; this.view = null; this.lostHostT = 0;
     this.set({ role: 'guest', join: peer, ch: this.guest.ch, rdy: 0, tm: -1, lob: null, st: null });
@@ -233,8 +233,8 @@ const Net = {
     const B = new Battle(setup, { view: true });
     B.fighters.forEach((f, i) => {
       const p = setup.players[i];
-      if (p.remote === '') f.label = this.nameOf(this.hostPeer);
-      else if (p.remote) f.label = p.remote === this.myPeer() ? 'Tú' : this.nameOf(p.remote);
+      if (p.remote === '') { f.label = this.nameOf(this.hostPeer); if (!B.fighters.some(q => q.avPeer === this.hostPeer)) f.avPeer = this.hostPeer; }
+      else if (p.remote) { f.label = p.remote === this.myPeer() ? 'Tú' : this.nameOf(p.remote); f.avPeer = p.remote; }
     });
     this.meIdx = setup.players.findIndex(p => p.remote && p.remote === this.myPeer());
     this.view = B; this.lastSnap = null; this.lastEv = 0;

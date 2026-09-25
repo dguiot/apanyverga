@@ -20,9 +20,10 @@ const Audio8 = {
         for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
         try { const m = localStorage.getItem('golpazo-muted'); if (m === '1') this.setMuted(true); if (m === 'fx') this.setSound('fx'); } catch (e) {}
       }
-      if (this.ctx.state === 'suspended') { const p = this.ctx.resume(); if (p && p.catch) p.catch(() => {}); }
+      // 'suspended' (sin gesto todavía) o 'interrupted' (Safari al prender el micrófono o una llamada)
+      if (this.ctx.state !== 'running' && this.ctx.state !== 'closed') { const p = this.ctx.resume(); if (p && p.catch) p.catch(() => {}); }
       // iPhone: que suene aunque el interruptor de silencio esté puesto (con videollamada lo decide el micrófono)
-      try { if (navigator.audioSession && navigator.audioSession.type !== 'play-and-record') navigator.audioSession.type = 'playback'; } catch (e) { /* sin sesión */ }
+      try { if (navigator.audioSession && !(typeof AV !== 'undefined' && AV.on) && navigator.audioSession.type !== 'playback') navigator.audioSession.type = 'playback'; } catch (e) { /* sin sesión */ }
       // iOS: un búfer mudo dentro del gesto termina de abrir el audio
       if (!this.primed && this.ctx.state !== 'closed') { const b = this.ctx.createBuffer(1, 1, 22050), s = this.ctx.createBufferSource(); s.buffer = b; s.connect(this.ctx.destination); s.start(0); this.primed = true; }
     } catch (e) { /* sin audio */ }

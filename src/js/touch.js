@@ -25,7 +25,8 @@ const TouchPad = {
     { a: 'grab',    label: 'Agarrar',                  col: '#ffbe0b', dx: 0.68, dy: 0.29, r: 0.075 },
   ],
   el: null, g: null, L: null, fsRefused: false, wasFs: false,
-  shown() { return this.active && APP.screen === 'battle'; },
+  // en la pelea propia y también como invitado (la pelea del anfitrión se ve en 'netview')
+  shown() { return this.active && (APP.screen === 'battle' || (APP.screen === 'netview' && Net.role === 'guest')); },
   // ---------- capa y medidas ----------
   setup() {
     if (this.el) return;
@@ -50,7 +51,7 @@ const TouchPad = {
     const u = clamp(Math.min(vw, vh), 280, 440);
     this.L = { vw, vh, dpr, u, sl, sr, st, sb, R: u * 0.17, knob: u * 0.075,
       home: { x: sl + u * 0.3, y: vh - sb - u * 0.3 },
-      pause: { x: vw / 2, y: st + 22, r: 19 },
+      pause: { x: vw - sr - 20, y: st + 22, r: 19 }, // arriba a la derecha: arriba al centro va el marcador
       btns: this.BUTTONS.map(b => Object.assign({}, b, { x: vw - sr - b.dx * u, y: vh - sb - b.dy * u, rr: b.r * u })) };
   },
   hitButton(x, y) {
@@ -62,10 +63,8 @@ const TouchPad = {
   // ---------- toques ----------
   down(e) {
     if (e.pointerType !== 'touch') return;
-    if (!this.active) {
-      this.active = true; this.setup();
-      if (!this.fsSupported() && !this.isStandalone() && typeof Toasts !== 'undefined') setTimeout(() => Toasts.push('📱 Pantalla completa: Compartir → "Agregar a inicio" y ábrelo desde el ícono'), 1200);
-    }
+    if (e.target && e.target.closest && e.target.closest('#av, #iosfs')) return; // botones de la voz y del aviso: no son la palanca
+    if (!this.active) { this.active = true; this.setup(); }
     if (!this.shown()) return;
     const x = e.clientX, y = e.clientY;
     const b = this.hitButton(x, y);
@@ -202,3 +201,28 @@ document.addEventListener('fullscreenchange', () => TouchPad.onFsChange());
 document.addEventListener('webkitfullscreenchange', () => TouchPad.onFsChange());
 // quién es "el ratón" en los menús: con pantalla táctil es la palanca en pantalla
 function pointerDev() { return TouchPad.active ? 'touch' : 'kb1'; }
+
+// iPhone: Safari no deja poner una página en pantalla completa; la única forma es abrirla desde el ícono
+// de inicio (el manifest la abre sin barras y de lado). Aviso en los menús, se cierra con ✕ y no vuelve.
+const IOSFS = {
+  el: null, shownState: null,
+  want() {
+    if (!window.APYV_WEB || TouchPad.fsSupported() || TouchPad.isStandalone()) return false;
+    const coarse = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || TouchPad.active;
+    if (!coarse || ['battle', 'netview', 'demo', 'vs'].includes(APP.screen)) return false;
+    try { if (localStorage.getItem('apyv-iosfs') === '1') return false; } catch (e) { /* sin almacenamiento */ }
+    return true;
+  },
+  update() {
+    const on = this.want();
+    if (on === this.shownState) return;
+    this.shownState = on;
+    if (on && !this.el) {
+      const el = this.el = document.createElement('div'); el.id = 'iosfs';
+      el.innerHTML = '<span>📱 <b>Pantalla completa en iPhone:</b> toca <b>Compartir ⬆︎</b> → <b>Agregar a inicio</b> y abre el juego desde el ícono.</span><button aria-label="Cerrar">✕</button>';
+      el.querySelector('button').addEventListener('click', () => { try { localStorage.setItem('apyv-iosfs', '1'); } catch (e) { /* nada */ } this.shownState = null; this.el.remove(); this.el = null; });
+      document.body.appendChild(el);
+    }
+    if (this.el) this.el.style.display = on ? '' : 'none';
+  },
+};

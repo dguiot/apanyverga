@@ -8,8 +8,7 @@ const ctx = canvas.getContext('2d');
 let VIEW = { scale: 1, dpr: 1 };
 
 function resize() {
-  // con la cámara y voz encendidas, el juego deja espacio abajo para las caras
-  const bar = window.AV_BAR || 0; // lo fija la franja de cámara (avchat.js)
+  const bar = 0; // las caras de la cámara van dentro del marcador: ya no hay franja abajo
   document.body.style.paddingBottom = bar ? bar + 'px' : '';
   const vw = window.innerWidth, vh = Math.max(120, window.innerHeight - bar);
   const s = Math.min(vw / W, vh / H);

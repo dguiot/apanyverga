@@ -2,16 +2,25 @@
 // ============================================================
 //  CÁMARA Y VOZ en las salas online. Cada jugador que la enciende
 //  se conecta directo con los demás (WebRTC, de navegador a navegador);
-//  la sala de Claude solo pasa las señales para encontrarse (tema "rtc").
+//  la sala solo pasa las señales para encontrarse (tema "rtc").
 //  Nada se graba ni se guarda.
+//  Las caras no van en una franja aparte: cada cámara sustituye al retrato
+//  del personaje de esa persona en el marcador de la pelea (y aparece en
+//  su tarjeta al elegir personaje). Los videos viven ocultos y el juego
+//  los dibuja en el lienzo.
 // ============================================================
 // en la versión web se pueden agregar servidores TURN (APYV_CONFIG.ice) para redes que no dejan conectar directo
 const AV_ICE = (window.APYV_CONFIG && window.APYV_CONFIG.ice) || [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }];
 const AV_CHUNK = 2800; // la señal viaja en trozos: cada mensaje de la sala admite 4 KiB
 const AV = {
   on: false, starting: false, stream: null, err: null, errT: 0, pcs: new Map(), parts: new Map(),
-  wired: false, mic: true, cam: true, barH: 0, el: null, tiles: new Map(), t: 0, denied: false,
+  wired: false, mic: true, cam: true, el: null, tiles: new Map(), t: 0, denied: false,
   supported() { return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.RTCPeerConnection); },
+  // celular: video más chico (la cara cabe igual en el cuadrito del marcador)
+  compact() {
+    const coarse = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || (typeof TouchPad !== 'undefined' && TouchPad.active);
+    return !!coarse && Math.min(window.innerWidth, window.innerHeight) < 600;
+  },
   inRoom() { return Net.ok && !!Net.room && (Net.role === 'host' || Net.role === 'guest'); },
   myKey() { return Net.role === 'host' ? Net.myPeer() : Net.hostPeer; },
   keyOf(p) { const pr = p.presence || {}; return pr.role === 'host' ? p.peer : pr.join; },
@@ -26,9 +35,10 @@ const AV = {
     let stream = null, err = null;
     // iPhone: con micrófono el audio tiene que ser de llamada (el juego lo pone en 'playback' para ignorar el modo silencio)
     try { if (navigator.audioSession) navigator.audioSession.type = 'play-and-record'; } catch (e) { /* sin sesión */ }
+    const small = this.compact();
     try {
       stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 320 }, height: { ideal: 240 }, frameRate: { ideal: 15, max: 20 }, facingMode: 'user' },
+        video: small ? { width: { ideal: 192 }, height: { ideal: 144 }, frameRate: { ideal: 12, max: 15 }, facingMode: 'user' } : { width: { ideal: 320 }, height: { ideal: 240 }, frameRate: { ideal: 15, max: 20 }, facingMode: 'user' },
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       });
     } catch (e) {
@@ -41,9 +51,11 @@ const AV = {
     if (!this.starting) { stream.getTracks().forEach(t => t.stop()); return; } // se canceló mientras pedía permiso
     this.stream = stream; this.on = true; this.starting = false; this.mic = true; this.cam = stream.getVideoTracks().length > 0;
     this.wire();
-    Net.set({ av: 1 });
+    Net.set({ av: 1, cam: this.cam ? 1 : 0 });
     this.ui();
-    Toasts.push('🎥 Cámara y voz encendidas');
+    Toasts.push('🎥 Cámara y voz encendidas: tu cara sale en tu cuadrito del marcador');
+    // Safari deja el audio del juego 'interrumpido' al abrir el micrófono: lo retomamos
+    setTimeout(() => Audio8.unlock(), 300);
   },
   explain(e) {
     const fp = document.featurePolicy || document.permissionsPolicy;
@@ -59,12 +71,15 @@ const AV = {
     if (this.stream) this.stream.getTracks().forEach(t => t.stop());
     this.stream = null;
     const was = this.on; this.on = false;
-    if (Net.ok) Net.set({ av: null });
+    if (Net.ok) Net.set({ av: null, cam: null });
     this.ui();
+    // sin micrófono, el iPhone vuelve a sonar aunque esté en modo silencio
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) { /* sin sesión */ }
+    setTimeout(() => Audio8.unlock(), 300);
     if (say && was) Toasts.push('Cámara y voz apagadas');
   },
   setMic(v) { this.mic = v; if (this.stream) this.stream.getAudioTracks().forEach(t => { t.enabled = v; }); this.ui(); },
-  setCam(v) { this.cam = v; if (this.stream) this.stream.getVideoTracks().forEach(t => { t.enabled = v; }); this.ui(); },
+  setCam(v) { this.cam = v; if (this.stream) this.stream.getVideoTracks().forEach(t => { t.enabled = v; }); Net.set({ cam: v ? 1 : 0 }); this.ui(); },
 
   // ---------- señales por la sala ----------
   wire() {
@@ -157,48 +172,41 @@ const AV = {
     if (this.t % 90 === 0) this.ui(); // nombres al día
   },
 
-  // ---------- franja de caras (debajo del juego) ----------
+  // ---------- videos ocultos: el juego los dibuja en el marcador ----------
   ui() {
     if (!this.on) {
       if (this.el) { this.el.remove(); this.el = null; this.tiles.clear(); }
-      if (this.barH) { this.barH = 0; window.AV_BAR = 0; resize(); }
       return;
     }
-    if (!this.el) {
-      const el = document.createElement('div'); el.id = 'av';
-      el.innerHTML = '<div class="av-tiles"></div><div class="av-ctl"><button data-a="mic" tabindex="-1"></button><button data-a="cam" tabindex="-1"></button><button data-a="off" tabindex="-1">Salir</button></div>';
-      el.addEventListener('mousedown', e => { if (e.target.closest('button')) e.preventDefault(); }); // sin foco: Espacio sigue siendo salto
-      el.addEventListener('click', e => {
-        const b = e.target.closest('button'); if (!b) return;
-        if (b.dataset.a === 'mic') this.setMic(!this.mic);
-        if (b.dataset.a === 'cam') this.setCam(!this.cam);
-        if (b.dataset.a === 'off') this.stop(true);
-        try { canvas.focus(); } catch (err) { /* nada */ }
-      });
-      document.body.appendChild(el); this.el = el;
-    }
-    const list = [{ key: 'me', stream: this.stream, name: 'Tú', me: true }];
-    for (const [peer, rec] of this.pcs) list.push({ key: peer, stream: rec.stream, name: Net.nameOf(peer), state: rec.pc.connectionState });
-    const box = this.el.querySelector('.av-tiles');
-    for (const [k, t] of this.tiles) if (!list.find(x => x.key === k)) { t.remove(); this.tiles.delete(k); }
+    if (!this.el) { const el = document.createElement('div'); el.id = 'av'; el.setAttribute('aria-hidden', 'true'); document.body.appendChild(el); this.el = el; }
+    const list = [{ key: 'me', stream: this.stream, me: true }];
+    for (const [peer, rec] of this.pcs) list.push({ key: peer, stream: rec.stream });
+    for (const [k, v] of this.tiles) if (!list.find(x => x.key === k)) { v.remove(); this.tiles.delete(k); }
     for (const it of list) {
-      let t = this.tiles.get(it.key);
-      if (!t) {
-        t = document.createElement('div'); t.className = 'av-tile';
-        t.innerHTML = '<video autoplay playsinline></video><span class="av-nm"></span><span class="av-st"></span>';
-        const v = t.querySelector('video'); if (it.me) { v.muted = true; v.classList.add('me'); }
-        box.appendChild(t); this.tiles.set(it.key, t);
-      }
-      const v = t.querySelector('video');
+      let v = this.tiles.get(it.key);
+      if (!v) { v = document.createElement('video'); v.autoplay = true; v.setAttribute('playsinline', ''); if (it.me) v.muted = true; this.el.appendChild(v); this.tiles.set(it.key, v); }
       if (it.stream && v.srcObject !== it.stream) { v.srcObject = it.stream; v.play().catch(() => {}); }
-      t.querySelector('.av-nm').textContent = it.name; // nombres: siempre como texto
-      t.querySelector('.av-st').textContent = it.me ? (this.mic ? '' : '🔇') : (it.state === 'connected' ? '' : 'conectando…');
-      t.classList.toggle('off', it.me && !this.cam);
     }
-    this.el.querySelector('[data-a=mic]').textContent = this.mic ? '🎤 Micrófono' : '🔇 Silenciado';
-    this.el.querySelector('[data-a=cam]').textContent = this.cam ? '📷 Cámara' : '🚫 Sin cámara';
-    const h = Math.round(clamp(window.innerHeight * 0.18, 96, 170));
-    if (h !== this.barH) { this.barH = h; window.AV_BAR = h; this.el.style.height = h + 'px'; resize(); }
+  },
+  // el video de una persona, si hay algo que mostrar (cámara prendida, conectada y con imagen)
+  videoFor(peer) {
+    if (!this.on || !peer) return null;
+    const me = peer === Net.myPeer();
+    const v = this.tiles.get(me ? 'me' : peer);
+    if (!v || !v.videoWidth || v.readyState < 2) return null;
+    if (me) return this.cam ? { v, mirror: true } : null;
+    const rec = this.pcs.get(peer), pr = Net.presOf(peer);
+    if (!rec || rec.pc.connectionState !== 'connected' || (pr && pr.cam === 0)) return null;
+    return { v, mirror: false };
+  },
+  // botón de cámara y voz en los menús: prendido se parte en micrófono · cámara · salir
+  segs(b) { return [{ a: 'mic', x: b.x, w: 52 }, { a: 'cam', x: b.x + 52, w: 52 }, { a: 'off', x: b.x + 104, w: b.w - 104 }].map(q => Object.assign(q, { y: b.y, h: b.h })); },
+  click(b) {
+    if (!this.on && !this.starting) return this.start();
+    if (this.starting) return this.stop(true);
+    const q = this.segs(b).find(q => hover(q.x, q.y, q.w, q.h));
+    if (!q || q.a === 'off') return this.stop(true);
+    if (q.a === 'mic') this.setMic(!this.mic); else this.setCam(!this.cam);
   },
 };
 window.addEventListener('resize', () => { if (AV.on) AV.ui(); });

@@ -27,8 +27,8 @@ class Battle {
       f.dev = p.dev; f.brain = brain; if (brain) brain.f = f; f.uid = p.uid || null;
       f.team = p.team !== undefined && p.team !== null ? p.team : i % 2;
       if (this.rules.teams) f.color = TEAM_COLORS[f.team];
-      if (ctrl instanceof NetCtrl) { f.netPeer = ctrl.peer; f.label = Net.nameOf(ctrl.peer); }
-      else if (this.online && !p.cpu) f.label = 'Anfitrión';
+      if (ctrl instanceof NetCtrl) { f.netPeer = ctrl.peer; f.label = Net.nameOf(ctrl.peer); f.avPeer = ctrl.peer; }
+      else if (this.online && !p.cpu) { f.label = 'Anfitrión'; if (!this.fighters.some(q => q.avPeer && q.avPeer === Net.myPeer())) f.avPeer = Net.myPeer(); }
       let sx = spawnX[i];
       if (this.rules.mode === 'soccer') { const k = setup.players.slice(0, i).filter(q => (q.team ?? 0) === f.team).length; sx = (f.team === 0 ? -1 : 1) * (380 + k * 220); }
       f.placeAt(sx, this.stage.floorY(sx) - 160);
@@ -217,7 +217,8 @@ class Battle {
     this.drawOffscreen();
     this.drawNowPlaying();
     this.drawHUD();
-    Modes.drawHUD(c, this);
+    // con el marcador arriba (celular), lo de cada modo baja para no encimarse
+    if (hudOnTop()) { c.save(); c.translate(0, 98); Modes.drawHUD(c, this); c.restore(); } else Modes.drawHUD(c, this);
     // anuncios
     let by = 130;
     for (const b of this.banners) {
@@ -262,9 +263,10 @@ class Battle {
     c.save(); c.globalAlpha = a;
     c.font = `600 15px ${FONT_BODY}`;
     const w = c.measureText('♪ ' + np.title).width + 28;
-    roundRect(c, 20, 18, w, 30, 15); c.fillStyle = 'rgba(8,12,22,.6)'; c.fill();
+    const ny = hudOnTop() ? H - 48 : 18; // con el marcador arriba, la canción va abajo
+    roundRect(c, 20, ny, w, 30, 15); c.fillStyle = 'rgba(8,12,22,.6)'; c.fill();
     c.strokeStyle = 'rgba(46,196,182,.5)'; c.lineWidth = 1.5; c.stroke();
-    text('♪ ' + np.title, 34, 34, 15, '#e2e8f0', { body: true, weight: 600, align: 'left' });
+    text('♪ ' + np.title, 34, ny + 16, 15, '#e2e8f0', { body: true, weight: 600, align: 'left' });
     c.restore();
   }
   drawKO(k) {
@@ -281,7 +283,7 @@ class Battle {
     c.fillStyle = wg; c.beginPath(); c.moveTo(0, -10 * a); c.lineTo(len * 0.85, -44 * a); c.lineTo(len * 0.85, 44 * a); c.lineTo(0, 10 * a); c.closePath(); c.fill();
     c.restore();
     ART.drawGlow(c, x, y, 260 * a + 60, k.col, a); ART.drawGlow(c, x, y, 110 * a + 20, '#ffffff', a);
-    const tx = clamp(x + Math.cos(ang) * 150, 120, W - 120), ty = clamp(y + Math.sin(ang) * 150, 100, H - 180);
+    const tx = clamp(x + Math.cos(ang) * 150, 120, W - 120), ty = clamp(y + Math.sin(ang) * 150, hudOnTop() ? 200 : 100, hudOnTop() ? H - 80 : H - 180);
     c.save(); c.globalAlpha = clamp(a * 1.5, 0, 1); c.translate(tx, ty); const sc = 1 + Math.max(0, 8 - k.t) * 0.12; c.scale(sc, sc);
     sfText('K.O.', 0, 0, 90, k.col, { strokeW: 12 });
     c.restore(); c.globalAlpha = 1;
@@ -291,8 +293,9 @@ class Battle {
     for (const f of this.fighters) {
       if (f.dead || f.stocks <= 0 || f.hidden) continue;
       const [x, y] = this.worldToScreen(f.x, f.y - 56);
-      if (x > -10 && x < W + 10 && y > -10 && y < H - 100) continue;
-      const bx = clamp(x, 60, W - 60), by = clamp(y, 60, H - 160);
+      const top = hudOnTop();
+      if (x > -10 && x < W + 10 && y > (top ? 100 : -10) && y < (top ? H + 10 : H - 100)) continue;
+      const bx = clamp(x, 60, W - 60), by = clamp(y, top ? 160 : 60, top ? H - 60 : H - 160);
       const ang = Math.atan2(y - by, x - bx);
       c.save(); c.translate(bx, by);
       c.fillStyle = f.color; c.beginPath(); c.moveTo(Math.cos(ang) * 58, Math.sin(ang) * 58); c.lineTo(Math.cos(ang + 0.5) * 42, Math.sin(ang + 0.5) * 42); c.lineTo(Math.cos(ang - 0.5) * 42, Math.sin(ang - 0.5) * 42); c.fill();
@@ -308,7 +311,7 @@ class Battle {
     const cw = 268, gap = 14, total = n * cw + (n - 1) * gap;
     let x0 = (W - total) / 2;
     for (const f of this.fighters) {
-      const x = x0, y = H - 100;
+      const x = x0, y = hudOnTop() ? 8 : H - 100;
       x0 += cw + gap;
       c.globalAlpha = f.stocks <= 0 ? 0.4 : 1;
       slab(x, y, cw, 86, { skew: 0.25, edge: withAlpha(f.color, 0.95), lw: 2.5 });
@@ -316,9 +319,14 @@ class Battle {
       c.save(); slabPath(x + 14, y + 7, 84, 72, 0.25); c.clip();
       const pg = c.createLinearGradient(0, y, 0, y + 80); pg.addColorStop(0, withAlpha(f.color, 0.6)); pg.addColorStop(1, '#0b0e16');
       c.fillStyle = pg; c.fillRect(x + 10, y + 5, 92, 76);
-      drawPortrait(c, f.id, x + 57, y + 44, 30, f.dead ? 'ko' : f.flinch > 0 ? 'hurt' : 'normal');
+      // con cámara y voz: su cara en vivo en lugar del retrato
+      const cam = typeof AV !== 'undefined' && f.avPeer ? AV.videoFor(f.avPeer) : null;
+      if (cam) drawVideoCover(c, cam.v, x + 10, y + 5, 92, 76, cam.mirror);
+      else drawPortrait(c, f.id, x + 57, y + 44, 30, f.dead ? 'ko' : f.flinch > 0 ? 'hurt' : 'normal');
+      if (cam && (f.dead || f.flinch > 0)) { c.fillStyle = f.dead ? 'rgba(10,12,20,.55)' : 'rgba(230,57,70,.3)'; c.fillRect(x + 10, y + 5, 92, 76); }
       c.restore();
-      slabPath(x + 14, y + 7, 84, 72, 0.25); c.lineWidth = 1.5; c.strokeStyle = 'rgba(255,255,255,.25)'; c.stroke();
+      slabPath(x + 14, y + 7, 84, 72, 0.25); c.lineWidth = cam ? 2.5 : 1.5; c.strokeStyle = cam ? withAlpha(f.color, 0.95) : 'rgba(255,255,255,.25)'; c.stroke();
+      if (cam) { c.fillStyle = '#ef4444'; c.beginPath(); c.arc(x + 26, y + 17, 4, 0, TAU); c.fill(); }
       sfText(CHARS[f.id].name, x + 106, y + 18, fitSize(CHARS[f.id].name, cw - 106 - 78, 22), '#dfe5ee', { align: 'left' });
       if (f.label && !f.cpu) text(f.label.slice(0, 12), x + cw - 24, y + 17, 12, f.color, { align: 'right', body: true, weight: 700 });
       else sfText(f.cpu ? `CPU ${f.brain ? f.brain.L.lv : ''}` : PLAYER_TAGS[f.port], x + cw - 22, y + 18, 20, f.color, { align: 'right' });
@@ -363,7 +371,7 @@ class Battle {
     if (timedMode(this.rules.mode)) {
       const s = Math.max(0, Math.ceil(this.timer / 60));
       const txt = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-      const ty = this.rules.mode === 'soccer' ? 72 : 12;
+      const ty = (this.rules.mode === 'soccer' ? 72 : 12) + (hudOnTop() ? 98 : 0);
       slab(W / 2 - 80, ty, 160, 54, { skew: 0.3, edge: GOLD });
       sfText(txt, W / 2, ty + 28, 48, s <= 10 ? RED : GOLD);
     }
@@ -377,4 +385,15 @@ class Battle {
       sfButton(o, W / 2 - 170 + (sel ? 10 : 0), y, 340, 56, sel);
     });
   }
+}
+
+// marcador arriba en pantalla táctil: abajo lo taparían los pulgares
+function hudOnTop() { return typeof TouchPad !== 'undefined' && TouchPad.active; }
+// dibuja un video llenando un rectángulo (recorta lo que sobra); la cámara propia va como espejo
+function drawVideoCover(c, v, x, y, w, h, mirror) {
+  const vw = v.videoWidth, vh = v.videoHeight, k = Math.max(w / vw, h / vh), dw = vw * k, dh = vh * k;
+  c.save();
+  if (mirror) { c.translate(x + w / 2, 0); c.scale(-1, 1); c.translate(-(x + w / 2), 0); }
+  try { c.drawImage(v, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh); } catch (e) { /* cuadro aún sin datos */ }
+  c.restore();
 }

@@ -1,0 +1,30 @@
+// iPhone (sin pantalla completa en Safari): aviso de "Agregar a inicio" en los menús, se cierra y no vuelve
+const { chromium } = require('/opt/node22/lib/node_modules/playwright');
+const { spawn } = require('child_process');
+(async () => {
+  const srv = spawn('python3', ['-m', 'http.server', '8772'], { cwd: process.cwd() + '/web', stdio: 'ignore' });
+  await new Promise(r => setTimeout(r, 900));
+  const browser = await chromium.launch();
+  const ctx = await browser.newContext({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+  await ctx.addInitScript({ path: 'mocksupa.js' });
+  await ctx.addInitScript(() => { window.requestAnimationFrame = () => 0; delete Element.prototype.requestFullscreen; delete Element.prototype.webkitRequestFullscreen; });
+  await ctx.route('**/config.js', r => r.fulfill({ contentType: 'text/javascript', body: 'window.APYV_CONFIG = { client: window.__mockClient, ice: [] };' }));
+  let pass = 0, fail = 0; const errs = [];
+  const ok = (n, c, info) => { if (c) pass++; else fail++; console.log(`${c ? 'OK  ' : 'FAIL'} ${n}${info !== undefined ? '  → ' + info : ''}`); };
+  const p = await ctx.newPage(); p.on('pageerror', e => errs.push(e.message));
+  await p.goto('http://localhost:8772/index.html'); await p.waitForTimeout(500);
+  await p.evaluate(() => { for (let i = 0; i < 3; i++) step(); render(); });
+  const vis = () => p.evaluate(() => { const e = document.getElementById('iosfs'); return !!e && e.style.display !== 'none' && e.getBoundingClientRect().width > 0; });
+  ok('en el menú aparece cómo tener pantalla completa en iPhone', await vis());
+  await p.screenshot({ path: 'shots/look/iosfs.png' });
+  await p.evaluate(() => { APP.startBattle({ players: [{ port: 0, char: 'puentin', dev: 'touch' }, { port: 1, char: 'nacho', cpu: 1 }], stage: 'temple', rules: { mode: 'stock', stocks: 3, items: 0 } }); for (let i = 0; i < 5; i++) step(); render(); });
+  ok('en la pelea no estorba', !(await vis()));
+  await p.evaluate(() => { BATTLE = null; APP.go('main'); step(); render(); });
+  await p.tap('#iosfs button'); await p.evaluate(() => { step(); render(); });
+  ok('se cierra con ✕', !(await vis()));
+  await p.reload(); await p.waitForTimeout(400); await p.evaluate(() => { for (let i = 0; i < 3; i++) step(); render(); });
+  ok('y ya no vuelve a salir', !(await vis()));
+  ok('sin errores', errs.length === 0, errs.slice(0, 3).join(' | '));
+  console.log(`\n${pass} OK, ${fail} FAIL`);
+  await browser.close(); srv.kill(); process.exit(fail ? 1 : 0);
+})();

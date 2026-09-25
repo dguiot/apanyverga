@@ -60,19 +60,13 @@
   canvas { display: block; background: #081a2e; image-rendering: auto; outline: none; max-width: 100%; }
   canvas:focus-visible { box-shadow: 0 0 0 3px #2ec4b6; }
   body { box-sizing: border-box; }
-  /* franja de cámara y voz */
-  #av { position: fixed; left: 0; right: 0; bottom: 0; display: flex; align-items: stretch; gap: 12px; padding: 8px 16px; box-sizing: border-box; background: #0b0f18; border-top: 1px solid #1f2a3a; font-family: 'Barlow', system-ui, sans-serif; }
-  .av-tiles { flex: 1; min-width: 0; display: flex; gap: 10px; justify-content: center; overflow: hidden; }
-  .av-tile { position: relative; flex: 0 1 auto; height: 100%; aspect-ratio: 4 / 3; min-width: 0; border-radius: 16px; overflow: hidden; background: #141b28; border: 2px solid rgba(46,196,182,.75); }
-  .av-tile video { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .av-tile video.me { transform: scaleX(-1); }
-  .av-tile.off video { visibility: hidden; }
-  .av-nm { position: absolute; left: 8px; right: 8px; bottom: 6px; color: #f4f6fa; font-weight: 700; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 3px rgba(0,0,0,.9); }
-  .av-st { position: absolute; right: 8px; top: 6px; color: #cbd5e1; font-size: 12px; text-shadow: 0 1px 3px rgba(0,0,0,.9); }
-  .av-ctl { flex: 0 0 auto; display: flex; flex-direction: column; justify-content: center; gap: 6px; }
-  .av-ctl button { border-radius: 999px; border: 1px solid #2a3547; background: #161e2c; color: #f4f6fa; font: 600 13px 'Barlow', system-ui, sans-serif; padding: 6px 14px; cursor: pointer; white-space: nowrap; }
-  .av-ctl button:hover { border-color: #2ec4b6; }
-  .av-ctl button[data-a=off] { color: #ffb4bb; }
+  /* videos de cámara y voz: ocultos, el juego los dibuja en el marcador */
+  #av { position: fixed; left: 0; bottom: 0; width: 2px; height: 2px; overflow: hidden; opacity: 0.01; pointer-events: none; }
+  #av video { width: 2px; height: 2px; }
+  /* aviso de pantalla completa en iPhone */
+  #iosfs { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); transform: translateX(-50%); z-index: 7; display: flex; align-items: center; gap: 10px; max-width: calc(100vw - 24px); box-sizing: border-box; padding: 10px 12px 10px 16px; border-radius: 16px; background: rgba(11,15,24,.94); border: 1px solid #2ec4b6; color: #f4f6fa; font: 600 14px/1.3 'Barlow', system-ui, sans-serif; box-shadow: 0 6px 24px rgba(0,0,0,.5); }
+  #iosfs b { color: #ffc53d; }
+  #iosfs button { flex: 0 0 auto; border: 0; border-radius: 999px; width: 32px; height: 32px; background: #1f2a3a; color: #f4f6fa; font-size: 16px; }
 </style>
 <canvas id="game" tabindex="0" aria-label="A pan y verga: juego de peleas para hasta 4 jugadores. Usa un control o el teclado."></canvas>
 <!--SCRIPTS-->
@@ -393,8 +387,7 @@ const ctx = canvas.getContext('2d');
 let VIEW = { scale: 1, dpr: 1 };
 
 function resize() {
-  // con la cámara y voz encendidas, el juego deja espacio abajo para las caras
-  const bar = window.AV_BAR || 0; // lo fija la franja de cámara (avchat.js)
+  const bar = 0; // las caras de la cámara van dentro del marcador: ya no hay franja abajo
   document.body.style.paddingBottom = bar ? bar + 'px' : '';
   const vw = window.innerWidth, vh = Math.max(120, window.innerHeight - bar);
   const s = Math.min(vw / W, vh / H);
@@ -1187,7 +1180,8 @@ const TouchPad = {
     { a: 'grab',    label: 'Agarrar',                  col: '#ffbe0b', dx: 0.68, dy: 0.29, r: 0.075 },
   ],
   el: null, g: null, L: null, fsRefused: false, wasFs: false,
-  shown() { return this.active && APP.screen === 'battle'; },
+  // en la pelea propia y también como invitado (la pelea del anfitrión se ve en 'netview')
+  shown() { return this.active && (APP.screen === 'battle' || (APP.screen === 'netview' && Net.role === 'guest')); },
   // ---------- capa y medidas ----------
   setup() {
     if (this.el) return;
@@ -1212,7 +1206,7 @@ const TouchPad = {
     const u = clamp(Math.min(vw, vh), 280, 440);
     this.L = { vw, vh, dpr, u, sl, sr, st, sb, R: u * 0.17, knob: u * 0.075,
       home: { x: sl + u * 0.3, y: vh - sb - u * 0.3 },
-      pause: { x: vw / 2, y: st + 22, r: 19 },
+      pause: { x: vw - sr - 20, y: st + 22, r: 19 }, // arriba a la derecha: arriba al centro va el marcador
       btns: this.BUTTONS.map(b => Object.assign({}, b, { x: vw - sr - b.dx * u, y: vh - sb - b.dy * u, rr: b.r * u })) };
   },
   hitButton(x, y) {
@@ -1224,10 +1218,8 @@ const TouchPad = {
   // ---------- toques ----------
   down(e) {
     if (e.pointerType !== 'touch') return;
-    if (!this.active) {
-      this.active = true; this.setup();
-      if (!this.fsSupported() && !this.isStandalone() && typeof Toasts !== 'undefined') setTimeout(() => Toasts.push('📱 Pantalla completa: Compartir → "Agregar a inicio" y ábrelo desde el ícono'), 1200);
-    }
+    if (e.target && e.target.closest && e.target.closest('#av, #iosfs')) return; // botones de la voz y del aviso: no son la palanca
+    if (!this.active) { this.active = true; this.setup(); }
     if (!this.shown()) return;
     const x = e.clientX, y = e.clientY;
     const b = this.hitButton(x, y);
@@ -1365,6 +1357,31 @@ document.addEventListener('webkitfullscreenchange', () => TouchPad.onFsChange())
 // quién es "el ratón" en los menús: con pantalla táctil es la palanca en pantalla
 function pointerDev() { return TouchPad.active ? 'touch' : 'kb1'; }
 
+// iPhone: Safari no deja poner una página en pantalla completa; la única forma es abrirla desde el ícono
+// de inicio (el manifest la abre sin barras y de lado). Aviso en los menús, se cierra con ✕ y no vuelve.
+const IOSFS = {
+  el: null, shownState: null,
+  want() {
+    if (!window.APYV_WEB || TouchPad.fsSupported() || TouchPad.isStandalone()) return false;
+    const coarse = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || TouchPad.active;
+    if (!coarse || ['battle', 'netview', 'demo', 'vs'].includes(APP.screen)) return false;
+    try { if (localStorage.getItem('apyv-iosfs') === '1') return false; } catch (e) { /* sin almacenamiento */ }
+    return true;
+  },
+  update() {
+    const on = this.want();
+    if (on === this.shownState) return;
+    this.shownState = on;
+    if (on && !this.el) {
+      const el = this.el = document.createElement('div'); el.id = 'iosfs';
+      el.innerHTML = '<span>📱 <b>Pantalla completa en iPhone:</b> toca <b>Compartir ⬆︎</b> → <b>Agregar a inicio</b> y abre el juego desde el ícono.</span><button aria-label="Cerrar">✕</button>';
+      el.querySelector('button').addEventListener('click', () => { try { localStorage.setItem('apyv-iosfs', '1'); } catch (e) { /* nada */ } this.shownState = null; this.el.remove(); this.el = null; });
+      document.body.appendChild(el);
+    }
+    if (this.el) this.el.style.display = on ? '' : 'none';
+  },
+};
+
 // ---- js/audio.js ----
 // ============================================================
 //  AUDIO: efectos sintetizados + música chiptune (mariachi de 8 bits)
@@ -1387,9 +1404,10 @@ const Audio8 = {
         for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
         try { const m = localStorage.getItem('golpazo-muted'); if (m === '1') this.setMuted(true); if (m === 'fx') this.setSound('fx'); } catch (e) {}
       }
-      if (this.ctx.state === 'suspended') { const p = this.ctx.resume(); if (p && p.catch) p.catch(() => {}); }
+      // 'suspended' (sin gesto todavía) o 'interrupted' (Safari al prender el micrófono o una llamada)
+      if (this.ctx.state !== 'running' && this.ctx.state !== 'closed') { const p = this.ctx.resume(); if (p && p.catch) p.catch(() => {}); }
       // iPhone: que suene aunque el interruptor de silencio esté puesto (con videollamada lo decide el micrófono)
-      try { if (navigator.audioSession && navigator.audioSession.type !== 'play-and-record') navigator.audioSession.type = 'playback'; } catch (e) { /* sin sesión */ }
+      try { if (navigator.audioSession && !(typeof AV !== 'undefined' && AV.on) && navigator.audioSession.type !== 'playback') navigator.audioSession.type = 'playback'; } catch (e) { /* sin sesión */ }
       // iOS: un búfer mudo dentro del gesto termina de abrir el audio
       if (!this.primed && this.ctx.state !== 'closed') { const b = this.ctx.createBuffer(1, 1, 22050), s = this.ctx.createBufferSource(); s.buffer = b; s.connect(this.ctx.destination); s.start(0); this.primed = true; }
     } catch (e) { /* sin audio */ }
@@ -10669,7 +10687,7 @@ const Net = {
     this.lastLobJSON = '';
   },
   join(peer, dev) {
-    this.role = 'guest'; this.hostPeer = peer; this.localDev = dev;
+    this.role = 'guest'; this.hostPeer = peer; this.localDev = TouchPad.active && !/^pad/.test(dev) ? 'touch' : dev;
     this.guest = { ch: randi(0, CHAR_ORDER.length - 1), rdy: 0, tm: -1, cnt: BUTTONS.map(() => 0) };
     this.lastSnap = null; this.lastEv = 0; this.view = null; this.lostHostT = 0;
     this.set({ role: 'guest', join: peer, ch: this.guest.ch, rdy: 0, tm: -1, lob: null, st: null });
@@ -10785,8 +10803,8 @@ const Net = {
     const B = new Battle(setup, { view: true });
     B.fighters.forEach((f, i) => {
       const p = setup.players[i];
-      if (p.remote === '') f.label = this.nameOf(this.hostPeer);
-      else if (p.remote) f.label = p.remote === this.myPeer() ? 'Tú' : this.nameOf(p.remote);
+      if (p.remote === '') { f.label = this.nameOf(this.hostPeer); if (!B.fighters.some(q => q.avPeer === this.hostPeer)) f.avPeer = this.hostPeer; }
+      else if (p.remote) { f.label = p.remote === this.myPeer() ? 'Tú' : this.nameOf(p.remote); f.avPeer = p.remote; }
     });
     this.meIdx = setup.players.findIndex(p => p.remote && p.remote === this.myPeer());
     this.view = B; this.lastSnap = null; this.lastEv = 0;
@@ -10892,16 +10910,25 @@ const Net = {
 // ============================================================
 //  CÁMARA Y VOZ en las salas online. Cada jugador que la enciende
 //  se conecta directo con los demás (WebRTC, de navegador a navegador);
-//  la sala de Claude solo pasa las señales para encontrarse (tema "rtc").
+//  la sala solo pasa las señales para encontrarse (tema "rtc").
 //  Nada se graba ni se guarda.
+//  Las caras no van en una franja aparte: cada cámara sustituye al retrato
+//  del personaje de esa persona en el marcador de la pelea (y aparece en
+//  su tarjeta al elegir personaje). Los videos viven ocultos y el juego
+//  los dibuja en el lienzo.
 // ============================================================
 // en la versión web se pueden agregar servidores TURN (APYV_CONFIG.ice) para redes que no dejan conectar directo
 const AV_ICE = (window.APYV_CONFIG && window.APYV_CONFIG.ice) || [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }];
 const AV_CHUNK = 2800; // la señal viaja en trozos: cada mensaje de la sala admite 4 KiB
 const AV = {
   on: false, starting: false, stream: null, err: null, errT: 0, pcs: new Map(), parts: new Map(),
-  wired: false, mic: true, cam: true, barH: 0, el: null, tiles: new Map(), t: 0, denied: false,
+  wired: false, mic: true, cam: true, el: null, tiles: new Map(), t: 0, denied: false,
   supported() { return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.RTCPeerConnection); },
+  // celular: video más chico (la cara cabe igual en el cuadrito del marcador)
+  compact() {
+    const coarse = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || (typeof TouchPad !== 'undefined' && TouchPad.active);
+    return !!coarse && Math.min(window.innerWidth, window.innerHeight) < 600;
+  },
   inRoom() { return Net.ok && !!Net.room && (Net.role === 'host' || Net.role === 'guest'); },
   myKey() { return Net.role === 'host' ? Net.myPeer() : Net.hostPeer; },
   keyOf(p) { const pr = p.presence || {}; return pr.role === 'host' ? p.peer : pr.join; },
@@ -10916,9 +10943,10 @@ const AV = {
     let stream = null, err = null;
     // iPhone: con micrófono el audio tiene que ser de llamada (el juego lo pone en 'playback' para ignorar el modo silencio)
     try { if (navigator.audioSession) navigator.audioSession.type = 'play-and-record'; } catch (e) { /* sin sesión */ }
+    const small = this.compact();
     try {
       stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 320 }, height: { ideal: 240 }, frameRate: { ideal: 15, max: 20 }, facingMode: 'user' },
+        video: small ? { width: { ideal: 192 }, height: { ideal: 144 }, frameRate: { ideal: 12, max: 15 }, facingMode: 'user' } : { width: { ideal: 320 }, height: { ideal: 240 }, frameRate: { ideal: 15, max: 20 }, facingMode: 'user' },
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       });
     } catch (e) {
@@ -10931,9 +10959,11 @@ const AV = {
     if (!this.starting) { stream.getTracks().forEach(t => t.stop()); return; } // se canceló mientras pedía permiso
     this.stream = stream; this.on = true; this.starting = false; this.mic = true; this.cam = stream.getVideoTracks().length > 0;
     this.wire();
-    Net.set({ av: 1 });
+    Net.set({ av: 1, cam: this.cam ? 1 : 0 });
     this.ui();
-    Toasts.push('🎥 Cámara y voz encendidas');
+    Toasts.push('🎥 Cámara y voz encendidas: tu cara sale en tu cuadrito del marcador');
+    // Safari deja el audio del juego 'interrumpido' al abrir el micrófono: lo retomamos
+    setTimeout(() => Audio8.unlock(), 300);
   },
   explain(e) {
     const fp = document.featurePolicy || document.permissionsPolicy;
@@ -10949,12 +10979,15 @@ const AV = {
     if (this.stream) this.stream.getTracks().forEach(t => t.stop());
     this.stream = null;
     const was = this.on; this.on = false;
-    if (Net.ok) Net.set({ av: null });
+    if (Net.ok) Net.set({ av: null, cam: null });
     this.ui();
+    // sin micrófono, el iPhone vuelve a sonar aunque esté en modo silencio
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) { /* sin sesión */ }
+    setTimeout(() => Audio8.unlock(), 300);
     if (say && was) Toasts.push('Cámara y voz apagadas');
   },
   setMic(v) { this.mic = v; if (this.stream) this.stream.getAudioTracks().forEach(t => { t.enabled = v; }); this.ui(); },
-  setCam(v) { this.cam = v; if (this.stream) this.stream.getVideoTracks().forEach(t => { t.enabled = v; }); this.ui(); },
+  setCam(v) { this.cam = v; if (this.stream) this.stream.getVideoTracks().forEach(t => { t.enabled = v; }); Net.set({ cam: v ? 1 : 0 }); this.ui(); },
 
   // ---------- señales por la sala ----------
   wire() {
@@ -11047,48 +11080,41 @@ const AV = {
     if (this.t % 90 === 0) this.ui(); // nombres al día
   },
 
-  // ---------- franja de caras (debajo del juego) ----------
+  // ---------- videos ocultos: el juego los dibuja en el marcador ----------
   ui() {
     if (!this.on) {
       if (this.el) { this.el.remove(); this.el = null; this.tiles.clear(); }
-      if (this.barH) { this.barH = 0; window.AV_BAR = 0; resize(); }
       return;
     }
-    if (!this.el) {
-      const el = document.createElement('div'); el.id = 'av';
-      el.innerHTML = '<div class="av-tiles"></div><div class="av-ctl"><button data-a="mic" tabindex="-1"></button><button data-a="cam" tabindex="-1"></button><button data-a="off" tabindex="-1">Salir</button></div>';
-      el.addEventListener('mousedown', e => { if (e.target.closest('button')) e.preventDefault(); }); // sin foco: Espacio sigue siendo salto
-      el.addEventListener('click', e => {
-        const b = e.target.closest('button'); if (!b) return;
-        if (b.dataset.a === 'mic') this.setMic(!this.mic);
-        if (b.dataset.a === 'cam') this.setCam(!this.cam);
-        if (b.dataset.a === 'off') this.stop(true);
-        try { canvas.focus(); } catch (err) { /* nada */ }
-      });
-      document.body.appendChild(el); this.el = el;
-    }
-    const list = [{ key: 'me', stream: this.stream, name: 'Tú', me: true }];
-    for (const [peer, rec] of this.pcs) list.push({ key: peer, stream: rec.stream, name: Net.nameOf(peer), state: rec.pc.connectionState });
-    const box = this.el.querySelector('.av-tiles');
-    for (const [k, t] of this.tiles) if (!list.find(x => x.key === k)) { t.remove(); this.tiles.delete(k); }
+    if (!this.el) { const el = document.createElement('div'); el.id = 'av'; el.setAttribute('aria-hidden', 'true'); document.body.appendChild(el); this.el = el; }
+    const list = [{ key: 'me', stream: this.stream, me: true }];
+    for (const [peer, rec] of this.pcs) list.push({ key: peer, stream: rec.stream });
+    for (const [k, v] of this.tiles) if (!list.find(x => x.key === k)) { v.remove(); this.tiles.delete(k); }
     for (const it of list) {
-      let t = this.tiles.get(it.key);
-      if (!t) {
-        t = document.createElement('div'); t.className = 'av-tile';
-        t.innerHTML = '<video autoplay playsinline></video><span class="av-nm"></span><span class="av-st"></span>';
-        const v = t.querySelector('video'); if (it.me) { v.muted = true; v.classList.add('me'); }
-        box.appendChild(t); this.tiles.set(it.key, t);
-      }
-      const v = t.querySelector('video');
+      let v = this.tiles.get(it.key);
+      if (!v) { v = document.createElement('video'); v.autoplay = true; v.setAttribute('playsinline', ''); if (it.me) v.muted = true; this.el.appendChild(v); this.tiles.set(it.key, v); }
       if (it.stream && v.srcObject !== it.stream) { v.srcObject = it.stream; v.play().catch(() => {}); }
-      t.querySelector('.av-nm').textContent = it.name; // nombres: siempre como texto
-      t.querySelector('.av-st').textContent = it.me ? (this.mic ? '' : '🔇') : (it.state === 'connected' ? '' : 'conectando…');
-      t.classList.toggle('off', it.me && !this.cam);
     }
-    this.el.querySelector('[data-a=mic]').textContent = this.mic ? '🎤 Micrófono' : '🔇 Silenciado';
-    this.el.querySelector('[data-a=cam]').textContent = this.cam ? '📷 Cámara' : '🚫 Sin cámara';
-    const h = Math.round(clamp(window.innerHeight * 0.18, 96, 170));
-    if (h !== this.barH) { this.barH = h; window.AV_BAR = h; this.el.style.height = h + 'px'; resize(); }
+  },
+  // el video de una persona, si hay algo que mostrar (cámara prendida, conectada y con imagen)
+  videoFor(peer) {
+    if (!this.on || !peer) return null;
+    const me = peer === Net.myPeer();
+    const v = this.tiles.get(me ? 'me' : peer);
+    if (!v || !v.videoWidth || v.readyState < 2) return null;
+    if (me) return this.cam ? { v, mirror: true } : null;
+    const rec = this.pcs.get(peer), pr = Net.presOf(peer);
+    if (!rec || rec.pc.connectionState !== 'connected' || (pr && pr.cam === 0)) return null;
+    return { v, mirror: false };
+  },
+  // botón de cámara y voz en los menús: prendido se parte en micrófono · cámara · salir
+  segs(b) { return [{ a: 'mic', x: b.x, w: 52 }, { a: 'cam', x: b.x + 52, w: 52 }, { a: 'off', x: b.x + 104, w: b.w - 104 }].map(q => Object.assign(q, { y: b.y, h: b.h })); },
+  click(b) {
+    if (!this.on && !this.starting) return this.start();
+    if (this.starting) return this.stop(true);
+    const q = this.segs(b).find(q => hover(q.x, q.y, q.w, q.h));
+    if (!q || q.a === 'off') return this.stop(true);
+    if (q.a === 'mic') this.setMic(!this.mic); else this.setCam(!this.cam);
   },
 };
 window.addEventListener('resize', () => { if (AV.on) AV.ui(); });
@@ -11123,8 +11149,8 @@ class Battle {
       f.dev = p.dev; f.brain = brain; if (brain) brain.f = f; f.uid = p.uid || null;
       f.team = p.team !== undefined && p.team !== null ? p.team : i % 2;
       if (this.rules.teams) f.color = TEAM_COLORS[f.team];
-      if (ctrl instanceof NetCtrl) { f.netPeer = ctrl.peer; f.label = Net.nameOf(ctrl.peer); }
-      else if (this.online && !p.cpu) f.label = 'Anfitrión';
+      if (ctrl instanceof NetCtrl) { f.netPeer = ctrl.peer; f.label = Net.nameOf(ctrl.peer); f.avPeer = ctrl.peer; }
+      else if (this.online && !p.cpu) { f.label = 'Anfitrión'; if (!this.fighters.some(q => q.avPeer && q.avPeer === Net.myPeer())) f.avPeer = Net.myPeer(); }
       let sx = spawnX[i];
       if (this.rules.mode === 'soccer') { const k = setup.players.slice(0, i).filter(q => (q.team ?? 0) === f.team).length; sx = (f.team === 0 ? -1 : 1) * (380 + k * 220); }
       f.placeAt(sx, this.stage.floorY(sx) - 160);
@@ -11313,7 +11339,8 @@ class Battle {
     this.drawOffscreen();
     this.drawNowPlaying();
     this.drawHUD();
-    Modes.drawHUD(c, this);
+    // con el marcador arriba (celular), lo de cada modo baja para no encimarse
+    if (hudOnTop()) { c.save(); c.translate(0, 98); Modes.drawHUD(c, this); c.restore(); } else Modes.drawHUD(c, this);
     // anuncios
     let by = 130;
     for (const b of this.banners) {
@@ -11358,9 +11385,10 @@ class Battle {
     c.save(); c.globalAlpha = a;
     c.font = `600 15px ${FONT_BODY}`;
     const w = c.measureText('♪ ' + np.title).width + 28;
-    roundRect(c, 20, 18, w, 30, 15); c.fillStyle = 'rgba(8,12,22,.6)'; c.fill();
+    const ny = hudOnTop() ? H - 48 : 18; // con el marcador arriba, la canción va abajo
+    roundRect(c, 20, ny, w, 30, 15); c.fillStyle = 'rgba(8,12,22,.6)'; c.fill();
     c.strokeStyle = 'rgba(46,196,182,.5)'; c.lineWidth = 1.5; c.stroke();
-    text('♪ ' + np.title, 34, 34, 15, '#e2e8f0', { body: true, weight: 600, align: 'left' });
+    text('♪ ' + np.title, 34, ny + 16, 15, '#e2e8f0', { body: true, weight: 600, align: 'left' });
     c.restore();
   }
   drawKO(k) {
@@ -11377,7 +11405,7 @@ class Battle {
     c.fillStyle = wg; c.beginPath(); c.moveTo(0, -10 * a); c.lineTo(len * 0.85, -44 * a); c.lineTo(len * 0.85, 44 * a); c.lineTo(0, 10 * a); c.closePath(); c.fill();
     c.restore();
     ART.drawGlow(c, x, y, 260 * a + 60, k.col, a); ART.drawGlow(c, x, y, 110 * a + 20, '#ffffff', a);
-    const tx = clamp(x + Math.cos(ang) * 150, 120, W - 120), ty = clamp(y + Math.sin(ang) * 150, 100, H - 180);
+    const tx = clamp(x + Math.cos(ang) * 150, 120, W - 120), ty = clamp(y + Math.sin(ang) * 150, hudOnTop() ? 200 : 100, hudOnTop() ? H - 80 : H - 180);
     c.save(); c.globalAlpha = clamp(a * 1.5, 0, 1); c.translate(tx, ty); const sc = 1 + Math.max(0, 8 - k.t) * 0.12; c.scale(sc, sc);
     sfText('K.O.', 0, 0, 90, k.col, { strokeW: 12 });
     c.restore(); c.globalAlpha = 1;
@@ -11387,8 +11415,9 @@ class Battle {
     for (const f of this.fighters) {
       if (f.dead || f.stocks <= 0 || f.hidden) continue;
       const [x, y] = this.worldToScreen(f.x, f.y - 56);
-      if (x > -10 && x < W + 10 && y > -10 && y < H - 100) continue;
-      const bx = clamp(x, 60, W - 60), by = clamp(y, 60, H - 160);
+      const top = hudOnTop();
+      if (x > -10 && x < W + 10 && y > (top ? 100 : -10) && y < (top ? H + 10 : H - 100)) continue;
+      const bx = clamp(x, 60, W - 60), by = clamp(y, top ? 160 : 60, top ? H - 60 : H - 160);
       const ang = Math.atan2(y - by, x - bx);
       c.save(); c.translate(bx, by);
       c.fillStyle = f.color; c.beginPath(); c.moveTo(Math.cos(ang) * 58, Math.sin(ang) * 58); c.lineTo(Math.cos(ang + 0.5) * 42, Math.sin(ang + 0.5) * 42); c.lineTo(Math.cos(ang - 0.5) * 42, Math.sin(ang - 0.5) * 42); c.fill();
@@ -11404,7 +11433,7 @@ class Battle {
     const cw = 268, gap = 14, total = n * cw + (n - 1) * gap;
     let x0 = (W - total) / 2;
     for (const f of this.fighters) {
-      const x = x0, y = H - 100;
+      const x = x0, y = hudOnTop() ? 8 : H - 100;
       x0 += cw + gap;
       c.globalAlpha = f.stocks <= 0 ? 0.4 : 1;
       slab(x, y, cw, 86, { skew: 0.25, edge: withAlpha(f.color, 0.95), lw: 2.5 });
@@ -11412,9 +11441,14 @@ class Battle {
       c.save(); slabPath(x + 14, y + 7, 84, 72, 0.25); c.clip();
       const pg = c.createLinearGradient(0, y, 0, y + 80); pg.addColorStop(0, withAlpha(f.color, 0.6)); pg.addColorStop(1, '#0b0e16');
       c.fillStyle = pg; c.fillRect(x + 10, y + 5, 92, 76);
-      drawPortrait(c, f.id, x + 57, y + 44, 30, f.dead ? 'ko' : f.flinch > 0 ? 'hurt' : 'normal');
+      // con cámara y voz: su cara en vivo en lugar del retrato
+      const cam = typeof AV !== 'undefined' && f.avPeer ? AV.videoFor(f.avPeer) : null;
+      if (cam) drawVideoCover(c, cam.v, x + 10, y + 5, 92, 76, cam.mirror);
+      else drawPortrait(c, f.id, x + 57, y + 44, 30, f.dead ? 'ko' : f.flinch > 0 ? 'hurt' : 'normal');
+      if (cam && (f.dead || f.flinch > 0)) { c.fillStyle = f.dead ? 'rgba(10,12,20,.55)' : 'rgba(230,57,70,.3)'; c.fillRect(x + 10, y + 5, 92, 76); }
       c.restore();
-      slabPath(x + 14, y + 7, 84, 72, 0.25); c.lineWidth = 1.5; c.strokeStyle = 'rgba(255,255,255,.25)'; c.stroke();
+      slabPath(x + 14, y + 7, 84, 72, 0.25); c.lineWidth = cam ? 2.5 : 1.5; c.strokeStyle = cam ? withAlpha(f.color, 0.95) : 'rgba(255,255,255,.25)'; c.stroke();
+      if (cam) { c.fillStyle = '#ef4444'; c.beginPath(); c.arc(x + 26, y + 17, 4, 0, TAU); c.fill(); }
       sfText(CHARS[f.id].name, x + 106, y + 18, fitSize(CHARS[f.id].name, cw - 106 - 78, 22), '#dfe5ee', { align: 'left' });
       if (f.label && !f.cpu) text(f.label.slice(0, 12), x + cw - 24, y + 17, 12, f.color, { align: 'right', body: true, weight: 700 });
       else sfText(f.cpu ? `CPU ${f.brain ? f.brain.L.lv : ''}` : PLAYER_TAGS[f.port], x + cw - 22, y + 18, 20, f.color, { align: 'right' });
@@ -11459,7 +11493,7 @@ class Battle {
     if (timedMode(this.rules.mode)) {
       const s = Math.max(0, Math.ceil(this.timer / 60));
       const txt = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-      const ty = this.rules.mode === 'soccer' ? 72 : 12;
+      const ty = (this.rules.mode === 'soccer' ? 72 : 12) + (hudOnTop() ? 98 : 0);
       slab(W / 2 - 80, ty, 160, 54, { skew: 0.3, edge: GOLD });
       sfText(txt, W / 2, ty + 28, 48, s <= 10 ? RED : GOLD);
     }
@@ -11473,6 +11507,17 @@ class Battle {
       sfButton(o, W / 2 - 170 + (sel ? 10 : 0), y, 340, 56, sel);
     });
   }
+}
+
+// marcador arriba en pantalla táctil: abajo lo taparían los pulgares
+function hudOnTop() { return typeof TouchPad !== 'undefined' && TouchPad.active; }
+// dibuja un video llenando un rectángulo (recorta lo que sobra); la cámara propia va como espejo
+function drawVideoCover(c, v, x, y, w, h, mirror) {
+  const vw = v.videoWidth, vh = v.videoHeight, k = Math.max(w / vw, h / vh), dw = vw * k, dh = vh * k;
+  c.save();
+  if (mirror) { c.translate(x + w / 2, 0); c.scale(-1, 1); c.translate(-(x + w / 2), 0); }
+  try { c.drawImage(v, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh); } catch (e) { /* cuadro aún sin datos */ }
+  c.restore();
 }
 
 // ---- js/menus.js ----
@@ -11631,21 +11676,28 @@ const APP = {
     if (avButtonShown()) {
       const b = AV_BTN, on = AV.on, hv = hover(b.x, b.y, b.w, b.h);
       slab(b.x, b.y, b.w, b.h, { skew: 0.2, top: on ? '#34d399' : hv ? '#ffd76a' : undefined, bottom: on ? '#059669' : hv ? '#e0a01a' : undefined, edge: on ? '#a7f3d0' : undefined });
-      text(AV.starting ? 'Pidiendo permiso…' : on ? `🎥 En vivo · ${AV.count() + 1}` : '🎥 Cámara y voz', b.x + b.w / 2, b.y + b.h / 2 + 1, 15, on || hv ? INK : PAPER, { body: true, weight: 700 });
+      if (on) {
+        // prendido: micrófono · cámara · salir
+        const sg = AV.segs(b), lab = { mic: AV.mic ? '🎤' : '🔇', cam: AV.cam ? '📷' : '🚫', off: `✕ Salir · ${AV.count() + 1}` };
+        for (const q of sg) { if (hover(q.x, q.y, q.w, q.h)) { ctx.fillStyle = 'rgba(255,255,255,.28)'; ctx.fillRect(q.x + 4, q.y + 4, q.w - 8, q.h - 8); } text(lab[q.a], q.x + q.w / 2, q.y + q.h / 2 + 1, q.a === 'off' ? 14 : 17, INK, { body: true, weight: 700 }); }
+        ctx.strokeStyle = 'rgba(6,40,30,.45)'; ctx.lineWidth = 1.5; for (const q of sg.slice(1)) { ctx.beginPath(); ctx.moveTo(q.x, q.y + 8); ctx.lineTo(q.x, q.y + q.h - 8); ctx.stroke(); }
+      } else text(AV.starting ? 'Pidiendo permiso…' : '🎥 Cámara y voz', b.x + b.w / 2, b.y + b.h / 2 + 1, 15, hv ? INK : PAPER, { body: true, weight: 700 });
       if (AV.err && performance.now() - AV.errT < 12000) {
         slab(W - 452, 62, 420, 96, { skew: 0.05, edge: '#ff9f1c' });
         wrapText(AV.err, W - 242, 82, 380, 14, 19, '#f1f5f9');
       }
     }
     TouchPad.draw();
+    IOSFS.update();
     Toasts.draw();
     const sx = W - 58, sy = 14;
-    if (!['battle', 'demo', 'vs'].includes(this.screen)) {
+    if (!['battle', 'demo', 'vs', 'netview'].includes(this.screen)) {
       slab(sx, sy, 46, 40, { skew: 0.2 });
       text(Audio8.muted ? '🔇' : '🔊', sx + 23, sy + 21, 18, PAPER, { body: true });
       // el navegador todavía no deja sonar (con control de juego pasa siempre: sus botones no cuentan como gesto)
       if (!Audio8.ready && Audio8.soundMode() !== 'off' && !avButtonShown()) {
-        const msg = TouchPad.active ? 'Toca la pantalla para activar el sonido' : 'Haz clic o pulsa una tecla para activar el sonido';
+        const touchy = TouchPad.active || (window.matchMedia && matchMedia('(pointer: coarse)').matches);
+        const msg = touchy ? 'Toca la pantalla para activar el sonido' : 'Haz clic o pulsa una tecla para activar el sonido';
         const a = 0.75 + 0.25 * Math.sin(this.t / 9);
         slab(sx - 392, sy + 2, 380, 36, { skew: 0.2, edge: '#ffbe0b' });
         ctx.globalAlpha = a; text('🔈 ' + msg, sx - 202, sy + 21, 15, '#ffe8a3', { body: true, weight: 700 }); ctx.globalAlpha = 1;
@@ -12061,6 +12113,12 @@ const APP = {
         : (Net.role === 'host' ? 'Tus amigos aparecen aquí al unirse · ←→ elegir · A confirmar · X/Y agregar CPU · ↑↓ nivel · B cerrar la sala' : '←→ elegir · A confirmar · B volver · luego ←→ para agregar CPUs') + (this.teamsOn() ? ' · Escudo: cambiar de equipo' : ''), W / 2, 677, 14, MUTED, { body: true, weight: 500 });
     }
   },
+  // de quién es la cámara de una tarjeta: el invitado por su conexión; el anfitrión (o quien juega aquí) por la propia
+  slotPeer(s) {
+    if (this.screen === 'netroom') return s.mine ? Net.myPeer() : s.peer || null;
+    if (Net.role !== 'host') return null;
+    return s.remote || (this.slots.find(x => x.type === 'human' && !x.remote) === s ? Net.myPeer() : null);
+  },
   drawSlot(i) {
     const r = this.slotRect(i), s = this.slots[i], col = PLAYER_COLORS[i];
     if (s.type === 'none') {
@@ -12093,7 +12151,14 @@ const APP = {
     }
     slabPath(r.x + 14, r.y + 12, 66, 28, 0.3); ctx.fillStyle = col; ctx.fill();
     sfText(s.type === 'cpu' ? 'CPU' : PLAYER_TAGS[i], r.x + 47, r.y + 26, 24, INK, { stroke: null });
-    text(s.type === 'cpu' ? '' : devLabel(s.dev), r.x + r.w - 18, r.y + 26, 13, '#cbd5e1', { align: 'right', body: true, weight: 600 });
+    // con cámara y voz: su cara en vivo en la esquina de su tarjeta
+    const cam = s.type === 'human' && typeof AV !== 'undefined' ? AV.videoFor(this.slotPeer(s)) : null;
+    if (cam) {
+      const cx = r.x + r.w - 84, cy = r.y + 8, cw2 = 72, ch2 = 50;
+      ctx.save(); roundRect(ctx, cx, cy, cw2, ch2, 10); ctx.clip(); drawVideoCover(ctx, cam.v, cx, cy, cw2, ch2, cam.mirror); ctx.restore();
+      roundRect(ctx, cx, cy, cw2, ch2, 10); ctx.lineWidth = 2; ctx.strokeStyle = col; ctx.stroke();
+      ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.arc(cx + 9, cy + 9, 3.5, 0, TAU); ctx.fill();
+    } else text(s.type === 'cpu' ? '' : devLabel(s.dev), r.x + r.w - 18, r.y + 26, 13, '#cbd5e1', { align: 'right', body: true, weight: 600 });
     sfText(id ? CHARS[id].name : 'Aleatorio', r.x + 220, r.y + 70, 36, PAPER);
     if (id) {
       text(CHARS[id].title, r.x + 220, r.y + 96, 13, MUTED, { body: true, weight: 600 });
@@ -12421,7 +12486,8 @@ const APP = {
       if (a[0] === 'h') {
         if (a[1] && a[1] === me) return { type: 'human', dev: 'net:Tú', cur: g.ch, ready: !!g.rdy, pick: g.rdy ? (CHAR_ORDER[a[4]] || CHAR_ORDER[g.ch] || null) : null, edit: i, mine: true, team: g.tm >= 0 ? g.tm : (a[5] || 0) };
         const nm = a[1] ? Net.nameOf(a[1]) : Net.nameOf(Net.hostPeer);
-        return { type: 'human', dev: 'net:' + nm, cur: a[2], ready: !!a[3], pick: CHAR_ORDER[a[4]] || null, edit: i, team: a[5] || 0 };
+        const first = sl.findIndex(x => x[0] === 'h' && !x[1]) === i;
+        return { type: 'human', dev: 'net:' + nm, cur: a[2], ready: !!a[3], pick: CHAR_ORDER[a[4]] || null, edit: i, team: a[5] || 0, peer: a[1] || (first ? Net.hostPeer : null) };
       }
       return { type: 'none' };
     });
@@ -12467,8 +12533,9 @@ const APP = {
   netviewDraw() {
     if (Net.view) Net.view.draw();
     if (!Net.lastSnap) { ctx.fillStyle = 'rgba(6,8,14,.7)'; ctx.fillRect(0, 0, W, H); sfText('Conectando con el anfitrión…', W / 2, H / 2, 44, GOLD); }
-    slab(16, 14, 250, 32, { skew: 0.3 });
-    text(`● ONLINE · sala de ${Net.nameOf(Net.hostPeer)}`, 141, 31, 13, TEAL, { body: true, weight: 700 });
+    const oy = hudOnTop() ? H - 46 : 14;
+    slab(16, oy, 250, 32, { skew: 0.3 });
+    text(`● ONLINE · sala de ${Net.nameOf(Net.hostPeer)}`, 141, oy + 17, 13, TEAL, { body: true, weight: 700 });
   },
 
   // ---------------- CONFIGURAR BOTONES ----------------
@@ -12961,7 +13028,8 @@ function step() {
   Devices.poll();
   try { Net.tick(); } catch (e) { console.error(e); }
   if (Pointer.clicked && APP.screen !== 'battle' && hover(W - 58, 14, 44, 44)) { Audio8.setMuted(!Audio8.muted); Pointer.clicked = false; }
-  if (Pointer.clicked && avButtonShown()) { const b = AV_BTN; if (hover(b.x, b.y, b.w, b.h)) { AV.toggle(); Pointer.clicked = false; } }
+  if (Pointer.clicked && avButtonShown()) { const b = AV_BTN; if (hover(b.x, b.y, b.w, b.h)) { AV.click(b); Pointer.clicked = false; } }
+  if (AV.on && keyEdge('kb1', 'KeyM')) { AV.setMic(!AV.mic); Toasts.push(AV.mic ? '🎤 Micrófono abierto' : '🔇 Micrófono silenciado'); }
   try { AV.tick(); } catch (e) { console.error(e); }
   try { APP.update(); } catch (e) { console.error(e); }
   Audio8.tick();
