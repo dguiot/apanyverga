@@ -29,6 +29,9 @@ const LOOKS = {
   nicole: { skin: '#dcae95', hair: '#c49a62', hairBack: 'long', hairLen: 46, eye: '#3f6e8a', lips: '#b5485d', top: '#bfa28a', top2: '#94796a', garment: 'blouse', sleeve: 'long', necklace: true, pants: '#2f3542', shoe: '#efe9e1', sole: '#a39a8f', accent: '#48cae4', build: { chest: 13.5, waist: 8.8, hips: 12.5, arm: 0.8, leg: 0.88 }, prop: { leg: 1.12, torso: 0.95, arm: 1.0, head: 0.93, neck: 1.15 } },
 };
 
+// lo que un personaje lleva en la mano cuando no carga un objeto (el capote del torero)
+const HAND_PROPS = {};
+
 // ---------- poses ----------
 // Ángulos: 0 = colgando hacia abajo, +π/2 = hacia delante, π = hacia arriba.
 // Brazos/piernas: [ángulo del segmento superior, flexión relativa del inferior]
@@ -358,11 +361,12 @@ function drawCharacter(c, id, pose, opt = {}) {
   // piernas
   drawLeg(c, L, B, hx - 4, hy, pose.legB, true, OUT);
   drawLeg(c, L, B, hx + 4, hy, pose.legF, false, OUT);
+  const onHand = opt.onHand !== undefined ? opt.onHand : HAND_PROPS[id] ? (cc, x, y, a) => HAND_PROPS[id](cc, null, x, y, a, OUT) : null;
   if (L.plan && typeof drawBodyPlan === 'function') {
     // cuerpo de una pieza (el chile): tronco y cabeza son lo mismo
     drawBodyPlan(c, id, L, pose, hx, hy, OUT, opt);
     const hand = drawArm(c, L, B, sx + cw * 0.3 * Math.cos(pose.lean), sy + 4, pose.armF, false, OUT);
-    if (opt.onHand) opt.onHand(c, hand[0], hand[1], hand[2]);
+    if (onHand) onHand(c, hand[0], hand[1], hand[2]);
     c.restore();
     return { hand, head: [hdx, hdy] };
   }
@@ -384,7 +388,7 @@ function drawCharacter(c, id, pose, opt = {}) {
   c.restore();
   // brazo delantero
   const hand = drawArm(c, L, B, sx + cw * 0.3 * Math.cos(pose.lean), sy + 4, pose.armF, false, OUT);
-  if (opt.onHand) opt.onHand(c, hand[0], hand[1], hand[2]);
+  if (onHand) onHand(c, hand[0], hand[1], hand[2]);
   c.restore();
   return { hand, head: [hdx, hdy] };
 }
@@ -427,9 +431,11 @@ function drawHead(c, id, face = 'normal', opt = {}) {
     if (opt.flip) c.scale(-1, 1);
     c.drawImage((face === 'hurt' || face === 'ko') && FACE_HURT[id] ? FACE_HURT[id] : img, -w / 2, -h / 2 - 1, w, h);
     c.restore();
+    if (L.headwear && typeof drawHeadwear === 'function') drawHeadwear(c, id, L, OUT, true);
     return;
   }
   drawToonHead(c, id, L, face, OUT);
+  if (L.headwear && typeof drawHeadwear === 'function') drawHeadwear(c, id, L, OUT, false);
 }
 function drawToonHead(c, id, L, face, OUT, clipInside) {
   const RX = SK.headRX, RY = SK.headRY;

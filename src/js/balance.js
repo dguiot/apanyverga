@@ -66,6 +66,7 @@ const CHAR_BAL = {
   chilazo: { dmg: 0.822, kb: 0.776, fs: 1.094 },
   nacho: { dmg: 1.129, kb: 0.755, fs: 1.065 },
   chispa: { dmg: 1.25, kb: 0.72, fs: 1.338 },
+  puentin: { dmg: 1.04, kb: 0.745, fs: 1.029 },
 };
 
 // qué tan lejos mandan los lanzamientos a % alto: los luchadores y los pesados sacan desde ~125% en la orilla,

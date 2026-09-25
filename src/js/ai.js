@@ -129,7 +129,7 @@ class AIBrain {
           if (f.id === 'pablo') { const dx = edgeX - f.x, dy = ly - 40 - f.y; const l = Math.hypot(dx, dy) || 1; s.x = dx / l; s.y = Math.min(-0.5, dy / l); }
           press('special'); return s;
         }
-        if (!f.airUsed.sp_s && ['nacho', 'pablo', 'robes', 'torito', 'michi', 'chilazo', 'chupa'].includes(f.id) && farX > 220 && f.y < ly + 60) { s.x = toward; press('special'); return s; }
+        if (!f.airUsed.sp_s && ['nacho', 'pablo', 'robes', 'torito', 'michi', 'chilazo', 'chupa', 'puentin'].includes(f.id) && farX > 220 && f.y < ly + 60) { s.x = toward; press('special'); return s; }
       }
       return s;
     }
@@ -205,6 +205,11 @@ class AIBrain {
     const face = sign(dx) || f.face;
 
     if (!f.grounded && f.state === 'air' && !f.airUsed.dodge && tgt && tgt.state === 'attack' && dist(tgt.x, tgt.y, f.x, f.y) < 120 && Math.random() < L.dodge * 0.25) { press('shield'); return s; }
+    // el torero espera la embestida con la verónica: la saca antes de que llegue el golpe
+    if (f.id === 'puentin' && tgt && mode === 'fight' && f.grounded && tgt.state === 'attack' && tgt.move && tgt.move.def && this.cool <= 0 && Math.abs(tgt.x - f.x) < 150 && Math.abs(tgt.y - f.y) < 80) {
+      const hs = tgt.move.def.hits || [], f0 = hs.length ? Math.min(...hs.map(h => h.f0)) : 0;
+      if (f0 - tgt.move.f >= 4 && Math.random() < L.shield * 0.5) { this.cool = L.react + 16; s.x = 0; s.y = 0; press('special'); return s; }
+    }
     // ---------- defensa ----------
     if (tgt && mode === 'fight' && f.grounded && this.shieldT <= 0 && tgt.state === 'attack' && Math.abs(tgt.x - f.x) < 140 && Math.random() < L.shield) this.shieldT = randi(8, 20);
     if (f.state === 'shield') this.wasShield = 8;
@@ -255,7 +260,7 @@ class AIBrain {
     }
 
     // proyectiles a distancia
-    if (adx > 320 && f.grounded && Math.random() < L.proj * 3 && this.cool <= 0) { this.cool = L.react + 20; if (sign(dx) !== f.face) s.x = sign(dx) * 0.4; press('special'); return s; }
+    if (adx > 320 && f.grounded && f.id !== 'puentin' && Math.random() < L.proj * 3 && this.cool <= 0) { this.cool = L.react + 20; if (sign(dx) !== f.face) s.x = sign(dx) * 0.4; press('special'); return s; }
     if (f.item && f.item.type === 'gun' && adx < 700 && Math.abs(dy) < 60 && this.cool <= 0) { this.cool = Math.max(8, L.react); f.face = sign(dx); press('attack'); return s; }
     if (f.item && ITEM_DEFS[f.item.type].kind === 'throw' && adx < 450 && this.cool <= 0) { this.cool = 20; s.x = sign(dx); press('grab'); return s; }
 
@@ -314,7 +319,11 @@ class AIBrain {
     }
     const r = Math.random();
     if (r < 0.05 + L.t * 0.03) { press('grab'); return s; }
-    if (r < 0.2) { s.x = face * (Math.random() < 0.5 ? 0.9 : 0); press('special'); return s; }
+    if (r < 0.2) {
+      // el torero no saca la verónica al aire: sin embestida no sirve; mejor banderillas o revolera
+      if (f.id === 'puentin') { if (Math.random() < 0.5) s.x = face * 0.9; else s.y = 0.9; } else s.x = face * (Math.random() < 0.5 ? 0.9 : 0);
+      press('special'); return s;
+    }
     if (high || r < 0.32) {
       const k = Math.random();
       if (k < 0.7) flickX(face); else if (k < 0.85) flickY(1); else flickY(-1);

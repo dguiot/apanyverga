@@ -929,7 +929,8 @@ class Fighter {
         else if (item.type === 'bat' || item.type === 'sword') { cc.rotate(Math.PI - ang); drawItemIcon(cc, item.type, 0, item.type === 'sword' ? -24 : -26, 1.18, true); }
         else drawItemIcon(cc, item.type, 0, -4, 0.85, true);
         cc.restore();
-      } : gOut ? (cc, hx, hy, ang) => { cc.save(); cc.translate(hx, hy); cc.rotate(Math.PI - ang); cc.translate(0, -30); cc.rotate(Math.PI); drawGuitar(cc, 0.82, outline); cc.restore(); } : null,
+      } : gOut ? (cc, hx, hy, ang) => { cc.save(); cc.translate(hx, hy); cc.rotate(Math.PI - ang); cc.translate(0, -30); cc.rotate(Math.PI); drawGuitar(cc, 0.82, outline); cc.restore(); }
+        : HAND_PROPS[this.id] ? (cc, hx, hy, ang) => HAND_PROPS[this.id](cc, this, hx, hy, ang, outline) : null,
     }));
     c.restore();
     c.globalAlpha = 1;

@@ -184,7 +184,11 @@ const EFFECT_COL = { fire: '#ff9f1c', elec: '#48cae4', slash: '#f1f5f9', normal:
 // dir: 1 lanza hacia la derecha para ángulos "hacia delante", -1 hacia la izquierda
 function applyHit(att, t, hit, dir, opts = {}) {
   if (!t || t.dead || t.stocks <= 0) return false;
-  if (t.invuln > 0 || t.hidden) return false;
+  if (t.invuln > 0 || t.hidden) {
+    // esquivar justo a tiempo: algunos personajes lo aprovechan (el ¡Olé! del torero)
+    if (att && att !== t && t.invuln > 0 && (t.state === 'dodge' || t.state === 'airdodge') && abil(t).onDodge && !sameTeam(att, t)) abil(t).onDodge(t, att, opts.proj ? hit : (att.move || hit));
+    return false;
+  }
   if (t.starTime > 0) { spawnFx('spark', t.x, t.y - 50, { col: '#ffd166' }); return false; }
   if (att && att === t) return false;
   if (sameTeam(att, t)) return false; // sin fuego amigo
@@ -302,6 +306,8 @@ function hitArea(att, r, hit, opts = {}) {
 }
 
 function triggerCounter(f, att, incoming) {
+  // la verónica no se teletransporta: deja pasar al rival por el capote
+  if (f.move && f.move.def.pass && typeof capotePass === 'function') return capotePass(f, att, incoming);
   Audio8.sfx('counter');
   spawnFx('boom', f.x, f.y - 50, { r: 70, col: '#f1f5f9' });
   f.x = att.x - att.face * 50; f.face = att.face; f.y = att.y; f.grounded = att.grounded;
