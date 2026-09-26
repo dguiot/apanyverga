@@ -27,6 +27,15 @@ function aiParams(lv) {
   };
 }
 
+// ¿ese especial dispara algo? (Bola de Fuego sí; Embestida no): se lee una vez de su código.
+// Sin esto la CPU "disparaba" desde lejos especiales que embisten o golpean cerca, una y otra vez
+const AI_PROJ = {};
+function aiHasProj(id, k) {
+  const key = id + ':' + k;
+  if (!(key in AI_PROJ)) { const m = SPECIALS[id] && SPECIALS[id][k]; AI_PROJ[key] = !!m && Object.values(m).some(v => typeof v === 'function' && /spawnProjectile/.test(String(v))); }
+  return AI_PROJ[key];
+}
+
 class AIBrain {
   constructor(level) {
     this.L = aiParams(level);
@@ -35,6 +44,18 @@ class AIBrain {
   }
   tick() {
     const s = this.think(), f = this.f;
+    // salto completo: presionar un solo cuadro da un saltito; para subir de piso se sostiene
+    if (this.holdJ > 0) { this.holdJ--; s.jump = true; }
+    // tras apretar un especial neutral, la palanca se queda al centro: el golpe lee la palanca al salir y, si ya
+    // iba otra vez hacia el rival, salía el especial de lado (una y otra vez contra una pared en la pirámide)
+    if (this.neutralT > 0) { this.neutralT--; s.x = 0; s.y = 0; }
+    // volcán con la lava arriba: sobre una plataforma no se baja por nada (perseguía al rival y caía a la lava)
+    const st = BATTLE && BATTLE.stage;
+    if (f && st && st.lavaPhase && st.lavaPhase !== 'idle' && f.grounded && f.surface && f.surface.plat) {
+      const nx = f.x + sign(s.x) * 26;
+      if (s.x && (nx < f.surface.x + 8 || nx > f.surface.x + f.surface.w - 8)) s.x = 0;
+      if (s.y > 0.5) s.y = 0;
+    }
     // cerca del techo (gravedad cero del espacio o un salto de más): no sigue subiendo, baja rápido
     if (f && !f.grounded && BATTLE) {
       const top = BATTLE.stage.blast.t;
@@ -47,7 +68,7 @@ class AIBrain {
     const s = blankState(), f = this.f, L = this.L;
     if (!f || f.dead || !BATTLE || BATTLE.phase !== 'fight') return s;
     const st = BATTLE.stage;
-    this.cool--; this.jumpCd--; this.shieldT--; this.guardT--;
+    this.cool--; this.jumpCd--; this.shieldT--; this.guardT--; this.backT--;
     const press = b => { s[b] = !this.ctrl.cur[b]; };
     const flickX = d => { s.x = d; this.ctrl.flickX = -1; this.ctrl.flickDirX = d; };
     const flickY = d => { s.y = d; this.ctrl.flickY = -1; this.ctrl.flickDirY = d; };
@@ -134,14 +155,27 @@ class AIBrain {
       return s;
     }
     if (f.state === 'helpless') { s.x = sign(-f.x); return s; }
+    if (this.nairT > 0) {
+      if (--this.nairMax <= 0) this.nairT = 0;
+      else { if (!f.grounded && --this.nairT <= 0) press('attack'); return s; }
+    }
 
     // ---------- peligros ----------
     if (st.id === 'volcano' && st.lavaPhase !== 'idle') {
-      const plat = st.plats.reduce((b, p) => Math.abs(p.x + p.w / 2 - f.x) < Math.abs(b.x + b.w / 2 - f.x) ? p : b, st.plats[0]);
+      // la plataforma más cercana que alcanza de un salto (la alta del centro solo si ya está a su altura);
+      // salto completo: con un saltito no llegaba y se quedaba rebotando en la lava
+      const reach = p => f.y - p.y < 240;
+      const plats = st.plats.filter(reach).length ? st.plats.filter(reach) : st.plats;
+      // la elegida se sostiene mientras siga al alcance (elegirla cada cuadro la hacía ir y venir entre dos)
+      if (!this.lavaPlat || !plats.includes(this.lavaPlat)) this.lavaPlat = plats.reduce((b, p) => Math.abs(p.x + p.w / 2 - f.x) < Math.abs(b.x + b.w / 2 - f.x) ? p : b, plats[0]);
+      const plat = this.lavaPlat;
       if (!(f.grounded && f.surface && f.surface.plat)) {
-        const px = plat.x + plat.w / 2;
-        s.x = Math.abs(px - f.x) > 30 ? sign(px - f.x) : 0;
-        if (Math.abs(px - f.x) < 140 && this.jumpCd <= 0 && (f.grounded || f.vy > 0)) { press('jump'); this.jumpCd = 18; }
+        const px = clamp(f.x, plat.x + 24, plat.x + plat.w - 24);
+        s.x = Math.abs(px - f.x) > 8 ? sign(px - f.x) : 0;
+        if (Math.abs(px - f.x) < 110 && this.jumpCd <= 0) {
+          if (f.grounded) { this.holdJ = 10; this.jumpCd = 24; }
+          else if (f.vy > -1 && f.y > plat.y - 10 && f.jumps > 0) { press('jump'); this.jumpCd = 24; }
+        }
         return s;
       }
     }
@@ -169,14 +203,16 @@ class AIBrain {
     let tgt = null, bd = 1e9;
     for (const o of opps) { const d = Math.abs(o.x - f.x) + Math.abs(o.y - f.y) * 0.6 - (L.killSense > 0.6 ? o.percent * 0.4 : 0); if (d < bd) { bd = d; tgt = o; } }
     const orb = BATTLE.items.find(i => i.type === 'orb');
-    const wantItem = !f.item && BATTLE.items.find(i => !i.holder && i.type !== 'orb' && ITEM_DEFS[i.type].kind !== 'consume' && Math.abs(i.x - f.x) < 260 && Math.abs(i.y - f.y) < 60 && i.grounded);
-    const heal = BATTLE.items.find(i => !i.holder && ['heart', 'taco', 'star', 'shroom'].includes(i.type) && Math.abs(i.x - f.x) < 400);
+    // un objeto que persigue y no alcanza (en otra plataforma, rebotando) se deja un rato: antes vibraba debajo de él
+    if (this.skipT > 0) this.skipT--; else this.skipItem = null;
+    const wantItem = !f.item && BATTLE.items.find(i => !i.holder && i !== this.skipItem && i.type !== 'orb' && ITEM_DEFS[i.type].kind !== 'consume' && Math.abs(i.x - f.x) < 260 && Math.abs(i.y - f.y) < 60 && i.grounded);
+    const heal = BATTLE.items.find(i => !i.holder && i !== this.skipItem && ['heart', 'taco', 'star', 'shroom'].includes(i.type) && Math.abs(i.x - f.x) < 400);
     let gx = tgt ? tgt.x : 0, gy = tgt ? tgt.y : st.top;
     let mode = 'fight';
     if (f.finalReady && tgt && Math.abs(tgt.x - f.x) < 520) { press('special'); return s; }
     if (orb && (!tgt || Math.abs(orb.x - f.x) < Math.abs(tgt.x - f.x) + 200)) { gx = orb.x; gy = orb.y + 40; mode = 'orb'; }
     else if (heal && f.percent > 40) { gx = heal.x; gy = heal.y; mode = 'item'; }
-    else if (wantItem && Math.random() < 0.5) { gx = wantItem.x; gy = wantItem.y; mode = 'pick'; }
+    else if (wantItem && (wantItem === this.pickFor ? this.pickYes : (this.pickFor = wantItem, this.pickYes = Math.random() < 0.5))) { gx = wantItem.x; gy = wantItem.y; mode = 'pick'; }
     // objetivos propios de cada modo
     const gm = BATTLE.rules.mode;
     if (gm === 'soccer' && BATTLE.ms.ball) return this.soccer(s, f, L, press, flickX);
@@ -204,7 +240,11 @@ class AIBrain {
     const safeX = x => x > st.left + 30 && x < st.right - 30;
     // encimados (o el rival justo arriba o abajo): "hacia el rival" cambia de signo cada cuadro y la CPU se
     // quedaba girando de lado a lado sin avanzar. Ahí conserva hacia dónde ve y no camina
-    const stack = adx < 10 * f.size() + 6;
+    // en el aire, con el rival muy arriba o abajo, más margen: la inercia la pasaba de largo y volvía
+    const stack = adx < (!f.grounded && Math.abs(dy) > 90 ? 40 : 10 * f.size() + 6);
+    // agarrar solo si el rival está enfrente y al alcance: encimado o a la espalda el agarre no atrapa nada
+    // (se quedaba agarrando al aire desde el escudo una y otra vez)
+    const grabOk = t => { const fx = (t.x - f.x) * f.face, sz = f.size(); return !!t && t.grounded && Math.abs(t.y - f.y) < 40 && fx > 14 * sz && fx < 70 * sz; };
     const face = stack ? f.face : sign(dx) || f.face, toward = stack ? 0 : sign(dx);
 
     if (!f.grounded && f.state === 'air' && !f.airUsed.dodge && tgt && tgt.state === 'attack' && dist(tgt.x, tgt.y, f.x, f.y) < 120 && Math.random() < L.dodge * 0.25) { press('shield'); return s; }
@@ -214,13 +254,14 @@ class AIBrain {
       if (f0 - tgt.move.f >= 4 && Math.random() < L.shield * 0.5) { this.cool = L.react + 16; s.x = 0; s.y = 0; press('special'); return s; }
     }
     // ---------- defensa ----------
-    if (tgt && mode === 'fight' && f.grounded && this.shieldT <= 0 && tgt.state === 'attack' && Math.abs(tgt.x - f.x) < 140 && Math.random() < L.shield) this.shieldT = randi(8, 20);
+    if (tgt && mode === 'fight' && f.grounded && this.shieldT <= 0 && tgt.state === 'attack' && Math.abs(tgt.x - f.x) < 140 && Math.abs(tgt.y - f.y) < 100 && Math.random() < L.shield) this.shieldT = randi(8, 20); // no se cubre de golpes de otra plataforma
     if (f.state === 'shield') this.wasShield = 8;
     else this.wasShield--;
     if (this.shieldT > 0 && f.grounded) {
       s.shield = true;
       // fuera de escudo: agarrar o castigar si el rival quedó cerca
-      if (tgt && f.shieldStun === 0 && Math.abs(tgt.x - f.x) < 90 && tgt.state === 'attack' && Math.random() < L.oos * 0.35) { this.shieldT = 0; if (Math.random() < 0.4) press('grab'); else { s.shield = false; press('attack'); } }
+      // (A desde el escudo también es agarre: encimado o a la espalda no atrapaba nada y se repetía)
+      if (tgt && f.shieldStun === 0 && grabOk(tgt) && tgt.state === 'attack' && Math.random() < L.oos * 0.35) { this.shieldT = 0; press('grab'); }
       return s;
     }
 
@@ -237,12 +278,19 @@ class AIBrain {
       return s;
     }
     if (mode === 'pick' || mode === 'item') {
-      if (adx < 30 && mode === 'pick' && f.grounded) { press('attack'); return s; }
-      s.x = sign(dx); return s;
+      const it = mode === 'pick' ? wantItem : heal;
+      this.itemT = this.itemFor === it ? (this.itemT || 0) + 1 : 0; this.itemFor = it;
+      if (this.itemT > 150) { this.skipItem = it; this.skipT = 300; this.itemT = 0; } // 2.5 s sin alcanzarlo: otra cosa
+      if (adx < 30 && mode === 'pick' && f.grounded && Math.abs(f.vx) < 3) { press('attack'); return s; }
+      // el último tramo caminando: corriendo se pasaba y al apretar A le salía un ataque en carrera
+      s.x = adx < 10 ? 0 : sign(dx) * (adx < 110 && f.grounded ? 0.45 : 1); return s;
     }
 
     // ---------- edge-guard: el rival está fuera ----------
-    const tOff = tgt.x < st.left - 20 || tgt.x > st.right + 20 || (tgt.y > st.top + 30 && !tgt.grounded);
+    // fuera = colgado de la orilla, o en el aire sin ningún piso debajo (en las azoteas la calle de abajo
+    // también es piso: antes cuidaba la orilla mientras el rival caminaba en otra azotea)
+    const overFloor = t => st.surfaces().some(q => !q.wall && t.x >= q.x - 10 && t.x <= q.x + q.w + 10 && q.y >= t.y - 5);
+    const tOff = tgt.state === 'ledge' || (!tgt.grounded && !overFloor(tgt));
     // la decisión de cuidar la orilla dura medio segundo: sorteada cada cuadro, la CPU corría de ida y vuelta junto al borde
     if (!tOff) this.egT = 0;
     else if (!(this.egT > 0)) { this.eg = L.edgeguard > 0 && Math.random() < L.edgeguard; this.egT = 30; }
@@ -268,8 +316,15 @@ class AIBrain {
     }
 
     // proyectiles a distancia
-    if (adx > 320 && f.grounded && f.id !== 'puentin' && Math.random() < L.proj * 3 && this.cool <= 0) { this.cool = L.react + 20; if (sign(dx) !== f.face) s.x = sign(dx) * 0.4; press('special'); return s; }
-    if (f.item && f.item.type === 'gun' && adx < 700 && Math.abs(dy) < 60 && this.cool <= 0) { this.cool = Math.max(8, L.react); f.face = sign(dx); press('attack'); return s; }
+    if (adx > 320 && Math.abs(dy) < 120 && f.grounded && aiHasProj(f.id, 'n') && Math.random() < L.proj * 3 && this.cool <= 0) {
+      if (sign(dx) !== f.face) { s.x = sign(dx) * 0.4; return s; } // primero voltea: con la palanca de lado salía el especial de lado
+      this.cool = L.react + 20; this.neutralT = 6; press('special'); return s;
+    }
+    // pistola: solo a su altura y si no se está cubriendo o esquivando; sin balas, se la avienta
+    if (f.item && f.item.type === 'gun' && this.cool <= 0) {
+      if (!(f.item.ammo > 0) && adx < 450) { this.cool = 20; s.x = sign(dx); press('grab'); return s; }
+      if (adx < 700 && Math.abs(dy) < 40 && !['shield', 'dodge', 'airdodge', 'respawn'].includes(tgt.state)) { this.cool = Math.max(14, L.react); f.face = sign(dx); press('attack'); return s; }
+    }
     if (f.item && ITEM_DEFS[f.item.type].kind === 'throw' && adx < 450 && this.cool <= 0) { this.cool = 20; s.x = sign(dx); press('grab'); return s; }
 
     // ---------- castigo: el rival está vulnerable ----------
@@ -277,7 +332,7 @@ class AIBrain {
     if (vulnerable && adx < range * 1.6 && Math.abs(dy) < 60 && f.grounded && Math.random() < L.punish && this.cool <= 0) {
       this.cool = L.react;
       if (face !== f.face) { s.x = face * 0.4; return s; }
-      if (tgt.percent > 90 || tgt.state === 'dizzy') { flickX(face); press('attack'); } else if (Math.random() < 0.22) press('grab'); else { s.x = face * 0.6; press('attack'); }
+      if (tgt.percent > 90 || tgt.state === 'dizzy') { flickX(face); press('attack'); } else if (Math.random() < 0.22 && grabOk(tgt)) press('grab'); else { s.x = face * 0.6; press('attack'); }
       return s;
     }
     // ---------- persecución aérea (juggle) ----------
@@ -291,11 +346,14 @@ class AIBrain {
       }
     }
 
+    if (mode === 'fight' && (Math.abs(dy) > 150 || this.climbTo || (f.grounded && adx > range))) { const c = this.climb(s, f, gx, gy, st, press, L); if (c) return c; }
     if (adx > range || Math.abs(dy) > 90) {
       s.x = toward * (f.grounded ? L.speed : 1);
       // el rival casi justo arriba o abajo: acercarse caminando (corriendo se pasaba de largo y daba la vuelta)
       if (f.grounded && Math.abs(dy) > 90 && adx < 70) s.x = toward * 0.35;
-      if (!f.grounded && !safeX(f.x + sign(dx) * 80) && !(tgt.x > st.left && tgt.x < st.right)) s.x = sign(-f.x);
+      // en el aire junto a la orilla, con el rival afuera: de regreso al escenario unos cuadros seguidos
+      // (decidido cada cuadro iba y venía justo en el límite)
+      if (!f.grounded && (this.backT > 0 || (!safeX(f.x + sign(dx) * 80) && !(tgt.x > st.left && tgt.x < st.right)))) { if (!(this.backT > 0)) this.backT = 18; s.x = sign(-f.x); }
       if (f.grounded && !safeX(f.x + sign(dx) * 60) && !(tgt.x > st.left && tgt.x < st.right)) s.x = 0;
       if (dy < -90 && (f.grounded || f.vy > 0) && this.jumpCd <= 0 && adx < 260) { press('jump'); this.jumpCd = 30 - L.t * 15; } // más arriba que el alcance: brinca (entre 90 y 110 se quedaba abajo)
       if (dy > 80 && f.grounded && f.surface && f.surface.plat && adx < 200 && Math.random() < 0.08) { s.y = 1; this.ctrl.flickY = 0; this.ctrl.flickDirY = 1; }
@@ -308,6 +366,11 @@ class AIBrain {
     // ---------- en rango ----------
     if (this.cool > 0) { if (Math.random() < 0.3) s.x = toward * 0.3; return s; }
     if (Math.random() > L.aggro) { this.cool = randi(4, 12); return s; }
+    // encimados: el jab empieza delante del cuerpo y el agarre también, así que no pegaban nunca (y se
+    // repetían). Saltito y aéreo neutral, que pega alrededor del cuerpo
+    if (stack && f.grounded && Math.abs(dy) < 40) { press('jump'); this.nairT = 5; this.nairMax = 24; this.cool = L.react + 8; return s; }
+    // contra un escudo, golpe tras golpe no sirve: agarrarlo
+    if (tgt.state === 'shield' && f.grounded && grabOk(tgt) && Math.random() < 0.25 + L.t * 0.5) { this.cool = L.react + 6; press('grab'); return s; }
     this.cool = L.react + randi(0, Math.round(8 * (1 - L.t)));
     const killPct = 110 - (tgt.weight() - 100) * 0.8;
     const high = tgt.percent > killPct * (1.3 - L.killSense * 0.4);
@@ -323,12 +386,12 @@ class AIBrain {
     if (face !== f.face && Math.random() < 0.6) { s.x = face * 0.6; return s; }
     if (L.t > 0.6 && Math.random() < L.t) {
       // espaciado: pegado → golpe rápido o agarre; a media distancia → golpe lateral o smash
-      if (adx < 45) { if (Math.random() < 0.16) press('grab'); else if (high) { flickY(Math.random() < 0.5 ? 1 : -1); press('attack'); } else press('attack'); }
+      if (adx < 45) { if (Math.random() < 0.16 && grabOk(tgt)) press('grab'); else if (high) { flickY(Math.random() < 0.5 ? 1 : -1); press('attack'); } else press('attack'); }
       else { if (high) flickX(face); else s.x = face * 0.6; press('attack'); }
       return s;
     }
     const r = Math.random();
-    if (r < 0.05 + L.t * 0.03) { press('grab'); return s; }
+    if (r < 0.05 + L.t * 0.03 && grabOk(tgt)) { press('grab'); return s; }
     if (r < 0.2) {
       // el torero no saca la verónica al aire: sin embestida no sirve; mejor banderillas o revolera
       if (f.id === 'puentin') { if (Math.random() < 0.5) s.x = face * 0.9; else s.y = 0.9; } else s.x = face * (Math.random() < 0.5 ? 0.9 : 0);
@@ -343,6 +406,102 @@ class AIBrain {
     if (r < 0.65) { s.y = 0.6; press('attack'); return s; }
     press('attack');
     return s;
+  }
+  // ---------- otro piso (azoteas, pirámide, volcán) ----------
+  // Rival mucho más arriba: subir por la plataforma, piso o elevador al alcance del salto (completo + doble);
+  // mucho más abajo: dejarse caer por la plataforma o caminar a una orilla que tenga piso debajo.
+  // Antes se quedaba debajo (o encima) del rival esperando, a veces toda la pelea.
+  climb(s, f, gx, gy, st, press, L) {
+    const dy = gy - f.y, REACH = 230, surf = st.surfaces().filter(q => !q.wall);
+    // ¿hay una pared (un piso macizo más alto que los pies) entre aquí y x? (en la pirámide caminaba contra ella)
+    const wallTo = x => st.solids.some(q => !q.plat && q.y < f.y - 10 && q.y + (q.h || 0) > f.y - 60 && Math.max(q.x, Math.min(f.x, x)) < Math.min(q.x + q.w, Math.max(f.x, x)));
+    // al bajar, el elevador se le escapa de los pies un instante cada cuadro: sigue arriba de él, que espere
+    const ride = !f.grounded && surf.find(q => q.move && f.x >= q.x && f.x <= q.x + q.w && q.y - f.y > -4 && q.y - f.y < 26);
+    if (ride && dy < -150) { s.x = 0; return s; }
+    if (!f.grounded) {
+      const q = this.climbTo;
+      if (!q || --this.climbT <= 0) { this.climbTo = null; return null; }
+      // tendedero de las azoteas: por encima de la cuerda con el doble salto y dejarse caer en ella (rebota hasta la orilla)
+      if (q.rope) {
+        const r = q.rope, cx = (r.x0 + r.x1) / 2;
+        s.x = Math.abs(cx - f.x) > 30 ? sign(cx - f.x) * 0.6 : 0; s.y = 0;
+        if (f.vy > -1.5 && f.y > r.y - 50 && f.jumps > 0 && this.jumpCd <= 0) { press('jump'); this.jumpCd = 20; }
+        // los que saltan poco (toro, dino, boliche…): con los dos saltos no pasan la cuerda; el especial hacia arriba sí
+        else if (f.jumps === 0 && f.vy > -1 && f.y > r.y - 10 && !f.airUsed.sp_u && f.state === 'air') { s.x = 0; s.y = -1; press('special'); }
+        return s;
+      }
+      // en el aire: hacia el piso elegido y doble salto al ir perdiendo altura por debajo de él
+      const tx = clamp(f.x, q.x + 18, q.x + q.w - 18);
+      s.x = Math.abs(tx - f.x) > 6 ? sign(tx - f.x) : 0;
+      if (f.vy > -1.5 && f.y > q.y - 8 && f.jumps > 0 && this.jumpCd <= 0) { press('jump'); this.jumpCd = 20; }
+      return s;
+    }
+    this.climbTo = null;
+    // un piso macizo en medio, a la misma altura que el rival (el bloque de arriba de la pirámide): subirse a él
+    const wall = Math.abs(dy) <= 150 && st.solids.find(q => !q.plat && q.y < f.y - 10 && q.y + (q.h || 0) > f.y - 60 && Math.max(q.x, Math.min(f.x, gx)) < Math.min(q.x + q.w, Math.max(f.x, gx)));
+    if (wall) {
+      if (f.y - wall.y > REACH) return null; // muy alto: que siga por donde pueda
+      const tx = f.x < wall.x + wall.w / 2 ? wall.x - 16 : wall.x + wall.w + 16;
+      if (Math.abs(tx - f.x) > 14) { s.x = sign(tx - f.x) * (Math.abs(tx - f.x) > 90 ? L.speed : 0.5); return s; }
+      if (this.jumpCd <= 0) { this.holdJ = 10; this.jumpCd = 24; this.climbTo = wall; this.climbT = 80; }
+      return s;
+    }
+    // en la calle de las azoteas, del lado de afuera de los edificios (sin elevador): el tendedero es la salida
+    if (dy < -150 && st.id === 'city' && typeof ROPES !== 'undefined' && f.y > 360) {
+      const r = ROPES.find(r => f.x < r.x1 + 30 && f.x > r.x0 - 240);
+      if (r) {
+        const tx = clamp(f.x, r.x0 + 40, r.x1 - 40);
+        if (Math.abs(tx - f.x) > 12) { s.x = sign(tx - f.x) * L.speed; return s; }
+        if (this.jumpCd <= 0) { this.holdJ = 12; this.jumpCd = 24; this.climbTo = { rope: r }; this.climbT = 120; }
+        return s;
+      }
+    }
+    if (dy < -150) {
+      // arriba de un elevador (lo que sube y baja): quieto hasta que llegue arriba, aunque ahora vaya de bajada
+      // (se bajaba y corría contra la pared del edificio)
+      const on = f.surface;
+      if (on && on.move) {
+        const v = on.y - (this.onY === undefined ? on.y : this.onY); this.onY = on.y;
+        if (Math.abs(v) > 0.2) on.aiLift = true;
+        on.aiTop = Math.min(on.aiTop === undefined ? on.y : on.aiTop, on.y); // lo más alto que se le ha visto
+        // ya arriba (y no sigue subiendo): de aquí se salta al techo; antes se quedaba a dar otra vuelta
+        if (on.aiLift && on.y - gy > 40 && (v < -0.2 || on.y > on.aiTop + 50)) { s.x = 0; return s; }
+      } else this.onY = undefined;
+      // plataforma: debajo de ella; piso macizo: junto a su orilla, por fuera
+      const spot = q => q.plat ? clamp(f.x, q.x + 22, q.x + q.w - 22) : f.x < q.x + q.w / 2 ? q.x - 16 : q.x + q.w + 16;
+      let best = null, bs = 1e9;
+      for (const q of surf) {
+        if (q === on) continue;
+        const up = f.y - q.y;
+        if (!q.move && (up < 25 || up > REACH)) continue;  // un elevador baja por ti: ese vale aunque esté lejos
+        if (q.y < gy - 120) continue;                       // más arriba que el rival no sirve
+        if (wallTo(spot(q))) continue;                      // no se llega caminando
+        if (q.plat && on && !q.move && (spot(q) < on.x || spot(q) > on.x + on.w)) continue; // no hay dónde pararse debajo
+        const near = clamp(f.x, q.x, q.x + q.w);
+        const sc = Math.abs(near - f.x) + Math.abs(q.x + q.w / 2 - gx) * 0.4 + (q.move && (up < 25 || up > REACH) ? 260 : 0);
+        if (sc < bs) { bs = sc; best = q; }
+      }
+      if (!best || bs > 1400) return null;
+      const up = f.y - best.y, inReach = up >= 25 && up <= REACH, tx = spot(best);
+      if (Math.abs(tx - f.x) > 14) { s.x = sign(tx - f.x) * (Math.abs(tx - f.x) > 90 ? L.speed : 0.5); return s; }
+      if (!inReach) { s.x = 0; return s; } // esperar al elevador
+      if (this.jumpCd <= 0) { this.holdJ = 10; this.jumpCd = 24; this.climbTo = best; this.climbT = 80; }
+      return s;
+    }
+    if (dy > 150) {
+      const on = f.surface; if (!on) return null;
+      // plataforma: bajarse por ella
+      if (on.plat) { s.y = 1; this.ctrl.flickY = 0; this.ctrl.flickDirY = 1; return s; }
+      // piso macizo: a la orilla que tenga piso debajo (nunca a un precipicio)
+      const below = x => surf.some(q => q !== on && x >= q.x && x <= q.x + q.w && q.y > f.y + 40);
+      const edges = [on.x - 20, on.x + on.w + 20].filter(x => below(x) && !wallTo(x));
+      if (!edges.length) return null;
+      const ex = edges.reduce((a, b) => Math.abs(b - gx) + Math.abs(b - f.x) < Math.abs(a - gx) + Math.abs(a - f.x) ? b : a);
+      s.x = sign(ex - f.x) * (Math.abs(ex - f.x) < 90 ? 1 : L.speed); // caminando se frena en la orilla: al final, corriendo
+      if (Math.abs(ex - f.x) < 40 && this.jumpCd <= 0) { press('jump'); this.jumpCd = 30; }
+      return s;
+    }
+    return null;
   }
   // Fútbol: ponerse detrás de la pelota y patear hacia la portería rival
   soccer(s, f, L, press, flickX) {
