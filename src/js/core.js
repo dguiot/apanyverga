@@ -6,18 +6,27 @@ const W = 1280, H = 720;
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 let VIEW = { scale: 1, dpr: 1 };
+// Xbox (Edge en la consola): poca memoria para el navegador y una tele 4K que pide lienzos gigantes
+const IS_XBOX = /Xbox/i.test(navigator.userAgent) || /[?&]xbox\b/.test(location.search); // ?xbox para probarlo en otra tele
+// tope de nitidez (pixeles del lienzo por pixel del juego) y ajuste automático si el equipo no aguanta.
+// En una tele 4K el lienzo salía de 3840×2160 y cada capa pintada de los mundos grandes pesaba decenas de MB:
+// la Xbox se trababa o se quedaba en negro. 1 = 1280×720 (se estira a la pantalla), 2 = 2560×1440
+const QUALITY = { cap: IS_XBOX ? 1 : 2, res: 1 };
 
 function resize() {
   const bar = 0; // las caras de la cámara van dentro del marcador: ya no hay franja abajo
   document.body.style.paddingBottom = bar ? bar + 'px' : '';
   const vw = window.innerWidth, vh = Math.max(120, window.innerHeight - bar);
   const s = Math.min(vw / W, vh / H);
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const k = Math.max(0.5, Math.min(s * Math.min(window.devicePixelRatio || 1, 2), QUALITY.cap * QUALITY.res));
+  const dpr = k / s;
   canvas.style.width = Math.floor(W * s) + 'px';
   canvas.style.height = Math.floor(H * s) + 'px';
-  canvas.width = Math.floor(W * s * dpr);
-  canvas.height = Math.floor(H * s * dpr);
-  VIEW.scale = s; VIEW.dpr = dpr;
+  canvas.width = Math.floor(W * k);
+  canvas.height = Math.floor(H * k);
+  // otra nitidez: las capas horneadas a la anterior ya no sirven (si se quedan, la memoria solo crece)
+  if (VIEW.k && Math.abs(VIEW.k - k) > 0.01 && typeof ART !== 'undefined') ART.store.clear();
+  VIEW.scale = s; VIEW.dpr = dpr; VIEW.k = k;
 }
 window.addEventListener('resize', resize);
 resize();
@@ -100,8 +109,8 @@ function toLogical(e) {
   const r = canvas.getBoundingClientRect();
   return { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H };
 }
-canvas.addEventListener('pointermove', e => { const p = toLogical(e); Pointer.x = p.x; Pointer.y = p.y; Pointer.moved = true; });
-canvas.addEventListener('pointerdown', e => { try { canvas.focus({ preventScroll: true }); window.focus(); } catch (er) { /* sin foco */ } const p = toLogical(e); Pointer.x = p.x; Pointer.y = p.y; Pointer.down = true; Pointer.clicked = true; Audio8.unlock(); });
+canvas.addEventListener('pointermove', e => { if (typeof TVBOX !== 'undefined' && TVBOX.fakeMouse(e)) return; const p = toLogical(e); Pointer.x = p.x; Pointer.y = p.y; Pointer.moved = true; });
+canvas.addEventListener('pointerdown', e => { if (typeof TVBOX !== 'undefined' && TVBOX.fakeMouse(e, true)) return; try { canvas.focus({ preventScroll: true }); window.focus(); } catch (er) { /* sin foco */ } const p = toLogical(e); Pointer.x = p.x; Pointer.y = p.y; Pointer.down = true; Pointer.clicked = true; Audio8.unlock(); });
 window.addEventListener('pointerup', () => { Pointer.down = false; });
 function hover(x, y, w, h) { return Pointer.x >= x && Pointer.x <= x + w && Pointer.y >= y && Pointer.y <= y + h; }
 // cada botón que una pantalla revisa aquí queda anotado para que el control también llegue a él (focus.js)

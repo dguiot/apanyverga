@@ -1338,5 +1338,5 @@ function drawModeIcon(id, x, y, on) {
 }
 
 // Invitar se atiende dentro del gesto (clic, toque o tecla I): solo así el navegador deja compartir o copiar
-canvas.addEventListener('click', e => { const p = toLogical(e); if (!InviteBox.isOpen() && APP.inviteHit(p.x, p.y)) Net.invite(); });
+canvas.addEventListener('click', e => { if (typeof TVBOX !== 'undefined' && TVBOX.fakeMouse(e, true)) return; const p = toLogical(e); if (!InviteBox.isOpen() && APP.inviteHit(p.x, p.y)) Net.invite(); });
 window.addEventListener('keydown', e => { if (e.code === 'KeyI' && !e.repeat && !InviteBox.isOpen() && APP.inviteShown()) Net.invite(); });

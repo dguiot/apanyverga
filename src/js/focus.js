@@ -114,4 +114,4 @@ const UIFocus = {
   },
 };
 // el ratón de verdad se mueve: el marco se quita
-window.addEventListener('mousemove', () => { if (UIFocus.cur) { UIFocus.cur = null; } }, { passive: true });
+window.addEventListener('mousemove', e => { if (typeof TVBOX !== 'undefined' && TVBOX.fakeMouse(e)) return; if (UIFocus.cur) { UIFocus.cur = null; } }, { passive: true });

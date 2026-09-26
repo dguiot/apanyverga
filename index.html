@@ -94,6 +94,18 @@
   #iosfs.swipe i { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 999px; background: #ffc53d; color: #1a1300; font: 800 22px/1 'Barlow', system-ui, sans-serif; font-style: normal; animation: iosup 1.1s ease-in-out infinite; }
   @keyframes iosup { 0%, 100% { transform: translateY(5px); } 50% { transform: translateY(-5px); } }
   @media (prefers-reduced-motion: reduce) { #iosfs.swipe i { animation: none; } }
+  /* Xbox: cómo pasar el control a "controles de juego" */
+  #tvbox { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 7; display: flex; align-items: center; gap: 14px; width: min(860px, calc(100vw - 48px)); box-sizing: border-box; padding: 14px 14px 14px 22px; border-radius: 20px; background: rgba(11,15,24,.94); border: 2px solid #2ec4b6; color: #f4f6fa; font: 600 20px/1.35 'Barlow', system-ui, sans-serif; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
+  #tvbox[hidden] { display: none; }
+  #tvbox > span { min-width: 0; flex: 1 1 auto; }
+  #tvbox.warn { border-color: #ffc53d; }
+  #tvbox b { color: #ffc53d; }
+  #tvbox button { flex: 0 0 auto; border: 0; border-radius: 999px; width: 44px; height: 44px; background: #1f2a3a; color: #f4f6fa; font-size: 20px; }
+  /* si el juego no arranca, se dice por qué (en vez de pantalla negra) */
+  #bootfail { position: fixed; inset: 0; z-index: 9; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(6,10,18,.9); color: #f4f6fa; font: 600 18px/1.4 'Barlow', system-ui, sans-serif; text-align: center; }
+  #bootfail > div { max-width: 560px; min-width: 0; }
+  #bootfail p { color: #cbd5e1; font-size: 15px; overflow-wrap: anywhere; }
+  #bootfail button { border: 0; border-radius: 999px; padding: 12px 26px; background: #2ec4b6; color: #062a26; font: 700 18px 'Barlow', system-ui, sans-serif; }
 </style>
 <canvas id="game" tabindex="0" aria-label="A pan y verga: juego de peleas para hasta 4 jugadores. Usa un control o el teclado."></canvas>
 <!--SCRIPTS-->
@@ -412,18 +424,27 @@ const W = 1280, H = 720;
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 let VIEW = { scale: 1, dpr: 1 };
+// Xbox (Edge en la consola): poca memoria para el navegador y una tele 4K que pide lienzos gigantes
+const IS_XBOX = /Xbox/i.test(navigator.userAgent) || /[?&]xbox\b/.test(location.search); // ?xbox para probarlo en otra tele
+// tope de nitidez (pixeles del lienzo por pixel del juego) y ajuste automático si el equipo no aguanta.
+// En una tele 4K el lienzo salía de 3840×2160 y cada capa pintada de los mundos grandes pesaba decenas de MB:
+// la Xbox se trababa o se quedaba en negro. 1 = 1280×720 (se estira a la pantalla), 2 = 2560×1440
+const QUALITY = { cap: IS_XBOX ? 1 : 2, res: 1 };
 
 function resize() {
   const bar = 0; // las caras de la cámara van dentro del marcador: ya no hay franja abajo
   document.body.style.paddingBottom = bar ? bar + 'px' : '';
   const vw = window.innerWidth, vh = Math.max(120, window.innerHeight - bar);
   const s = Math.min(vw / W, vh / H);
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const k = Math.max(0.5, Math.min(s * Math.min(window.devicePixelRatio || 1, 2), QUALITY.cap * QUALITY.res));
+  const dpr = k / s;
   canvas.style.width = Math.floor(W * s) + 'px';
   canvas.style.height = Math.floor(H * s) + 'px';
-  canvas.width = Math.floor(W * s * dpr);
-  canvas.height = Math.floor(H * s * dpr);
-  VIEW.scale = s; VIEW.dpr = dpr;
+  canvas.width = Math.floor(W * k);
+  canvas.height = Math.floor(H * k);
+  // otra nitidez: las capas horneadas a la anterior ya no sirven (si se quedan, la memoria solo crece)
+  if (VIEW.k && Math.abs(VIEW.k - k) > 0.01 && typeof ART !== 'undefined') ART.store.clear();
+  VIEW.scale = s; VIEW.dpr = dpr; VIEW.k = k;
 }
 window.addEventListener('resize', resize);
 resize();
@@ -506,8 +527,8 @@ function toLogical(e) {
   const r = canvas.getBoundingClientRect();
   return { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H };
 }
-canvas.addEventListener('pointermove', e => { const p = toLogical(e); Pointer.x = p.x; Pointer.y = p.y; Pointer.moved = true; });
-canvas.addEventListener('pointerdown', e => { try { canvas.focus({ preventScroll: true }); window.focus(); } catch (er) { /* sin foco */ } const p = toLogical(e); Pointer.x = p.x; Pointer.y = p.y; Pointer.down = true; Pointer.clicked = true; Audio8.unlock(); });
+canvas.addEventListener('pointermove', e => { if (typeof TVBOX !== 'undefined' && TVBOX.fakeMouse(e)) return; const p = toLogical(e); Pointer.x = p.x; Pointer.y = p.y; Pointer.moved = true; });
+canvas.addEventListener('pointerdown', e => { if (typeof TVBOX !== 'undefined' && TVBOX.fakeMouse(e, true)) return; try { canvas.focus({ preventScroll: true }); window.focus(); } catch (er) { /* sin foco */ } const p = toLogical(e); Pointer.x = p.x; Pointer.y = p.y; Pointer.down = true; Pointer.clicked = true; Audio8.unlock(); });
 window.addEventListener('pointerup', () => { Pointer.down = false; });
 function hover(x, y, w, h) { return Pointer.x >= x && Pointer.x <= x + w && Pointer.y >= y && Pointer.y <= y + h; }
 // cada botón que una pantalla revisa aquí queda anotado para que el control también llegue a él (focus.js)
@@ -578,7 +599,7 @@ function rgbStr(c, a = 1) { return a >= 1 ? `rgb(${c[0] | 0},${c[1] | 0},${c[2] 
 
 const ART = {
   store: new Map(),
-  hi: true,                // bloom y luz de borde; baja sola si el equipo no aguanta
+  hi: !IS_XBOX,            // bloom y luz de borde; baja sola si el equipo no aguanta (en Xbox empieza apagado)
   light: null,             // luz del escenario actual
   frameMs: 0, slow: 0,
   pxRes() { return clamp(VIEW.scale * VIEW.dpr, 1, 2); },
@@ -587,7 +608,8 @@ const ART = {
   memo(key, make) { if (!this.store.has(key)) this.store.set(key, make()); return this.store.get(key); },
   // lienzo horneado en coordenadas del mundo: {img, x, y, w, h}
   bake(key, x, y, w, h, draw, res) {
-    const R = res || this.pxRes();
+    // ninguna capa pasa de 4096 pixeles por lado (los mundos grandes miden más de 3000 de ancho)
+    const R = Math.min(res || this.pxRes(), 4096 / Math.max(w, h, 1));
     return this.memo(key + '@' + R.toFixed(2), () => {
       const cv = mkCanvas(w * R, h * R), c = cv.getContext('2d');
       c.scale(R, R); c.translate(-x, -y); draw(c);
@@ -789,6 +811,8 @@ const ART = {
   measure(ms) {
     this.frameMs = lerp(this.frameMs, ms, 0.05);
     if (this.hi && this.frameMs > 22) { if (++this.slow > 120) { this.hi = false; this.slow = 0; } }
+    // ya sin brillo y todavía lento: menos pixeles (hasta 60%), una vez cada 3 s
+    else if (!this.hi && this.frameMs > 24 && QUALITY.res > 0.6) { if (++this.slow > 180) { QUALITY.res = Math.max(0.6, QUALITY.res - 0.2); resize(); this.slow = 0; this.frameMs = 16; } }
     else this.slow = Math.max(0, this.slow - 1);
   },
 };
@@ -874,10 +898,11 @@ window.addEventListener('keydown', e => {
   }
   if (Capture.active && e.code === 'Escape') { e.preventDefault(); Capture.cancel = true; return; }
   if (GAME_KEYS.has(e.code) || e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault();
+  if (typeof TVBOX !== 'undefined' && TVBOX.holdKey(e)) return; // Xbox: la tecla puede ser el mismo botón del control
   if (!e.repeat) { keysTapped.add(e.code); keyOrder.set(e.code, ++keySeq); }
   keysDown.add(e.code);
 });
-window.addEventListener('keyup', e => keysDown.delete(e.code));
+window.addEventListener('keyup', e => { if (typeof TVBOX !== 'undefined' && TVBOX.holdKey(e, true)) return; keysDown.delete(e.code); });
 window.addEventListener('blur', () => keysDown.clear());
 
 function blankState() {
@@ -1066,6 +1091,7 @@ const Devices = {
     // agarre (control, teclado o pantalla); antes quedaba amarrado a lo que usó para entrar a la sala
     (this.ctrls.local || (this.ctrls.local = new Controller('local'))).update(this.merge(raw));
     keysTapped.clear();
+    if (typeof TVBOX !== 'undefined') TVBOX.tick(raw);
   },
   lastLocal: null, // el último aparato que se usó (a ese le toca vibrar)
   merge(raw) {
@@ -1540,6 +1566,147 @@ const IOSFS = {
       : '📱 <b>Pantalla completa en iPhone:</b> toca <b>Compartir ⬆︎</b> → <b>Agregar a inicio</b> y abre el juego desde el ícono.';
   },
 };
+
+// ---- js/xbox.js ----
+// ============================================================
+//  XBOX (Edge en la consola, conectada a la tele)
+//  Edge arranca en "modo navegador": el control mueve una flecha de ratón con la palanca, A hace clic
+//  donde esté la flecha, la cruceta manda teclas de flecha y B regresa a la página anterior. Y al mismo
+//  tiempo el juego lee el mismo control por la API de controles. Resultado: cada toque contaba doble
+//  (la cruceta brincaba dos opciones, A picaba un botón al azar bajo la flecha) y B te sacaba del juego
+//  a una pantalla negra.
+//  · las teclas y clics que son eco del control se descartan (la tecla llega en los mismos ms que el botón);
+//  · con un control conectado, la flecha de ratón del navegador no cuenta (el control ya llega a todos los botones);
+//  · B / "atrás" no abandona la página;
+//  · un aviso explica cómo pasar a "Usar controles de juego" y se quita solo cuando ya está así;
+//  · si el juego no arranca, se muestra por qué en vez de quedarse en negro.
+// ============================================================
+const TVBOX = {
+  on: IS_XBOX,
+  WIN: 160,            // ms: una tecla y un botón del control tan juntos son el mismo toque
+  HOLD: 60,            // ms que espera una tecla antes de contar (para ver si llega el botón)
+  q: [],               // teclas en espera [{ e: {code, repeat}, up, t }]
+  dropped: new Set(),  // teclas descartadas: su auto-repetición y su soltar también
+  padT: -1e9,          // último flanco de algún control
+  prev: {},            // estado anterior de cada control
+  browsing: false,     // se vio al navegador usando el control como ratón/teclado
+  clean: 0,            // toques del control sin eco: ya está en "controles de juego"
+  NAVKEYS: new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter', 'NumpadEnter', 'Escape', 'Backspace', 'Space']),
+  now() { return performance.now(); },
+  // teclado: en Xbox la cruceta/A/B pueden llegar como teclas además de como botones
+  holdKey(e, up) {
+    if (!this.on) return false;
+    // Edge antiguo manda los botones del control como teclas "Gamepad…": siempre son eco
+    if (/^Gamepad/.test(e.key || '') || (e.keyCode >= 195 && e.keyCode <= 218)) { this.seenEcho(); try { e.preventDefault(); } catch (er) { /* nada */ } return true; }
+    if (!this.NAVKEYS.has(e.code)) return false;
+    try { e.preventDefault(); } catch (er) { /* nada */ }
+    if (!padInfo.length) return false; // sin control conectado es un teclado de verdad: pasa directo
+    this.q.push({ code: e.code, repeat: !!e.repeat, up: !!up, t: this.now() });
+    return true;
+  },
+  seenEcho() { this.browsing = true; this.clean = 0; this.banner(); },
+  tick(raw) {
+    if (!this.on) return;
+    const t = this.now();
+    let edge = false, dir = false;
+    for (const [d, s] of raw) {
+      if (!d.startsWith('pad')) continue;
+      const cur = { x: Math.abs(s.x) > 0.5 ? Math.sign(s.x) : 0, y: Math.abs(s.y) > 0.5 ? Math.sign(s.y) : 0 };
+      for (const b of BUTTONS) cur[b] = !!s[b];
+      const p = this.prev[d] || {};
+      for (const k in cur) if (cur[k] && cur[k] !== p[k]) { edge = true; if (k === 'x' || k === 'y') dir = true; }
+      this.prev[d] = cur;
+    }
+    if (edge) this.padT = t;
+    // teclas en espera: las que coinciden con un botón del control son eco
+    let echo = false;
+    while (this.q.length && t - this.q[0].t >= this.HOLD) {
+      const k = this.q.shift();
+      if (k.up) { keysDown.delete(k.code); this.dropped.delete(k.code); continue; }
+      if (this.dropped.has(k.code)) continue;
+      if (Math.abs(k.t - this.padT) <= this.WIN) { this.dropped.add(k.code); echo = true; continue; }
+      if (!k.repeat) { keysTapped.add(k.code); keyOrder.set(k.code, ++keySeq); }
+      keysDown.add(k.code);
+    }
+    // toques de la cruceta sin eco (ni tecla ni flecha de ratón): ya está en "controles de juego"
+    if (echo) this.seenEcho();
+    else if (dir && !this.q.length && t - this.mouseT > 1000 && ++this.clean >= 6) this.browsing = false;
+    this.banner();
+  },
+  mouseT: -1e9,
+  // ratón: con un control conectado, la flecha que mueve la palanca (y el clic de A) es del navegador
+  fakeMouse(e, click) {
+    if (!this.on || !padInfo.length) return false;
+    if (e.pointerType && e.pointerType !== 'mouse') return false; // dedo o lápiz: de verdad
+    this.mouseT = this.now();
+    if (click || !this.browsing) this.seenEcho();
+    return true;
+  },
+  // B = "atrás" del navegador: se queda en el juego
+  // (Edge se salta al regresar las entradas agregadas sin un toque del usuario: se agrega otra con el primer toque)
+  gest: false,
+  trap(gesture) {
+    if (!this.on || !window.history || !history.pushState) return;
+    try {
+      if (!history.state || !history.state.apv) history.pushState({ apv: 1 }, '');
+      else if (gesture && !this.gest) history.pushState({ apv: 2 }, '');
+      if (gesture) this.gest = true;
+    } catch (e) { /* sin historial */ }
+  },
+  // ---------- aviso "Usar controles de juego" ----------
+  el: null, closed: false, shown: null,
+  banner() {
+    if (!this.on) return;
+    const want = !this.closed && (this.browsing || this.clean < 6) && (typeof APP === 'undefined' || !['battle', 'demo', 'vs', 'netview'].includes(APP.screen));
+    const key = want ? (this.browsing ? 'warn' : 'tip') : 'off';
+    if (key === this.shown || !document.body) return;
+    this.shown = key;
+    if (!want) { if (this.el) this.el.hidden = true; return; }
+    if (!this.el) {
+      const el = document.createElement('div');
+      el.id = 'tvbox'; el.setAttribute('role', 'status');
+      el.innerHTML = '<span><b>Xbox:</b> pulsa <b>A</b> una vez (enciende el sonido), luego <b>mantén presionado ☰ Menú</b> y elige <b>«Usar controles de juego»</b>.</span><button type="button" aria-label="Cerrar aviso">✕</button>';
+      el.querySelector('button').addEventListener('click', ev => { ev.stopPropagation(); this.closed = true; this.banner(); });
+      el.addEventListener('pointerdown', ev => ev.stopPropagation());
+      document.body.appendChild(el);
+      this.el = el;
+    }
+    this.el.hidden = false;
+    this.el.classList.toggle('warn', this.browsing);
+  },
+  // ---------- si no arranca: decir por qué ----------
+  errs: [],
+  fail(msg) {
+    if (document.getElementById('bootfail')) return;
+    const el = document.createElement('div');
+    el.id = 'bootfail';
+    el.innerHTML = '<div><b>El juego no pudo arrancar.</b><p></p><button type="button">Recargar</button></div>';
+    el.querySelector('p').textContent = msg;
+    el.querySelector('button').addEventListener('click', () => location.reload());
+    document.body.appendChild(el);
+  },
+};
+for (const ev of ['error', 'unhandledrejection']) window.addEventListener(ev, e => {
+  const m = e.reason ? (e.reason.message || String(e.reason)) : (e.message || (e.target && e.target.src ? 'no cargó ' + e.target.src.split('/').pop() : 'error'));
+  TVBOX.errs.push(m);
+}, true);
+// a los 8 s: si el bucle ni empezó (un archivo no cargó o tronó al arrancar), se dice en vez de pantalla negra
+setTimeout(() => {
+  const started = typeof Devices !== 'undefined' && Devices.frame > 0;
+  if (typeof APP === 'undefined' || (!started && TVBOX.errs.length)) TVBOX.fail(TVBOX.errs.length ? [...new Set(TVBOX.errs)].sort((a, b) => /^no cargó/.test(b) - /^no cargó/.test(a)).slice(0, 2).join(' · ') : 'Algún archivo del juego no cargó. Revisa la conexión y recarga.');
+}, 8000);
+// la tele o la consola pueden tirar la memoria del lienzo (pantalla negra al volver): se vuelve a pintar todo
+canvas.addEventListener('contextlost', e => { e.preventDefault(); });
+canvas.addEventListener('contextrestored', () => { if (typeof ART !== 'undefined') ART.store.clear(); });
+if (TVBOX.on) {
+  document.documentElement.classList.add('xbox');
+  TVBOX.trap();
+  for (const ev of ['keydown', 'pointerdown']) window.addEventListener(ev, () => TVBOX.trap(true), { capture: true, passive: true });
+  window.addEventListener('popstate', () => TVBOX.trap());
+  // sin nada que desplazar: la cruceta en modo navegador no mueve la página
+  window.addEventListener('scroll', () => { if (window.scrollY || window.scrollX) window.scrollTo(0, 0); }, { passive: true });
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => TVBOX.banner()); else TVBOX.banner();
+}
 
 // ---- js/audio.js ----
 // ============================================================
@@ -13507,7 +13674,7 @@ function drawModeIcon(id, x, y, on) {
 }
 
 // Invitar se atiende dentro del gesto (clic, toque o tecla I): solo así el navegador deja compartir o copiar
-canvas.addEventListener('click', e => { const p = toLogical(e); if (!InviteBox.isOpen() && APP.inviteHit(p.x, p.y)) Net.invite(); });
+canvas.addEventListener('click', e => { if (typeof TVBOX !== 'undefined' && TVBOX.fakeMouse(e, true)) return; const p = toLogical(e); if (!InviteBox.isOpen() && APP.inviteHit(p.x, p.y)) Net.invite(); });
 window.addEventListener('keydown', e => { if (e.code === 'KeyI' && !e.repeat && !InviteBox.isOpen() && APP.inviteShown()) Net.invite(); });
 
 // ---- js/focus.js ----
@@ -13626,7 +13793,7 @@ const UIFocus = {
   },
 };
 // el ratón de verdad se mueve: el marco se quita
-window.addEventListener('mousemove', () => { if (UIFocus.cur) { UIFocus.cur = null; } }, { passive: true });
+window.addEventListener('mousemove', e => { if (typeof TVBOX !== 'undefined' && TVBOX.fakeMouse(e)) return; if (UIFocus.cur) { UIFocus.cur = null; } }, { passive: true });
 
 // ---- js/fame.js ----
 // ============================================================

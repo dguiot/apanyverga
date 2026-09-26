@@ -11,6 +11,11 @@ pantalla táctil) o en línea, cada quien desde su casa, con cámara y voz.
 arriba en el menú para esconder las barras, o mejor: *Compartir → Agregar a inicio* y abre el juego
 desde el ícono (así abre sin barras y de lado, siempre).
 
+**Xbox (Edge):** Edge arranca con el control manejando el navegador (flecha de ratón, B = atrás).
+Pulsa **A** una vez (enciende el sonido), luego **mantén presionado ☰ Menú** y elige
+**«Usar controles de juego»**; el juego lo avisa en pantalla y el aviso se quita solo. Para salir de
+ese modo, vuelve a mantener ☰ Menú. En la consola el juego pinta a 1280×720 y la tele lo estira.
+
 ## Cómo funciona la versión web
 
 - `index.html` es el juego completo en un solo archivo (se genera; no se edita a mano).

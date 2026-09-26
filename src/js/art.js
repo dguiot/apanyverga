@@ -40,7 +40,7 @@ function rgbStr(c, a = 1) { return a >= 1 ? `rgb(${c[0] | 0},${c[1] | 0},${c[2] 
 
 const ART = {
   store: new Map(),
-  hi: true,                // bloom y luz de borde; baja sola si el equipo no aguanta
+  hi: !IS_XBOX,            // bloom y luz de borde; baja sola si el equipo no aguanta (en Xbox empieza apagado)
   light: null,             // luz del escenario actual
   frameMs: 0, slow: 0,
   pxRes() { return clamp(VIEW.scale * VIEW.dpr, 1, 2); },
@@ -49,7 +49,8 @@ const ART = {
   memo(key, make) { if (!this.store.has(key)) this.store.set(key, make()); return this.store.get(key); },
   // lienzo horneado en coordenadas del mundo: {img, x, y, w, h}
   bake(key, x, y, w, h, draw, res) {
-    const R = res || this.pxRes();
+    // ninguna capa pasa de 4096 pixeles por lado (los mundos grandes miden más de 3000 de ancho)
+    const R = Math.min(res || this.pxRes(), 4096 / Math.max(w, h, 1));
     return this.memo(key + '@' + R.toFixed(2), () => {
       const cv = mkCanvas(w * R, h * R), c = cv.getContext('2d');
       c.scale(R, R); c.translate(-x, -y); draw(c);
@@ -251,6 +252,8 @@ const ART = {
   measure(ms) {
     this.frameMs = lerp(this.frameMs, ms, 0.05);
     if (this.hi && this.frameMs > 22) { if (++this.slow > 120) { this.hi = false; this.slow = 0; } }
+    // ya sin brillo y todavía lento: menos pixeles (hasta 60%), una vez cada 3 s
+    else if (!this.hi && this.frameMs > 24 && QUALITY.res > 0.6) { if (++this.slow > 180) { QUALITY.res = Math.max(0.6, QUALITY.res - 0.2); resize(); this.slow = 0; this.frameMs = 16; } }
     else this.slow = Math.max(0, this.slow - 1);
   },
 };

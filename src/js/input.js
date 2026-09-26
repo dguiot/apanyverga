@@ -78,10 +78,11 @@ window.addEventListener('keydown', e => {
   }
   if (Capture.active && e.code === 'Escape') { e.preventDefault(); Capture.cancel = true; return; }
   if (GAME_KEYS.has(e.code) || e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault();
+  if (typeof TVBOX !== 'undefined' && TVBOX.holdKey(e)) return; // Xbox: la tecla puede ser el mismo botón del control
   if (!e.repeat) { keysTapped.add(e.code); keyOrder.set(e.code, ++keySeq); }
   keysDown.add(e.code);
 });
-window.addEventListener('keyup', e => keysDown.delete(e.code));
+window.addEventListener('keyup', e => { if (typeof TVBOX !== 'undefined' && TVBOX.holdKey(e, true)) return; keysDown.delete(e.code); });
 window.addEventListener('blur', () => keysDown.clear());
 
 function blankState() {
@@ -270,6 +271,7 @@ const Devices = {
     // agarre (control, teclado o pantalla); antes quedaba amarrado a lo que usó para entrar a la sala
     (this.ctrls.local || (this.ctrls.local = new Controller('local'))).update(this.merge(raw));
     keysTapped.clear();
+    if (typeof TVBOX !== 'undefined') TVBOX.tick(raw);
   },
   lastLocal: null, // el último aparato que se usó (a ese le toca vibrar)
   merge(raw) {
