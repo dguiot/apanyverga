@@ -88,7 +88,7 @@ const TVBOX = {
   el: null, closed: false, shown: null,
   banner() {
     if (!this.on) return;
-    const want = !this.closed && (this.browsing || this.clean < 6) && (typeof APP === 'undefined' || !['battle', 'demo', 'vs', 'netview'].includes(APP.screen));
+    const want = !this.closed && (this.browsing || this.clean < 6) && (typeof APP === 'undefined' || ['title', 'main', 'online'].includes(APP.screen)); // en las demás tapaba botones (¡A pelear!, Volver)
     const key = want ? (this.browsing ? 'warn' : 'tip') : 'off';
     if (key === this.shown || !document.body) return;
     this.shown = key;
@@ -126,9 +126,15 @@ setTimeout(() => {
   const started = typeof Devices !== 'undefined' && Devices.frame > 0;
   if (typeof APP === 'undefined' || (!started && TVBOX.errs.length)) TVBOX.fail(TVBOX.errs.length ? [...new Set(TVBOX.errs)].sort((a, b) => /^no cargó/.test(b) - /^no cargó/.test(a)).slice(0, 2).join(' · ') : 'Algún archivo del juego no cargó. Revisa la conexión y recarga.');
 }, 8000);
-// la tele o la consola pueden tirar la memoria del lienzo (pantalla negra al volver): se vuelve a pintar todo
-canvas.addEventListener('contextlost', e => { e.preventDefault(); });
-canvas.addEventListener('contextrestored', () => { if (typeof ART !== 'undefined') ART.store.clear(); });
+// sin memoria de video, el navegador tira el lienzo y luego lo restaura solo. OJO: en un lienzo 2D,
+// preventDefault() en "contextlost" le dice que NO lo restaure (al revés que en WebGL): así se quedaba
+// congelado para siempre. Al volver, lo que estaba pintado en lienzos guardados puede venir vacío
+TVBOX.lost = 0;
+canvas.addEventListener('contextlost', () => { TVBOX.lost++; });
+canvas.addEventListener('contextrestored', () => {
+  if (typeof ART !== 'undefined') ART.store.clear();
+  if (typeof APP !== 'undefined') APP.previews = {};
+});
 if (TVBOX.on) {
   document.documentElement.classList.add('xbox');
   TVBOX.trap();

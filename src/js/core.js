@@ -24,9 +24,13 @@ function resize() {
   canvas.style.height = Math.floor(H * s) + 'px';
   canvas.width = Math.floor(W * k);
   canvas.height = Math.floor(H * k);
-  // otra nitidez: las capas horneadas a la anterior ya no sirven (si se quedan, la memoria solo crece)
-  if (VIEW.k && Math.abs(VIEW.k - k) > 0.01 && typeof ART !== 'undefined') ART.store.clear();
+  // otra nitidez: las capas horneadas a la anterior ya no sirven (si se quedan, la memoria solo crece).
+  // Solo si de verdad cambia su resolución: volver a pintar un mundo a media pelea es un tirón
+  // (VIEW.k primero: en la versión de un solo archivo, typeof ART truena si ART aún no existe)
+  const res = () => VIEW.k && typeof ART !== 'undefined' ? ART.pxRes().toFixed(2) + '/' + ART.bgRes().toFixed(2) : '';
+  const was = res();
   VIEW.scale = s; VIEW.dpr = dpr; VIEW.k = k;
+  if (was && res() !== was) ART.store.clear();
 }
 window.addEventListener('resize', resize);
 resize();

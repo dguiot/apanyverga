@@ -108,12 +108,54 @@ const { spawn } = require('child_process');
   await Y.evaluate(() => APP.startBattle({ players: [{ port: 0, char: 'nacho', dev: 'pad0' }, { port: 1, char: 'pablo', cpu: 1 }], stage: 'temple', rules: { mode: 'stock', stocks: 3, items: 0 } }));
   await Y.evaluate(() => { TVBOX.browsing = true; }); await Y.waitForTimeout(200);
   ok('en la pelea el aviso se esconde', await banner(Y) === 'off');
+  await Y.evaluate(() => { APP.battle = null; BATTLE = null; APP.go('stagesel'); }); await Y.waitForTimeout(200);
+  ok('en la pantalla de escenarios tampoco (tapaba ¡A pelear!)', await banner(Y) === 'off');
+  await Y.evaluate(() => APP.go('main')); await Y.waitForTimeout(200);
+  ok('en el menú sí vuelve a salir mientras siga en modo navegador', await banner(Y) === 'warn');
   ok('sin errores en Xbox', X.errs.length + Y.errs.length + Z.errs.length === 0, [...X.errs, ...Y.errs, ...Z.errs].slice(0, 3).join(' | '));
 
-  // 9) si un archivo no carga: aviso con Recargar en vez de pantalla negra
-  const F = await mk({ block: 'js/menus.js', wait: 8800 });
-  const bf = await F.evaluate(() => { const b = document.getElementById('bootfail'); return b ? b.textContent : null; });
-  ok('archivo que no carga: aviso "no pudo arrancar" con Recargar', !!bf && /Recargar/.test(bf), bf);
+  // 9) pantalla de escenarios: las vistas previas son miniaturas (antes se guardaban y dibujaban los 8
+  //    mundos completos: ~160 MB de lienzos y la Xbox se congelaba ahí)
+  const S = await mk({ pad: true });
+  const sel = await S.evaluate(() => {
+    const mb = () => { let px = 0; for (const v of ART.store.values()) { const c = v && v.img ? v.img : v; if (c && c.width) px += c.width * c.height; } return Math.round(px * 4 / 1048576); };
+    APP.slots = [{ type: 'human', dev: 'pad0', cur: 0, ready: true, pick: 'nacho', edit: 0, team: 0 }, { type: 'cpu', cur: 1, ready: true, pick: 'pablo', level: 5, team: 1 }, { type: 'none' }, { type: 'none' }];
+    APP.rules.mode = 'stock'; APP.go('stagesel');
+    for (let i = 0; i < STAGE_INFO.length + 3; i++) { step(); render(); }
+    const shown = Object.values(APP.previews).filter(p => p.shown && p.img).length;
+    const t0 = performance.now(); for (let i = 0; i < 5; i++) render(); const drawMs = (performance.now() - t0) / 5;
+    return { mb: mb(), shown, n: STAGE_INFO.length, drawMs: +drawMs.toFixed(1) };
+  });
+  ok('escenarios: las 8 vistas previas salen', sel.shown === sel.n, `${sel.shown}/${sel.n}`);
+  ok('escenarios: poca memoria de lienzos (antes ~160 MB)', sel.mb < 40, sel.mb + ' MB');
+  // 10) si la consola tira el lienzo por falta de memoria, se deja que el navegador lo restaure
+  //     (preventDefault en un lienzo 2D le dice que NO lo restaure: se quedaba congelado)
+  const lost = await S.evaluate(() => {
+    const e = new Event('contextlost', { cancelable: true }); canvas.dispatchEvent(e);
+    canvas.dispatchEvent(new Event('contextrestored'));
+    const cleared = ART.store.size === 0 && Object.keys(APP.previews).length === 0;
+    for (let i = 0; i < STAGE_INFO.length + 3; i++) { step(); render(); }
+    return { prevented: e.defaultPrevented, cleared, again: Object.values(APP.previews).filter(p => p.shown).length };
+  });
+  ok('lienzo perdido: el juego no impide que se restaure', !lost.prevented);
+  ok('lienzo restaurado: se vuelve a pintar todo', lost.cleared && lost.again === sel.n, JSON.stringify(lost));
+  // 11) al empezar la pelea se sueltan las capas de lo que ya no se usa
+  const fight = await S.evaluate(() => {
+    APP.startBattle({ players: [{ port: 0, char: 'nacho', dev: 'pad0' }, { port: 1, char: 'pablo', cpu: 1 }], stage: 'pyramid', rules: { mode: 'stock', stocks: 3, items: 0 } });
+    for (let i = 0; i < 5; i++) { step(); render(); }
+    let px = 0; for (const v of ART.store.values()) { const c = v && v.img ? v.img : v; if (c && c.width) px += c.width * c.height; }
+    return Math.round(px * 4 / 1048576);
+  });
+  ok('pelea en el mundo más grande: memoria de lienzos contenida', fight < 60, fight + ' MB');
+  ok('sin errores en la pantalla de escenarios', S.errs.length === 0, S.errs.slice(0, 3).join(' | '));
+
+  // 12) si un archivo no carga: aviso con Recargar en vez de pantalla negra
+  // (la versión de un solo archivo no tiene archivos sueltos que puedan faltar)
+  if (!/golpazo|web\//.test(process.env.PAGE || '')) {
+    const F = await mk({ block: 'js/menus.js', wait: 8800 });
+    const bf = await F.evaluate(() => { const b = document.getElementById('bootfail'); return b ? b.textContent : null; });
+    ok('archivo que no carga: aviso "no pudo arrancar" con Recargar', !!bf && /Recargar/.test(bf), bf);
+  }
   const G = await mk({ ua: '', wait: 8600 });
   ok('arranque normal: sin ese aviso', await G.evaluate(() => !document.getElementById('bootfail')));
 

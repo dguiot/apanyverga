@@ -43,14 +43,15 @@ const ART = {
   hi: !IS_XBOX,            // bloom y luz de borde; baja sola si el equipo no aguanta (en Xbox empieza apagado)
   light: null,             // luz del escenario actual
   frameMs: 0, slow: 0,
-  pxRes() { return clamp(VIEW.scale * VIEW.dpr, 1, 2); },
-  bgRes() { return clamp(VIEW.scale * VIEW.dpr * 0.8, 0.7, 1.4); },
+  lowRes: 0,              // >0 mientras se pinta una miniatura (vista previa de escenario): capas chiquitas
+  pxRes() { return this.lowRes || clamp(VIEW.scale * VIEW.dpr, 1, 2); },
+  bgRes() { return this.lowRes || clamp(VIEW.scale * VIEW.dpr * 0.8, 0.7, 1.4); },
   // guarda lo que cuesta dibujar (se genera una vez por clave)
   memo(key, make) { if (!this.store.has(key)) this.store.set(key, make()); return this.store.get(key); },
   // lienzo horneado en coordenadas del mundo: {img, x, y, w, h}
   bake(key, x, y, w, h, draw, res) {
     // ninguna capa pasa de 4096 pixeles por lado (los mundos grandes miden más de 3000 de ancho)
-    const R = Math.min(res || this.pxRes(), 4096 / Math.max(w, h, 1));
+    const R = Math.min(res || this.pxRes(), 4096 / Math.max(w, h, 1), this.lowRes || 9);
     return this.memo(key + '@' + R.toFixed(2), () => {
       const cv = mkCanvas(w * R, h * R), c = cv.getContext('2d');
       c.scale(R, R); c.translate(-x, -y); draw(c);
@@ -116,6 +117,7 @@ const ART = {
   },
   // nube volumétrica: muchas bolitas suaves, arriba iluminada y abajo en sombra
   cloud(seed, w, h, lit, dark, res = 1) {
+    if (this.lowRes) res = Math.min(res, Math.max(0.25, this.lowRes)); // miniatura: nubes chiquitas (se dibujan a su tamaño igual)
     return this.memo(`cloud:${seed}:${w}:${h}:${lit}:${dark}:${res}`, () => {
       const cv = mkCanvas(w * res, h * res), c = cv.getContext('2d'), r = srand(seed);
       c.scale(res, res);
@@ -147,7 +149,7 @@ const ART = {
   },
   // capa de fondo en pantalla, repetida en horizontal y con paralaje
   layer(key, w, h, draw, res) {
-    const R = res || this.bgRes();
+    const R = Math.min(res || this.bgRes(), this.lowRes || 9);
     return this.memo('layer:' + key + '@' + R.toFixed(2), () => {
       const cv = mkCanvas(w * R, h * R), c = cv.getContext('2d');
       c.scale(R, R); draw(c, w, h);

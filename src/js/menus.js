@@ -130,6 +130,8 @@ const APP = {
   },
   startBattle(setup) {
     this.lastSetup = setup;
+    // Xbox: poca memoria de video. Las capas del escenario anterior se sueltan antes de pintar el nuevo
+    if (IS_XBOX) ART.store.clear();
     const online = Net.role === 'host';
     this.battle = new Battle(setup, { online });
     NetEv.on = online;
@@ -140,6 +142,7 @@ const APP = {
   startDemo() {
     const ids = CHAR_ORDER.slice().sort(() => Math.random() - 0.5).slice(0, 4);
     const setup = { players: ids.map((id, i) => ({ port: i, char: id, cpu: 7 })), stage: pick(STAGE_INFO).id, rules: { mode: 'stock', stocks: 2, items: 3 } };
+    if (IS_XBOX) ART.store.clear();
     this.battle = new Battle(setup, { demo: true }); this.go('demo');
   },
   showResults(r) {
@@ -832,34 +835,43 @@ const APP = {
     this.showVS(setup);
   },
   previews: {},
+  // miniatura de un escenario: sus capas se pintan a la resolución de la miniatura (no a la de la pelea)
+  stageThumb(info, soccer, pw, ph, wide) {
+    const k = VIEW.k || 1, cv = mkCanvas(pw * k, ph * k), c = cv.getContext('2d');
+    const st = makeStage(info.id, { soccer });
+    st.t++; for (const s of st.surfaces()) if (s.move) { const p = s.move(st.t, s); s.x = p[0]; s.y = p[1]; }
+    ART.lowRes = clamp(k * pw / W * 1.3, 0.2, 1);
+    try {
+      c.scale(k * pw / W, k * ph / H);
+      const z = (info.big ? 0.36 : 0.62) * (wide ? 1.35 : 1);
+      st.drawBG(c, { x: 0, y: -150, z: 1 });
+      c.translate(W / 2, H / 2 + 60); c.scale(z, z); c.translate(0, info.big ? 40 : 100);
+      st.drawStage(c); st.drawFG(c);
+    } catch (e) { console.error(e); } finally { ART.lowRes = 0; }
+    return { img: cv, k: VIEW.k, w: pw, h: ph, shown: true };
+  },
   stageselDraw() {
     drawMenuBG(3);
     sfText('Elige el escenario', W / 2, 40, 44, PAPER);
-    // la primera vez que se dibuja un escenario pinta y guarda sus capas (hasta medio segundo cada uno):
-    // una vista previa nueva por cuadro. Antes salían las 8 juntas y el juego se congelaba casi 2 s aquí
+    // cada vista previa se pinta UNA vez, en chiquito, a su propio lienzo, y se descarta el escenario.
+    // Antes los 8 mundos se dibujaban completos en cada cuadro con sus capas a tamaño real (~160 MB de
+    // lienzos): en la Xbox la tarjeta se quedaba sin memoria y el juego se congelaba aquí.
+    // Una nueva por cuadro, para que la pantalla aparezca de inmediato
     let fresh = 0;
     STAGE_INFO.forEach((info, i) => {
       const r = this.stageRect(i), sel = i === this.stageSel, locked = this.stageLocked(i), wide = r.cols >= 3, narrow = r.cols === 4;
       const pk = info.id + (info.id === 'stadium' && this.rules.mode === 'soccer' ? ':futbol' : ''); // el estadio de Fútbol lleva porterías
-      if (!this.previews[pk]) this.previews[pk] = makeStage(info.id, { soccer: pk !== info.id });
-      const st = this.previews[pk], ready = st.shown || fresh++ === 0;
-      if (ready) {
-        st.shown = true; st.t++;
-        for (const s of st.surfaces()) if (s.move) { const p = s.move(st.t, s); s.x = p[0]; s.y = p[1]; }
-      }
+      const pw = narrow ? 124 : wide ? 190 : r.w - 16, ph = wide ? r.h - 16 : 164;
+      const old = this.previews[pk], ok = old && old.k === VIEW.k && old.w === pw && old.h === ph;
+      if (!ok && fresh++ === 0) this.previews[pk] = this.stageThumb(info, pk !== info.id, pw, ph, wide);
+      const ready = !!this.previews[pk] && (ok || this.previews[pk] !== old);
       ctx.save(); ctx.translate(0, sel ? -6 : 0);
       if (locked) ctx.globalAlpha = 0.35;
       slab(r.x, r.y, r.w, r.h, { skew: 0.1, edge: sel ? (this.stageRow === 0 ? GOLD : TEAL) : undefined, lw: sel ? 4 : 2 });
       // vista previa: a lo ancho (4 escenarios) o a la izquierda (rejilla de 6)
-      const pw = narrow ? 124 : wide ? 190 : r.w - 16, ph = wide ? r.h - 16 : 164;
       ctx.save(); slabPath(r.x + 8, r.y + 8, pw, ph, 0.1); ctx.clip();
-      if (ready) {
-        ctx.translate(r.x + 8, r.y + 8); ctx.scale(pw / W, ph / H);
-        const z = info.big ? 0.36 : 0.62;
-        st.drawBG(ctx, { x: 0, y: -150, z: 1 });
-        ctx.translate(W / 2, H / 2 + 60); ctx.scale(z * (wide ? 1.35 : 1), z * (wide ? 1.35 : 1)); ctx.translate(0, info.big ? 40 : 100);
-        st.drawStage(ctx); st.drawFG(ctx);
-      } else { ctx.fillStyle = 'rgba(255,255,255,.06)'; ctx.fillRect(r.x + 8, r.y + 8, pw, ph); } // un instante, mientras se pinta
+      if (ready) ctx.drawImage(this.previews[pk].img, r.x + 8, r.y + 8, pw, ph);
+      else { ctx.fillStyle = 'rgba(255,255,255,.06)'; ctx.fillRect(r.x + 8, r.y + 8, pw, ph); } // un instante, mientras se pinta
       ctx.restore();
       if (wide) {
         const tx = r.x + pw + 22, tw = r.w - pw - 34;
