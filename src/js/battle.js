@@ -94,6 +94,15 @@ class Battle {
       if (this.endT === 150 && !this.resim) APP.showResults(this.results());
     }
   }
+  saveState() { return copyBattleState(this); }
+  loadState(s) {
+    // El objeto de pelea sigue vivo; todas las referencias internas se copian juntas.
+    const seen = new Map([[s, this]]);
+    for (const k of Object.keys(this)) if (!STATE_VISUAL.has(k)) delete this[k];
+    for (const k of Object.keys(s)) this[k] = copyStateValue(s[k], seen, k);
+    BATTLE = this;
+    return this;
+  }
   checksum() {
     // Centésimas y referencias del grafo; las etiquetas y efectos locales no cambian la pelea.
     const omit = new Set(['ch', 'moves', 'def', 'throwDef', '_lastHit', '_t', 'clouds', 'stars', 'particles', 'light', 'grade', 'pose', 'swoosh', '_swoosh', '_ltx', '_lty', 'dev', 'netPeer', 'peer', 'label', 'uid', 'avPeer', 'why', 'fx', 'koFx', 'banners', 'cam', 'shake', 'flash', 'dim', 'camKick']);
@@ -428,3 +437,23 @@ function drawVideoCover(c, v, x, y, w, h, mirror) {
   try { c.drawImage(v, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh); } catch (e) { /* cuadro aún sin datos */ }
   c.restore();
 }
+
+// Lo visual y el transporte no forman parte del estado que se rebobina.
+const STATE_VISUAL = new Set(['fx', 'koFx', 'banners', 'cam', 'shake', 'flash', 'dim', 'camKick', 'resim', 'rollbackSession']);
+const STATE_REF = new Set(['ch', 'moves', 'def', 'throwDef', 'setup', 'clouds', 'stars']);
+function copyStateValue(v, seen, key) {
+  if (!v || typeof v !== 'object' || STATE_REF.has(key)) return v;
+  // Los recursos del navegador son pesados y nunca los modifica la simulación.
+  if (v instanceof Node || (typeof Path2D !== 'undefined' && v instanceof Path2D) || (typeof CanvasGradient !== 'undefined' && v instanceof CanvasGradient) || (typeof CanvasPattern !== 'undefined' && v instanceof CanvasPattern)) return v;
+  if (seen.has(v)) return seen.get(v);
+  const out = Array.isArray(v) ? [] : v instanceof Map ? new Map() : v instanceof Set ? new Set() : Object.create(Object.getPrototypeOf(v));
+  seen.set(v, out);
+  if (v instanceof Map) { for (const [k, x] of v) out.set(copyStateValue(k, seen), copyStateValue(x, seen)); }
+  else if (v instanceof Set) { for (const x of v) out.add(copyStateValue(x, seen)); }
+  else for (const k of Object.keys(v)) {
+    if ((v instanceof Battle && STATE_VISUAL.has(k)) || (v instanceof Fighter && ['swoosh', '_ltx', '_lty'].includes(k))) continue;
+    out[k] = copyStateValue(v[k], seen, k);
+  }
+  return out;
+}
+function copyBattleState(b) { return copyStateValue(b, new Map()); }
