@@ -129,12 +129,14 @@ const APP = {
     if (s === 'modesel') this.modeSel = Math.max(0, MODES.findIndex(m => m.id === this.rules.mode));
   },
   startBattle(setup) {
+    Net.stopRollback();
     this.lastSetup = setup;
     // Xbox: poca memoria de video. Las capas del escenario anterior se sueltan antes de pintar el nuevo
     if (IS_XBOX) ART.store.clear();
     const online = Net.role === 'host';
-    this.battle = new Battle(setup, { online });
-    NetEv.on = online;
+    this.battle = new Battle(setup, { online, rollback: !!setup.rollback });
+    if (setup.rollback) Net.attachRollback(this.battle);
+    NetEv.on = online && !setup.rollback;
     if (online) Net.publishLobby({ ph: 'game' });
     this.go('battle');
   },

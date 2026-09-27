@@ -220,6 +220,25 @@ class Controller {
   sideFlick(n = 4) { return this.flickX <= n; }
 }
 
+// El control de la pelea lee el mismo paquete cuantizado en todas las pantallas.
+class ReplayCtrl extends Controller {
+  feed(a) {
+    const s = blankState();
+    ['x', 'y', 'cx', 'cy'].forEach((k, i) => { s[k] = clamp(Math.round(+a[i] || 0), -100, 100) / 100; });
+    const bits = +a[4] || 0;
+    BUTTONS.forEach((k, i) => { s[k] = !!(bits & (1 << i)); });
+    s.tapJump = !(bits & 256); s.digital = !!(bits & 512);
+    s.any = BUTTONS.some(k => s[k]);
+    this.update(s);
+  }
+  static pack(s) {
+    let bits = 0;
+    BUTTONS.forEach((k, i) => { if (s[k]) bits |= 1 << i; });
+    if (s.tapJump === false) bits |= 256; if (s.digital) bits |= 512;
+    return ['x', 'y', 'cx', 'cy'].map(k => Math.round(clamp(+s[k] || 0, -1, 1) * 100)).concat(bits);
+  }
+}
+
 // Captura de un botón/tecla nueva para reasignar
 function startCapture(dev, action) {
   Object.assign(Capture, { active: true, dev, action, t: 0, result: null, cancel: false });
