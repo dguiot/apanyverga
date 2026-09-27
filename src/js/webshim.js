@@ -126,6 +126,7 @@
   const me = { peer: rid(10), state: {}, uid: null };
   const others = new Map(); // peer → { presence, by, nm, online, seq }
   const handlers = {};
+  const fastHandlers = {}, stateHandlers = {};
   const conn = { up: false, on: [], off: [] };
   let ch = null, lastFull = 0;
   const fastPending = {}, fastTimer = {};
@@ -151,7 +152,7 @@
   }
   function sendFast(k, v) {
     const ps = partners(); let viaCanal = false;
-    for (const peer of ps) { const l = links.get(peer); if (l && l.dc && l.dc.readyState === 'open') { try { l.dc.send(JSON.stringify({ s: ++l.out, k, v })); } catch (e) { viaCanal = true; } } else viaCanal = true; }
+    for (const peer of ps) { const l = links.get(peer); if (l && l.dc && l.dc.readyState === 'open') { try { if (!dcSend(l, { s: ++l.out, k, v }, false)) viaCanal = true; } catch (e) { viaCanal = true; } } else viaCanal = true; }
     if (!viaCanal) return;
     fastPending[k] = v;
     if (!fastTimer[k]) fastTimer[k] = setTimeout(() => { fastTimer[k] = null; const p = {}; p[k] = fastPending[k]; send('P', { peer: me.peer, patch: p }); }, FALLBACK_MS[k] || 100);
@@ -159,15 +160,50 @@
 
   // conexiones directas (DataChannel) con los compañeros de pelea; el invitado llama
   const links = new Map(); // peer → { pc, dc, out, in, born }
-  function closeLink(peer) { const l = links.get(peer); if (!l) return; links.delete(peer); try { l.dc && l.dc.close(); } catch (e) { /* ya cerrado */ } try { l.pc.close(); } catch (e) { /* ya cerrado */ } }
+  function closeLink(peer) { const l = links.get(peer); if (!l) return; links.delete(peer); try { l.stateDc && l.stateDc.close(); l.dc && l.dc.close(); } catch (e) { /* ya cerrado */ } try { l.pc.close(); } catch (e) { /* ya cerrado */ } }
   function wireDc(l, dc) {
-    l.dc = dc;
+    const reliable = dc.label === 'rs';
+    if (reliable) l.stateDc = dc; else l.dc = dc;
     dc.onmessage = ev => {
       let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+      if (m && m.r === 1) { receiveFast(l, m, reliable); return; }
+      if (reliable) return;
       if (!m || typeof m.k !== 'string' || !FAST.has(m.k) || !(m.s > l.in)) return; // sin orden garantizado: lo viejo se tira
       l.in = m.s; other(l.peer).presence[m.k] = m.v;
     };
   }
+  // Solo las pruebas definen __netsim. El canal fiable conserva sus mensajes.
+  function dcSend(l, m, reliable) {
+    const dc = reliable ? l.stateDc : l.dc;
+    if (!dc || dc.readyState !== 'open') return false;
+    const data = JSON.stringify(m), sim = window.__netsim;
+    if (sim && !reliable && Math.random() < clampNet(sim.loss, 0, 1)) return true;
+    const delay = sim ? Math.max(0, (+sim.delay || 0) + (Math.random() * 2 - 1) * (+sim.jitter || 0)) : 0;
+    const sendNow = () => { if (dc.readyState === 'open') try { dc.send(data); } catch (e) { /* ya desconectado */ } };
+    if (delay) setTimeout(sendNow, delay); else sendNow();
+    return true;
+  }
+  const clampNet = (n, a, b) => Math.max(a, Math.min(b, +n || 0));
+  function receiveFast(l, m, reliable) {
+    if (!partners().includes(l.peer) || typeof m.k !== 'string' || m.k.length > 16) return;
+    // Un invitado no puede hacerse pasar por otro. El anfitrión pone el origen al reenviar.
+    const peer = me.state.role === 'host' ? l.peer : (typeof m.from === 'string' ? m.from : l.peer);
+    const hs = reliable ? stateHandlers : fastHandlers;
+    for (const h of hs[m.k] || []) try { h({ k: m.k, peer, data: m.v, reliable }); } catch (e) { console.error(e); }
+    if (me.state.role === 'host' && !reliable && m.k === 'ri') {
+      for (const p of partners()) if (p !== l.peer) { const dest = links.get(p); if (dest) dcSend(dest, { r: 1, k: m.k, v: m.v, from: peer }, false); }
+    }
+  }
+  function directSend(k, v, to, reliable) {
+    if (typeof k !== 'string' || k.length > 16) return false;
+    // Un paquete basta para reparar cualquiera de las últimas 8 pérdidas.
+    if (k === 'ri') { if (!v || !Array.isArray(v.a)) return false; v = Object.assign({}, v, { a: v.a.slice(-8).map(a => a.slice(0, 5)) }); }
+    const ps = to ? partners().filter(p => p === to) : partners();
+    let sent = ps.length > 0;
+    for (const peer of ps) { const l = links.get(peer); if (!l || !dcSend(l, { r: 1, k, v, from: me.peer }, reliable)) sent = false; }
+    return sent;
+  }
+  function addFast(hs, k, cb) { (hs[k] || (hs[k] = [])).push(cb); return () => { hs[k] = hs[k].filter(h => h !== cb); }; }
   function makeLink(peer, caller) {
     closeLink(peer);
     const pc = new RTCPeerConnection({ iceServers: ICE });
@@ -181,6 +217,7 @@
     pc.onconnectionstatechange = () => { if (['failed', 'closed'].includes(pc.connectionState) && links.get(peer) === l) closeLink(peer); };
     if (caller) {
       wireDc(l, pc.createDataChannel('g', { ordered: false, maxRetransmits: 0 }));
+      wireDc(l, pc.createDataChannel('rs', { ordered: true }));
       pc.createOffer().then(o => pc.setLocalDescription(o)).then(() => send('D', { peer: me.peer, to: peer, t: 'offer', sdp: pc.localDescription.sdp })).catch(() => closeLink(peer));
     } else pc.ondatachannel = e => wireDc(l, e.channel);
     return l;
@@ -254,6 +291,11 @@
     });
   }
   const room = {
+    fastSend(k, v, to) { return directSend(k, v, to, false); },
+    onFast(k, cb) { return addFast(fastHandlers, k, cb); },
+    stateSend(k, v, to) { return directSend(k, v, to, true); },
+    onState(k, cb) { return addFast(stateHandlers, k, cb); },
+    fastReady(ps = partners()) { return ps.length > 0 && ps.every(p => { const l = links.get(p); return l && l.dc && l.dc.readyState === 'open' && l.stateDc && l.stateDc.readyState === 'open'; }); },
     async setMeta() { if (!ch || !conn.up) return; me.uid = await user.id(); await ch.track({ by: me.uid, nm: myName(), t: Date.now() }).catch(() => {}); },
     presence(patch) {
       if (!patch || typeof patch !== 'object') return Promise.resolve();
@@ -275,7 +317,7 @@
     on(ev, cb) { (handlers[ev] || (handlers[ev] = [])).push(cb); return () => { handlers[ev] = handlers[ev].filter(h => h !== cb); }; },
     onConnection(onUp, onDown) { if (onUp) conn.on.push(onUp); if (onDown) conn.off.push(onDown); if (conn.up && onUp) onUp(true); },
     // para pruebas y diagnóstico
-    _debug() { return { me: me.peer, up: conn.up, links: [...links].map(([p, l]) => [p, l.dc ? l.dc.readyState : 'none', l.pc.connectionState]), others: [...others.keys()] }; },
+    _debug() { return { me: me.peer, up: conn.up, links: [...links].map(([p, l]) => [p, l.dc ? l.dc.readyState : 'none', l.pc.connectionState, l.stateDc ? l.stateDc.readyState : 'none']), others: [...others.keys()] }; },
   };
 
   window.claude = {
