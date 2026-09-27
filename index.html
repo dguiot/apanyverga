@@ -9940,7 +9940,7 @@ class Fighter {
     this.stocks = opts.stocks || 3; this.percent = 0; this.dead = false; this.respawnT = 0;
     this.x = 0; this.y = 0; this.vx = 0; this.vy = 0; this.lx = 0; this.ly = 0; this.face = 1;
     this.state = 'air'; this.sf = 0; this.grounded = false; this.surface = null;
-    this.jumps = this.ch.jumps - 1; this.move = null;
+    this.jumps = this.ch.jumps - 1; this.move = null; this.coyoteT = 0;
     this.hitlag = 0; this.hitstun = 0; this.tumble = false; this.invuln = 0;
     this.shieldHP = 100; this.shieldStun = 0; this.dropT = 0; this.fastFall = false;
     this.airUsed = {}; this.item = null; this.finalReady = false;
@@ -9970,6 +9970,7 @@ class Fighter {
   inReflect() { return this.state === 'attack' && !!this.move && this.inWindow(this.move.def.reflect); }
   intangibleToStage() { return this.invuln > 0 || this.hidden || this.state === 'respawn' || this.dead; }
   setState(s) {
+    if (s !== this.state) this.coyoteT = 0;
     if (s !== 'attack') this.move = null;
     if (this.state !== s) { this.state = s; this.sf = 0; }
   }
@@ -9997,6 +9998,7 @@ class Fighter {
     if (this.stretch > 0) this.stretch = Math.max(0, this.stretch - 0.12);
     this.jabWin = Math.max(0, this.jabWin - 1);
     this.runState();
+    this.coyoteT = Math.max(0, this.coyoteT - 1);
     if (this.dead) return;
     abilityTick(this);
     this.physics();
@@ -10304,6 +10306,18 @@ class Fighter {
   airActions() {
     const c = this.ctrl;
     if (this.swim) return; // en el agua solo se nada (Salto = brazada)
+    // Cinco cuadros de gracia al salir del piso: se conserva el doble salto.
+    const tap = c.tapUp(2);
+    if (this.coyoteT > 0 && (c.buffered('jump') || tap)) {
+      const combo = c.buffered('attack', 3) || c.buffered('special', 3);
+      const full = !combo && (c.held('jump') || (tap && c.y < -0.5));
+      c.consume('jump'); this.coyoteT = 0;
+      this.vy = -(full ? this.ch.jump : this.ch.jump * 0.66) * PHYS.jumpK;
+      this.vx = clamp(this.vx + c.x * 1.5, -this.ch.air * 1.2, this.ch.air * 1.2);
+      this.fastFall = false; this.stretch = 1;
+      Audio8.sfx('jump'); spawnFx('dust', this.x - 8, this.y - 4); spawnFx('dust', this.x + 8, this.y - 4);
+      if (!combo) return;
+    }
     if (c.cPressed && this.item) {
       const it = this.item, k = ITEM_DEFS[it.type].kind, d = c.cdir();
       if (k === 'weapon' && it.type !== 'gun') return this.startMove(it.type + 'Air');
@@ -10332,7 +10346,6 @@ class Fighter {
     if (c.buffered('special')) { c.consume('special'); return this.special(); }
     if (c.buffered('grab') && this.item) { c.consume('grab'); this.throwHeld([c.x, c.y], false); return; }
     if (abilityWallJump(this)) return;
-    const tap = c.tapUp(2);
     if ((c.buffered('jump') || tap) && this.jumps > 0) { this.doubleJump(false); return; }
     if (c.buffered('shield') && (this.airUsed.dodgeN || 0) < (abil(this).airDodges || 1)) {
       c.consume('shield'); this.airUsed.dodgeN = (this.airUsed.dodgeN || 0) + 1;
@@ -10590,9 +10603,9 @@ class Fighter {
     this.x = L.x + L.side * 16 * s; this.y = L.s.y + skOf(this.id).hang * s;
     if (this.sf < 8) return;
     const toward = c.x * -L.side;
-    if (c.pressed('jump') || c.tapUp(2)) { this.setState('air'); this.vy = -this.ch.jump * 1.05 * PHYS.jumpK; this.vx = -L.side * 2; this.y = L.s.y - 4; this.x = L.x + L.side * 10; Audio8.sfx('jump'); this.ledgeCd = 20; return; }
-    if (c.pressed('attack') || c.pressed('special')) { this.ledgeTo = L; this.pendingMove = 'ledgeAtk'; this.setState('climb'); this.invuln = 18; return; }
-    if (c.pressed('shield')) { this.ledgeTo = L; this.setState('climb'); this.invuln = 20; this.pendingRoll = true; return; }
+    if (c.buffered('jump') || c.tapUp(2)) { c.consume('jump'); this.setState('air'); this.vy = -this.ch.jump * 1.05 * PHYS.jumpK; this.vx = -L.side * 2; this.y = L.s.y - 4; this.x = L.x + L.side * 10; Audio8.sfx('jump'); this.ledgeCd = 20; return; }
+    if (c.buffered('attack') || c.buffered('special')) { c.consume('attack'); c.consume('special'); this.ledgeTo = L; this.pendingMove = 'ledgeAtk'; this.setState('climb'); this.invuln = 18; return; }
+    if (c.buffered('shield')) { c.consume('shield'); this.ledgeTo = L; this.setState('climb'); this.invuln = 20; this.pendingRoll = true; return; }
     if (toward > 0.6 || (c.y < -0.6 && !c.upFlick(2))) { this.ledgeTo = L; this.setState('climb'); this.invuln = 14; return; }
     if (toward < -0.6 || c.y > 0.6 || this.sf > 330) { this.setState('air'); this.ledgeCd = 30; this.x += L.side * 8; this.vy = 1; return; }
   }
@@ -10661,6 +10674,7 @@ class Fighter {
       const so = this.surface;
       if (!so || nx < so.x - 3 || nx > so.x + so.w + 3) {
         // se salió del borde
+        const grace = ['walk', 'dash', 'run', 'brake', 'turn', 'shield'].includes(this.state);
         if (['idle', 'walk', 'dash', 'run', 'crouch', 'turn', 'land', 'shield'].includes(this.state) && so && !so.plat) {
           // detenerse en el borde si camina despacio
           if ((this.state === 'walk' && Math.abs(this.ctrl.x) < 0.8) || ['idle', 'shield', 'land', 'crouch'].includes(this.state)) { nx = clamp(nx, so.x, so.x + so.w); this.vx = 0; }
@@ -10672,19 +10686,28 @@ class Fighter {
           else if (this.state !== 'attack' && this.state !== 'hitstun' && this.state !== 'dodge') this.setState('air');
           if (this.state === 'dodge') this.setState('air');
         }
+        if (!this.grounded && grace) this.coyoteT = 5;
       } else ny = so.y;
     }
     this.x = nx; this.y = ny;
     if (!wasGrounded && this.grounded) Audio8.sfx('land');
   }
   land(so) {
+    this.coyoteT = 0;
     const prevVy = this.vy + this.ly;
     this.grounded = true; this.surface = so; this.vy = 0; this.fastFall = false;
     this.jumps = this.ch.jumps - 1; this.airUsed = {};
     if (this.state === 'hitstun') {
       if (this.tumble && this.ly > 5) { this.ly = -this.ly * 0.55; this.grounded = false; this.surface = null; spawnFx('boom', this.x, this.y, { r: 50 }); return; }
       if (this.tumble) {
-        if (this.ctrl.buffered('shield', 10) || abil(this).autoTech) { this.invuln = 20; this.lx = this.ly = 0; spawnFx('boom', this.x, this.y - 40, { r: 50, col: '#f1f5f9' }); Audio8.sfx('dodge'); this.setState('idle'); return; }
+        const auto = abil(this).autoTech;
+        if (this.ctrl.buffered('shield', 10) || auto) {
+          this.ctrl.consume('shield'); this.lx = this.ly = 0;
+          spawnFx('boom', this.x, this.y - 40, { r: 50, col: '#f1f5f9' });
+          if (!auto && Math.abs(this.ctrl.x) > 0.5) this.startRoll(sign(this.ctrl.x));
+          else { Audio8.sfx('dodge'); this.setState('idle'); }
+          this.invuln = Math.max(this.invuln, 20); return;
+        }
         this.lx *= 0.4; this.ly = 0; this.setState('down'); spawnFx('dust', this.x, this.y - 4); return;
       }
       this.ly = 0;
@@ -11127,7 +11150,7 @@ class AIBrain {
     const stack = adx < (!f.grounded && Math.abs(dy) > 90 ? 40 : 10 * f.size() + 6);
     // agarrar solo si el rival está enfrente y al alcance: encimado o a la espalda el agarre no atrapa nada
     // (se quedaba agarrando al aire desde el escudo una y otra vez)
-    const grabOk = t => { const fx = (t.x - f.x) * f.face, sz = f.size(); return !!t && t.grounded && Math.abs(t.y - f.y) < 40 && fx > 14 * sz && fx < 70 * sz; };
+    const grabOk = t => { const fx = (t.x - f.x) * f.face, sz = f.size(); return !!t && t.invuln <= 0 && t.starTime <= 0 && t.grounded && Math.abs(t.y - f.y) < 40 && fx > 14 * sz && fx < 70 * sz; };
     const face = stack ? f.face : sign(dx) || f.face, toward = stack ? 0 : sign(dx);
 
     if (!f.grounded && f.state === 'air' && !f.airUsed.dodge && tgt && tgt.state === 'attack' && dist(tgt.x, tgt.y, f.x, f.y) < 120 && simRandom() < L.dodge * 0.25) { press('shield'); return s; }

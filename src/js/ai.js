@@ -244,7 +244,7 @@ class AIBrain {
     const stack = adx < (!f.grounded && Math.abs(dy) > 90 ? 40 : 10 * f.size() + 6);
     // agarrar solo si el rival está enfrente y al alcance: encimado o a la espalda el agarre no atrapa nada
     // (se quedaba agarrando al aire desde el escudo una y otra vez)
-    const grabOk = t => { const fx = (t.x - f.x) * f.face, sz = f.size(); return !!t && t.grounded && Math.abs(t.y - f.y) < 40 && fx > 14 * sz && fx < 70 * sz; };
+    const grabOk = t => { const fx = (t.x - f.x) * f.face, sz = f.size(); return !!t && t.invuln <= 0 && t.starTime <= 0 && t.grounded && Math.abs(t.y - f.y) < 40 && fx > 14 * sz && fx < 70 * sz; };
     const face = stack ? f.face : sign(dx) || f.face, toward = stack ? 0 : sign(dx);
 
     if (!f.grounded && f.state === 'air' && !f.airUsed.dodge && tgt && tgt.state === 'attack' && dist(tgt.x, tgt.y, f.x, f.y) < 120 && simRandom() < L.dodge * 0.25) { press('shield'); return s; }
