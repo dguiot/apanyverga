@@ -6,7 +6,7 @@ APP.battleUpdate = function () {
   if (!this.battle) return;
   this.battle.update();
 };
-APP.battleDraw = function () { if (this.battle) this.battle.draw(); };
+APP.battleDraw = function () { if (this.battle) { this.battle.draw(); if (this.battle.rollbackSession) this.battle.rollbackSession.drawDebug(); } };
 
 // Si solo hay un jugador en teclado, las flechas y WASD le sirven a él (y los
 // botones de ambos esquemas durante la pelea). Con dos jugadores en teclado, cada
