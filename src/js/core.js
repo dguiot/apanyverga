@@ -63,7 +63,7 @@ const approach = (v, t, s) => v < t ? Math.min(v + s, t) : Math.max(v - s, t);
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
 const easeOut = t => 1 - (1 - t) * (1 - t);
 const easeInOut = t => t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function circleRect(cx, cy, r, rx, ry, rw, rh) {
   const nx = clamp(cx, rx, rx + rw), ny = clamp(cy, ry, ry + rh);

@@ -17,14 +17,19 @@ const sameBind = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 let GAME_KEYS = new Set();
 const Binds = {
-  kb: null, pads: {},
+  kb: null, pads: {}, saved: null,
   load() {
     try { const j = JSON.parse(localStorage.getItem('golpazo-binds-v1') || 'null'); if (j) { this.kb = j.kb; this.pads = j.pads || {}; } } catch (e) { /* sin almacenamiento */ }
     this.kb = this.kb || {};
     for (const k of ['kb1', 'kb2']) this.kb[k] = Object.assign(clone(DEFAULT_KB[k]), this.kb[k] || {});
     this.refresh();
   },
-  save() { try { localStorage.setItem('golpazo-binds-v1', JSON.stringify({ kb: this.kb, pads: this.pads })); } catch (e) { /* sin almacenamiento */ } this.refresh(); },
+  save() {
+    try { localStorage.setItem('golpazo-binds-v1', JSON.stringify({ kb: this.kb, pads: this.pads })); this.saved = true; }
+    catch (e) { this.saved = false; }
+    this.refresh();
+    return this.saved;
+  },
   refresh() { GAME_KEYS = new Set(Object.values(this.kb).flatMap(m => ACTIONS.flatMap(a => m[a] || []))); },
   forDev(dev) { if (dev.startsWith('kb')) return this.kb[dev]; return this.pads[padIdOf(dev)] || DEFAULT_PAD; },
   editable(dev) {

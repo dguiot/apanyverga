@@ -21,7 +21,9 @@ const { spawn } = require('child_process');
     p.on('pageerror', e => errs.push(name + ' ' + e.message + ' ' + (e.stack || '').split('\n')[1]));
     p.on('console', m => { if (m.type() === 'error') errs.push(name + ' ' + m.text().slice(0, 200)); });
     p.on('dialog', d => d.accept(name));
-    await p.goto('http://localhost:8768/index.html' + (qs || ''));
+    const url = new URL('http://localhost:8768/index.html' + (qs || ''));
+    url.searchParams.set('rb', '0'); // esta prueba mide el transporte de imágenes; rollback tiene su propia batería
+    await p.goto(url.href);
     return p;
   };
   const key = async (p, k, wait = 180) => { await p.keyboard.down(k); await p.waitForTimeout(50); await p.keyboard.up(k); await p.waitForTimeout(wait); };
@@ -52,6 +54,7 @@ const { spawn } = require('child_process');
   const ch0 = await B.evaluate(() => Net.guest.ch), N = await B.evaluate(() => NCH() + 1), MI = await B.evaluate(() => CHAR_ORDER.indexOf('michi'));
   for (let i = 0; i < (MI - ch0 + N) % N; i++) await key(B, 'ArrowRight', 90);
   await key(B, 'KeyJ', 900);
+  await waitFor(A, () => APP.slots.some(s => s.remote && s.ready && s.pick === 'michi'), null, 6000);
   const slotsA = await A.evaluate(() => APP.slots.map(s => s.type === 'none' ? '-' : `${s.type}:${s.pick || s.cur}${s.remote ? ':R:' + s.name : ''}`).join(' '));
   ok('anfitrión ve a Beto listo con Michi', slotsA.includes('michi:R:Beto'), slotsA);
   // ---- invitar: código de sala, link copiado y entrar directo con el link
@@ -114,6 +117,7 @@ const { spawn } = require('child_process');
   await waitFor(C, () => Net.hosts().some(h => !h.sameTab), null, 5000);
   await C.evaluate(() => { APP.onSel = 1; }); await key(C, 'Enter', 900); await key(C, 'KeyJ', 900);
   ok('sin DataChannel: el invitado entra igual', await scr(C) === 'netroom', await scr(C));
+  await waitFor(A, () => APP.slots.some(s => s.remote && s.ready), null, 6000);
   await key(A, 'Enter', 400); await key(A, 'Enter', 800);
   await waitFor(A, () => APP.screen === 'battle' && BATTLE && BATTLE.phase === 'fight', null, 9000);
   const viaCanal = await waitFor(C, () => APP.screen === 'netview' && !!Net.lastSnap, null, 6000);

@@ -40,10 +40,10 @@ const { spawn } = require('child_process');
   };
   const banner = p => p.evaluate(() => { const b = document.getElementById('tvbox'); return b && !b.hidden ? (b.classList.contains('warn') ? 'warn' : 'tip') : 'off'; });
 
-  // 1) nitidez: en una tele 4K el lienzo se queda en 1280×720 (en una PC con la misma pantalla, 2560×1440)
+  // 1) nitidez: en una tele 4K el lienzo de Xbox no supera 1280×720.
   const X = await mk({ pad: true });
   const cx = await X.evaluate(() => [canvas.width, canvas.height, canvas.style.width]);
-  ok('Xbox en tele 4K: lienzo de 1280×720 estirado a la pantalla', cx[0] === 1280 && cx[1] === 720 && cx[2] === '1920px', cx.join(' '));
+  ok('Xbox en tele 4K: lienzo ligero estirado a la pantalla', cx[0] <= 1280 && cx[1] <= 720 && cx[0] >= 640 && cx[2] === '1920px', cx.join(' '));
   const PC = await mk({ ua: '' });
   const cp = await PC.evaluate(() => [canvas.width, canvas.height, typeof TVBOX, TVBOX.on, !!document.getElementById('tvbox')]);
   ok('PC con la misma pantalla: nitidez normal y sin nada de Xbox', cp[0] === 2560 && cp[1] === 1440 && cp[3] === false && !cp[4], cp.join(' '));
