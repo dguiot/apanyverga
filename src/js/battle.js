@@ -8,7 +8,7 @@ class Battle {
     BATTLE = this;
     this.rng = setup.seed === undefined ? null : new SimRNG(setup.seed);
     SimRNG.run(this.rng, () => {
-    this.setup = setup; this.demo = !!opts.demo; this.online = !!opts.online; this.view = !!opts.view;
+    this.setup = setup; this.demo = !!opts.demo; this.online = !!opts.online; this.view = !!opts.view; this.rollback = !!opts.rollback;
     this.rules = Object.assign({ mode: 'stock', stocks: 3, time: 3, items: 2, teams: false, party: false }, setup.rules);
     if (this.rules.mode === 'soccer') this.rules.teams = true;
     this.party = this.rules.party && setup.party ? PARTY_BY_ID[setup.party] || null : null;
@@ -23,6 +23,7 @@ class Battle {
     setup.players.forEach((p, i) => {
       let ctrl, brain = null;
       if (p.cpu) { brain = new AIBrain(p.cpu); ctrl = brain.ctrl; }
+      else if (this.rollback) ctrl = new ReplayCtrl('rb:' + p.port);
       else if (p.dev && p.dev.startsWith('net:')) ctrl = new NetCtrl(p.dev.slice(4));
       else ctrl = Devices.ctrls[p.dev] || (Devices.ctrls[p.dev] = new Controller(p.dev)); // el mismo que actualiza Devices.poll
       const f = new Fighter(p.port, p.char, ctrl, { cpu: !!p.cpu, stocks: stockMode(this.rules.mode) ? this.rules.stocks : 1 });
@@ -43,6 +44,7 @@ class Battle {
   get alive() { return this.fighters.filter(f => f.stocks > 0); }
 
   update() {
+    if (this.rollbackSession && !this.rollbackSession.running) return this.rollbackSession.tick();
     return SimRNG.run(this.rng, () => {
       this.advance();
       // Turbo: 3 cuadros de pelea por cada 2 pasos, sin depender del reloj del menú.
@@ -50,11 +52,11 @@ class Battle {
     });
   }
   advance() {
-    if (this.online && !this.resim) this.netTick();
+    if (this.online && !this.rollback && !this.resim) this.netTick();
     if (this.paused) return this.updatePause();
     // pausa
     for (const f of this.fighters) {
-      if (!f.cpu && !f.netPeer && f.ctrl.pressed('start') && this.phase === 'fight' && !this.demo) { this.paused = true; this.pauser = f.dev; this.pauseSel = 0; Audio8.sfx('menu'); Rumble.stopAll(); return; }
+      if (!f.cpu && (!this.rollback ? !f.netPeer : this.rollbackSession.owners[f.port] === this.rollbackSession.hostPeer) && f.ctrl.pressed('start') && this.phase === 'fight' && !this.demo) { this.paused = true; this.pauser = this.rollback ? f.port : f.dev; this.pauseSel = 0; Audio8.sfx('menu'); Rumble.stopAll(); return; }
     }
     this.camKick = (this.camKick || 0) * 0.84; if (this.slowCd > 0) this.slowCd--;
     if (this.slow > 0) { this.slow--; if (this.slow % 3 !== 0) { this.updateCamera(); return; } }
@@ -91,7 +93,7 @@ class Battle {
     }
     if (this.phase === 'end') {
       this.endT++;
-      if (this.endT === 150 && !this.resim) APP.showResults(this.results());
+      if (this.endT === 150 && !this.resim && !this.rollback) APP.showResults(this.results());
     }
   }
   saveState() { return copyBattleState(this); }
@@ -186,6 +188,15 @@ class Battle {
 
   // ---------- pausa ----------
   updatePause() {
+    if (this.rollback) {
+      const f = this.fighters.find(f => f.port === this.pauser), c = f && f.ctrl;
+      if (!c) return;
+      if (c.cur.y < -0.5 && c.prev.y >= -0.5) this.pauseSel = (this.pauseSel + 2) % 3;
+      if (c.cur.y > 0.5 && c.prev.y <= 0.5) this.pauseSel = (this.pauseSel + 1) % 3;
+      if (c.pressed('start') || c.pressed('shield')) this.paused = false;
+      else if (c.pressed('attack') || c.pressed('jump')) { if (!this.pauseSel) this.paused = false; else this.rbCommand = this.pauseSel; }
+      return;
+    }
     const opts = ['Continuar', 'Reiniciar', 'Salir al menú'];
     for (const d of Devices.list) {
       const n = Devices.nav(d);

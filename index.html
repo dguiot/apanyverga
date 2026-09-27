@@ -11548,6 +11548,7 @@ const Net = {
     this.set({ role: 'guest', join: peer, ch: this.guest.ch, rdy: 0, tm: -1, lob: null, st: null });
   },
   leave() {
+    this.stopRollback();
     if (typeof AV !== 'undefined' && AV.on) AV.stop(true);
     this.role = 'off'; this.hostPeer = null; NetEv.on = false; this.view = null;
     this.set({ role: 'idle', join: null, lob: null, st: null, inp: null, rdy: 0 });
@@ -11589,9 +11590,23 @@ const Net = {
     }
   },
   startMatch(setup) {
+    setup.players.forEach((p, i) => { if (p.team === undefined || p.team === null) p.team = i % 2; });
     const enc = { pl: setup.players.map(p => [p.port, CHAR_ORDER.indexOf(p.char), p.cpu || 0, p.remote || (p.cpu ? null : ''), p.team || 0]), stg: STAGE_INFO.findIndex(s => s.id === setup.stage), ru: this.encRules(setup.rules), py: setup.party ? PARTY.findIndex(p => p.id === setup.party) : -1 };
+    const peers = [...new Set(setup.players.filter(p => !p.cpu && p.remote).map(p => p.remote))];
+    const rb = this.rollbackChoice() === '1' && window.APYV_WEB && peers.length && this.room && typeof this.room.fastReady === 'function' && this.room.fastReady(peers) && peers.every(p => this.presOf(p)?.rbc === 1);
+    setup.rollback = !!rb; enc.rb = rb ? 1 : 0;
+    if (rb) { setup.seed = (Math.random() * 4294967296) >>> 0; enc.sd = setup.seed; }
     this.lob.ep = (this.lob.ep || 0) + 1;
     this.publishLobby({ ph: 'vs', set: enc, res: null });
+  },
+  rollbackChoice() { try { return new URLSearchParams(location.search).get('rb'); } catch (e) { return null; } },
+  stopRollback() { if (this.rollbackSession) this.rollbackSession.stop(); this.rollbackSession = null; },
+  attachRollback(B) {
+    this.stopRollback();
+    const owners = {};
+    for (const p of B.setup.players) if (!p.cpu) owners[p.port] = p.remote || this.hostPeer;
+    this.rollbackSession = new RollbackSession(B, { myPeer: this.myPeer(), hostPeer: this.hostPeer, owners, ep: this.lob.ep, room: this.room });
+    B.fighters.forEach(f => { if (owners[f.port]) { f.label = owners[f.port] === this.myPeer() ? 'Tú' : this.nameOf(owners[f.port]); f.avPeer = owners[f.port]; } });
   },
   // foto del estado para los invitados
   pushSnapshot(B) {
@@ -11651,6 +11666,7 @@ const Net = {
       stage: (STAGE_INFO[enc.stg] || STAGE_INFO[0]).id,
       rules: this.decRules(enc.ru),
       party: enc.py >= 0 && PARTY[enc.py] ? PARTY[enc.py].id : null,
+      seed: enc.rb ? enc.sd : undefined, rollback: !!enc.rb,
     };
   },
   // construye la vista local (sin simular) para dibujar lo que manda el anfitrión
@@ -11730,10 +11746,12 @@ const Net = {
   // ---------- cada fotograma ----------
   tick() {
     if (!this.ok) return;
+    const cap = window.APYV_WEB && this.room && typeof this.room.fastReady === 'function' && this.rollbackChoice() !== '0' ? 1 : 0;
+    if (this.rbCap !== cap) { this.rbCap = cap; this.set({ rbc: cap }); }
     if (this.role === 'host') {
       if (['modesel', 'charsel', 'stagesel'].includes(APP.screen)) { this.syncSlots(); this.publishLobby({ ph: 'lobby' }); }
     } else if (this.role === 'guest') {
-      this.sendInput();
+      if (!this.rollbackSession) this.sendInput();
       const hp = this.hostPres();
       if (!hp || !hp.lob) {
         if (++this.lostHostT > 150) { Toasts.push('El anfitrión cerró la sala'); this.leave(); APP.go('online'); }
@@ -11743,12 +11761,19 @@ const Net = {
       const lob = hp.lob;
       if (lob.ph === 'lobby' && APP.screen !== 'netroom') {
         if (['results', 'netview', 'vs'].includes(APP.screen)) { this.guest.rdy = 0; this.set({ rdy: 0 }); }
-        this.view = null; BATTLE = null; APP.go('netroom');
+        this.stopRollback(); APP.battle = null; this.view = null; BATTLE = null; APP.go('netroom');
       }
       if (lob.ph === 'vs' && APP.screen !== 'vs' && lob.set) { APP.pendingSetup = this.decodeSetup(lob.set); APP.pendingSetup.net = true; APP.go('vs'); Audio8.sfx('go'); }
-      if (lob.ph === 'game' && lob.set && (!this.view || this.viewEp !== lob.ep)) { this.viewEp = lob.ep; this.buildView(this.decodeSetup(lob.set)); APP.go('netview'); }
+      if (lob.ph === 'game' && lob.set && this.viewEp !== lob.ep) {
+        this.viewEp = lob.ep; this.stopRollback();
+        const setup = this.decodeSetup(lob.set);
+        if (setup.rollback) {
+          setup.players.forEach(p => { if (!p.cpu) p.dev = p.remote === this.myPeer() ? this.localDev : 'rb:' + p.port; });
+          this.lob.ep = lob.ep; this.view = null; APP.startBattle(setup);
+        } else { this.buildView(setup); APP.go('netview'); }
+      }
       if (lob.ph === 'res' && lob.res && APP.screen !== 'results') {
-        APP.results = this.decodeResults(lob.res); BATTLE = null; this.view = null; APP.go('results'); Audio8.playSong('results');
+        this.stopRollback(); APP.battle = null; APP.results = this.decodeResults(lob.res); BATTLE = null; this.view = null; APP.go('results'); Audio8.playSong('results');
         if (lob.fm) Fame.save(lob.fm, true); // respaldo: si el anfitrión no pudo guardar la pelea, la guarda un invitado
       }
       if (APP.screen === 'netview' && this.view && hp.st && hp.st !== this.lastSnapObj) { this.lastSnapObj = hp.st; BATTLE = this.view; this.applySnapshot(this.view, hp.st); }
@@ -12040,7 +12065,7 @@ class Battle {
     BATTLE = this;
     this.rng = setup.seed === undefined ? null : new SimRNG(setup.seed);
     SimRNG.run(this.rng, () => {
-    this.setup = setup; this.demo = !!opts.demo; this.online = !!opts.online; this.view = !!opts.view;
+    this.setup = setup; this.demo = !!opts.demo; this.online = !!opts.online; this.view = !!opts.view; this.rollback = !!opts.rollback;
     this.rules = Object.assign({ mode: 'stock', stocks: 3, time: 3, items: 2, teams: false, party: false }, setup.rules);
     if (this.rules.mode === 'soccer') this.rules.teams = true;
     this.party = this.rules.party && setup.party ? PARTY_BY_ID[setup.party] || null : null;
@@ -12055,6 +12080,7 @@ class Battle {
     setup.players.forEach((p, i) => {
       let ctrl, brain = null;
       if (p.cpu) { brain = new AIBrain(p.cpu); ctrl = brain.ctrl; }
+      else if (this.rollback) ctrl = new ReplayCtrl('rb:' + p.port);
       else if (p.dev && p.dev.startsWith('net:')) ctrl = new NetCtrl(p.dev.slice(4));
       else ctrl = Devices.ctrls[p.dev] || (Devices.ctrls[p.dev] = new Controller(p.dev)); // el mismo que actualiza Devices.poll
       const f = new Fighter(p.port, p.char, ctrl, { cpu: !!p.cpu, stocks: stockMode(this.rules.mode) ? this.rules.stocks : 1 });
@@ -12075,6 +12101,7 @@ class Battle {
   get alive() { return this.fighters.filter(f => f.stocks > 0); }
 
   update() {
+    if (this.rollbackSession && !this.rollbackSession.running) return this.rollbackSession.tick();
     return SimRNG.run(this.rng, () => {
       this.advance();
       // Turbo: 3 cuadros de pelea por cada 2 pasos, sin depender del reloj del menú.
@@ -12082,11 +12109,11 @@ class Battle {
     });
   }
   advance() {
-    if (this.online && !this.resim) this.netTick();
+    if (this.online && !this.rollback && !this.resim) this.netTick();
     if (this.paused) return this.updatePause();
     // pausa
     for (const f of this.fighters) {
-      if (!f.cpu && !f.netPeer && f.ctrl.pressed('start') && this.phase === 'fight' && !this.demo) { this.paused = true; this.pauser = f.dev; this.pauseSel = 0; Audio8.sfx('menu'); Rumble.stopAll(); return; }
+      if (!f.cpu && (!this.rollback ? !f.netPeer : this.rollbackSession.owners[f.port] === this.rollbackSession.hostPeer) && f.ctrl.pressed('start') && this.phase === 'fight' && !this.demo) { this.paused = true; this.pauser = this.rollback ? f.port : f.dev; this.pauseSel = 0; Audio8.sfx('menu'); Rumble.stopAll(); return; }
     }
     this.camKick = (this.camKick || 0) * 0.84; if (this.slowCd > 0) this.slowCd--;
     if (this.slow > 0) { this.slow--; if (this.slow % 3 !== 0) { this.updateCamera(); return; } }
@@ -12123,7 +12150,7 @@ class Battle {
     }
     if (this.phase === 'end') {
       this.endT++;
-      if (this.endT === 150 && !this.resim) APP.showResults(this.results());
+      if (this.endT === 150 && !this.resim && !this.rollback) APP.showResults(this.results());
     }
   }
   saveState() { return copyBattleState(this); }
@@ -12218,6 +12245,15 @@ class Battle {
 
   // ---------- pausa ----------
   updatePause() {
+    if (this.rollback) {
+      const f = this.fighters.find(f => f.port === this.pauser), c = f && f.ctrl;
+      if (!c) return;
+      if (c.cur.y < -0.5 && c.prev.y >= -0.5) this.pauseSel = (this.pauseSel + 2) % 3;
+      if (c.cur.y > 0.5 && c.prev.y <= 0.5) this.pauseSel = (this.pauseSel + 1) % 3;
+      if (c.pressed('start') || c.pressed('shield')) this.paused = false;
+      else if (c.pressed('attack') || c.pressed('jump')) { if (!this.pauseSel) this.paused = false; else this.rbCommand = this.pauseSel; }
+      return;
+    }
     const opts = ['Continuar', 'Reiniciar', 'Salir al menú'];
     for (const d of Devices.list) {
       const n = Devices.nav(d);
@@ -12490,6 +12526,140 @@ function copyStateValue(v, seen, key) {
 }
 function copyBattleState(b) { return copyStateValue(b, new Map()); }
 
+// ---- js/rollback.js ----
+// Cada pantalla simula con entradas cuantizadas; el anfitrión decide eventos y resultados.
+const RB_WINDOW = 8, RB_NEUTRAL = [0, 0, 0, 0, 0];
+const rbSame = (a, b) => a && b && a.every((x, i) => x === b[i]);
+class RollbackSession {
+  constructor(battle, opts) {
+    this.battle = battle; battle.rollback = true; battle.rollbackSession = this;
+    this.myPeer = opts.myPeer; this.hostPeer = opts.hostPeer; this.owners = opts.owners; this.ep = opts.ep;
+    this.host = this.myPeer === this.hostPeer; this.frame = 0; this.confirmed = -1; this.delay = 2;
+    this.now = opts.now || (() => performance.now()); this.read = opts.read || (p => {
+      const f = this.battle.fighters.find(f => f.port === p);
+      return (Devices.ctrls[f.dev] || Devices.ctrls[Net.localDev] || {}).cur || blankState();
+    });
+    this.send = opts.send || ((k, v, to, reliable) => reliable ? Net.room.stateSend(k, v, to) : Net.room.fastSend(k, v, to));
+    this.real = new Map(); this.used = new Map(); this.lastHeard = new Map(); this.captured = new Map();
+    this.snapshots = new Map(); this.hashes = new Map(); this.events = new Map(); this.cpuAt = new Map();
+    this.rollbackFrom = null; this.running = false; this.stopped = false; this.off = [];
+    this.metrics = { rollbacks: 0, resimFrames: 0, resimMs: 0, saveMs: 0, stalls: 0 };
+    this.ports = Object.keys(this.owners).map(Number); this.local = this.ports.filter(p => this.owners[p] === this.myPeer);
+    for (const p of this.ports) {
+      this.real.set(p, new Map([[0, RB_NEUTRAL], [1, RB_NEUTRAL]])); this.used.set(p, new Map()); this.lastHeard.set(p, this.now());
+      const f = battle.fighters.find(f => f.port === p); f.ctrl = new ReplayCtrl('rb:' + p); f.netPeer = this.owners[p] === this.hostPeer ? null : this.owners[p];
+    }
+    if (opts.room) {
+      for (const k of ['ri', 'rq']) this.off.push(opts.room.onFast(k, e => this.receive(k, e.data, e.peer)));
+      this.off.push(opts.room.onState('rcpu', e => this.receive('rcpu', e.data, e.peer)));
+    }
+  }
+  stop() { this.stopped = true; this.off.forEach(fn => fn()); this.off = []; }
+  inputMessage(p, end, count = 8) {
+    const entries = this.real.get(p), a = []; let first = end;
+    while (first > Math.max(0, end - count + 1) && entries.has(first - 1)) first--;
+    for (let f = first; f <= end; f++) { if (!entries.has(f)) break; a.push(entries.get(f)); }
+    return { ep: this.ep, p, f: first + a.length - 1, a, ack: this.confirmed, now: this.frame };
+  }
+  capture() {
+    for (const p of this.local) {
+      if (this.cpuAt.has(p)) continue;
+      const f = this.frame + this.delay, entries = this.real.get(p);
+      if (!entries.has(f)) entries.set(f, ReplayCtrl.pack(this.read(p)));
+      this.captured.set(p, f); this.send('ri', this.inputMessage(p, f));
+    }
+  }
+  receive(k, v, peer) {
+    if (this.stopped || !v || v.ep !== this.ep) return;
+    if (k === 'rq') {
+      if (!Number.isInteger(v.p) || !Number.isInteger(v.f) || !this.ports.includes(v.p) || v.f < 0 || v.f > this.frame + 4) return;
+      if (this.owners[v.p] === this.myPeer || this.host) {
+        if (this.real.get(v.p).has(v.f)) this.send('ri', this.inputMessage(v.p, Math.min(v.f + 7, this.captured.get(v.p) ?? v.f)), peer);
+      } else this.send('rq', v, this.owners[v.p]);
+      return;
+    }
+    if (k === 'rcpu') {
+      if (peer !== this.hostPeer || !this.ports.includes(v.p) || !Number.isInteger(v.f) || v.f < 0 || !Array.isArray(v.a) || v.a.length > 16) return;
+      this.cpuAt.set(v.p, v.f); this.events.set(v.p, v);
+      for (let i = 0; i < v.a.length; i++) this.put(v.p, v.first + i, v.a[i]);
+      if (v.f < this.frame) this.rollbackFrom = Math.min(this.rollbackFrom ?? v.f, v.f);
+      return;
+    }
+    if (k !== 'ri' || !this.ports.includes(v.p) || this.cpuAt.has(v.p)) return;
+    if (peer !== this.owners[v.p] && !(peer === this.hostPeer && !this.host)) return;
+    if (!Number.isInteger(v.f) || v.f < 0 || v.f > this.frame + 120 || !Array.isArray(v.a) || !v.a.length || v.a.length > 8) return;
+    if (!v.a.every(a => Array.isArray(a) && a.length === 5 && a.every((x, i) => Number.isInteger(x) && Math.abs(x) <= (i === 4 ? 1023 : 100)))) return;
+    this.lastHeard.set(v.p, this.now());
+    for (let i = 0; i < v.a.length; i++) this.put(v.p, v.f - v.a.length + 1 + i, v.a[i]);
+  }
+  put(p, f, a) {
+    if (f < 0 || !Array.isArray(a)) return;
+    this.real.get(p).set(f, a.slice());
+    const old = this.used.get(p).get(f);
+    if (old && !rbSame(old, a)) this.rollbackFrom = Math.min(this.rollbackFrom ?? f, f);
+  }
+  advanceConfirmed() {
+    while (this.confirmed + 1 < this.frame && this.ports.every(p => this.real.get(p).has(this.confirmed + 1) || (this.cpuAt.has(p) && this.confirmed + 1 >= this.cpuAt.get(p)))) this.confirmed++;
+  }
+  simulate(f, resim) {
+    const b = this.battle; BATTLE = b; b.resim = resim;
+    const t = performance.now(); this.snapshots.set(f, b.saveState()); this.metrics.saveMs = performance.now() - t;
+    for (const p of this.ports) {
+      const fighter = b.fighters.find(x => x.port === p), event = this.events.get(p);
+      if (event && f >= event.f) {
+        if (!fighter.cpu) { fighter.cpu = true; fighter.brain = new AIBrain(5); fighter.brain.f = fighter; fighter.ctrl = fighter.brain.ctrl; }
+        continue;
+      }
+      const a = this.real.get(p).get(f) || this.used.get(p).get(f - 1) || RB_NEUTRAL;
+      this.used.get(p).set(f, a); fighter.ctrl.feed(a);
+    }
+    this.running = true;
+    try { b.update(); } finally { this.running = false; b.resim = false; }
+    this.hashes.set(f, b.checksum());
+  }
+  reconcile() {
+    const from = this.rollbackFrom; this.rollbackFrom = null;
+    if (from !== null && from < this.frame) {
+      const s = this.snapshots.get(from);
+      if (!s) { this.rollbackFrom = from; return false; }
+      const t = performance.now(); this.battle.loadState(s);
+      for (let f = from; f < this.frame; f++) this.simulate(f, true);
+      this.metrics.rollbacks++; this.metrics.resimFrames += this.frame - from; this.metrics.resimMs = performance.now() - t;
+    }
+    this.advanceConfirmed(); return true;
+  }
+  disconnects() {
+    if (!this.host) return;
+    for (const p of this.ports) if (this.owners[p] !== this.myPeer && !this.cpuAt.has(p) && this.now() - this.lastHeard.get(p) > 3000) {
+      const first = this.confirmed + 1, a = [];
+      for (let f = first; f < this.frame; f++) a.push(this.used.get(p).get(f) || RB_NEUTRAL);
+      const event = { ep: this.ep, p, f: this.frame, first, a };
+      this.receive('rcpu', event, this.hostPeer); this.send('rcpu', event, undefined, true);
+    }
+  }
+  tick() {
+    if (this.stopped) return;
+    this.capture(); this.disconnects();
+    if (!this.reconcile() || this.frame - this.confirmed > RB_WINDOW) {
+      this.metrics.stalls++;
+      for (const p of this.ports) if (!this.real.get(p).has(this.confirmed + 1) && !this.cpuAt.has(p)) this.send('rq', { ep: this.ep, p, f: this.confirmed + 1 }, this.host ? this.owners[p] : this.hostPeer);
+      return;
+    }
+    this.simulate(this.frame++, false); this.advanceConfirmed();
+    for (const f of this.snapshots.keys()) if (f < this.frame - RB_WINDOW) this.snapshots.delete(f);
+    // Se conserva un minuto de entradas para recuperar paquetes perdidos, sin crecer toda la visita.
+    for (const m of [...this.real.values(), ...this.used.values(), this.hashes]) for (const f of m.keys()) if (f < this.frame - 3600) m.delete(f);
+    const b = this.battle, committed = this.confirmed === this.frame - 1 ? b : this.snapshots.get(this.confirmed + 1);
+    if (this.host && !b.demo && committed) {
+      if (committed.rbCommand) {
+        const cmd = committed.rbCommand; delete b.rbCommand; this.stop();
+        if (cmd === 1) { Net.startMatch(b.setup); APP.startBattle(b.setup); }
+        else { BATTLE = null; Net.publishLobby({ ph: 'lobby', set: null }); APP.go('charsel'); }
+      } else if (committed.phase === 'end' && committed.endT >= 150) { if (committed !== b) b.loadState(committed); this.stop(); APP.showResults(b.results()); }
+    }
+  }
+}
+
 // ---- js/menus.js ----
 // ============================================================
 //  MENÚS Y FLUJO DE PANTALLAS (estilo arcade de peleas)
@@ -12621,12 +12791,14 @@ const APP = {
     if (s === 'modesel') this.modeSel = Math.max(0, MODES.findIndex(m => m.id === this.rules.mode));
   },
   startBattle(setup) {
+    Net.stopRollback();
     this.lastSetup = setup;
     // Xbox: poca memoria de video. Las capas del escenario anterior se sueltan antes de pintar el nuevo
     if (IS_XBOX) ART.store.clear();
     const online = Net.role === 'host';
-    this.battle = new Battle(setup, { online });
-    NetEv.on = online;
+    this.battle = new Battle(setup, { online, rollback: !!setup.rollback });
+    if (setup.rollback) Net.attachRollback(this.battle);
+    NetEv.on = online && !setup.rollback;
     if (online) Net.publishLobby({ ph: 'game' });
     this.go('battle');
   },
