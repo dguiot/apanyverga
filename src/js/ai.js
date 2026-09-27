@@ -73,30 +73,30 @@ class AIBrain {
     const flickX = d => { s.x = d; this.ctrl.flickX = -1; this.ctrl.flickDirX = d; };
     const flickY = d => { s.y = d; this.ctrl.flickY = -1; this.ctrl.flickDirY = d; };
     if (this.idleT > 0 && f.grounded && !['hitstun', 'grabbed', 'ledge'].includes(f.state)) { this.idleT--; return s; }
-    if (f.grounded && Math.random() < L.daydream) { this.idleT = randi(20, 50); return s; }
+    if (f.grounded && simRandom() < L.daydream) { this.idleT = randi(20, 50); return s; }
     if (f.state === 'respawn') { if (f.sf > 40 - L.t * 25) s.x = sign(-f.x) || 1; return s; }
-    if (f.state === 'grabbed') { if (Math.random() < 0.3 + L.t * 0.6) press(pick(['attack', 'jump', 'special'])); s.x = Math.random() > 0.5 ? 1 : -1; return s; }
+    if (f.state === 'grabbed') { if (simRandom() < 0.3 + L.t * 0.6) press(pick(['attack', 'jump', 'special'])); s.x = simRandom() > 0.5 ? 1 : -1; return s; }
     if (f.state === 'hitstun') {
-      if (Math.random() < L.di) { s.x = -sign(f.lx) * 0.9; s.y = f.ly < 0 ? 0.6 : -0.8; }
-      if (f.tumble && Math.random() < L.tech * 0.4 && f.x > st.left - 20 && f.x < st.right + 20) press('shield'); // fuera del escenario no: se volvería un esquive perdido
+      if (simRandom() < L.di) { s.x = -sign(f.lx) * 0.9; s.y = f.ly < 0 ? 0.6 : -0.8; }
+      if (f.tumble && simRandom() < L.tech * 0.4 && f.x > st.left - 20 && f.x < st.right + 20) press('shield'); // fuera del escenario no: se volvería un esquive perdido
       return s;
     }
     if (f.state === 'ledge') {
       if (f.sf > 10 + randi(0, Math.max(2, L.react))) {
-        const r = Math.random();
+        const r = simRandom();
         if (r < 0.45) s.x = -f.ledge.side; else if (r < 0.7) press('jump'); else if (r < 0.85) press('attack'); else press('shield');
       }
       return s;
     }
-    if (f.state === 'down') { if (Math.random() < 0.1 + L.t * 0.3) { if (Math.random() < 0.5) press('attack'); else s.x = pick([-1, 1]); } return s; }
+    if (f.state === 'down') { if (simRandom() < 0.1 + L.t * 0.3) { if (simRandom() < 0.5) press('attack'); else s.x = pick([-1, 1]); } return s; }
     if (f.state === 'holding') {
       if (f.sf > 8 + randi(0, 10)) {
         const t = f.grabbing;
-        if (t && t.percent < 50 && Math.random() < 0.5 && f.sf < 30) { if (f.sf % 8 === 0) press('attack'); return s; }
+        if (t && t.percent < 50 && simRandom() < 0.5 && f.sf < 30) { if (f.sf % 8 === 0) press('attack'); return s; }
         // lanzamiento según posición y %
         const toEdge = f.x > 0 ? 1 : -1;
         if (t && t.percent > 120 && Math.abs(f.x) < 150) s.y = -1;
-        else if (t && t.percent < 60 && L.juggle > 0.5) s.y = Math.random() < 0.5 ? -1 : 1;
+        else if (t && t.percent < 60 && L.juggle > 0.5) s.y = simRandom() < 0.5 ? -1 : 1;
         else s.x = toEdge;
       }
       return s;
@@ -127,7 +127,7 @@ class AIBrain {
       // debajo del piso: primero sale por la orilla más cercana (hacia el centro se queda atorada abajo)
       if (out < -8 && f.y > ly + 20) {
         s.x = lg.side;
-        if (f.jumps > 0 && f.vy > -2 && this.jumpCd <= 0 && Math.random() < L.recover) { press('jump'); this.jumpCd = 22; }
+        if (f.jumps > 0 && f.vy > -2 && this.jumpCd <= 0 && simRandom() < L.recover) { press('jump'); this.jumpCd = 22; }
         return s;
       }
       // más abajo que la orilla: se queda justo afuera (si se mete debajo choca con el piso por abajo),
@@ -138,7 +138,7 @@ class AIBrain {
         if (snapWin) s.x = toward;
         else { const tx = edgeX - toward * margin, dx = tx - f.x; s.x = Math.abs(dx) < 6 ? 0 : clamp(dx / 30, -1, 1); }
       }
-      if (Math.random() > L.recover) return s;
+      if (simRandom() > L.recover) return s;
       const below = f.y > ly - 40;
       const farX = Math.abs(f.x - edgeX);
       // alto y lejos: primero planea hacia la orilla; el salto y el especial se guardan para cuando baje
@@ -182,17 +182,17 @@ class AIBrain {
     // peligros que caen del cielo (rocas del volcán, cañonazos): salirse de abajo
     if (L.dodge > 0 && f.grounded) {
       const drop = BATTLE.projectiles.find(p => !p.owner && p.vy > 0 && p.y < f.y && f.y - p.y < 750 && Math.abs(p.x - f.x) < 80);
-      if (drop && Math.random() < L.dodge + 0.3) { s.x = sign(f.x - drop.x) || 1; return s; }
+      if (drop && simRandom() < L.dodge + 0.3) { s.x = sign(f.x - drop.x) || 1; return s; }
     }
     // el metro de las azoteas: si viene y estoy en la calle, brinco alto (se mantiene Salto para el salto completo)
-    if (st.id === 'city' && f.y > 450 && (st.trainWarn > 0 || (st.train && Math.sign(f.x - st.trainX) === st.trainDir && Math.abs(f.x - st.trainX) < 2600)) && Math.random() < L.dodge + 0.4) {
+    if (st.id === 'city' && f.y > 450 && (st.trainWarn > 0 || (st.train && Math.sign(f.x - st.trainX) === st.trainDir && Math.abs(f.x - st.trainX) < 2600)) && simRandom() < L.dodge + 0.4) {
       if (f.grounded || f.state === 'jumpsquat') { s.jump = true; return s; }
       if (f.jumps > 0 && f.vy > 0 && this.jumpCd <= 0) { press('jump'); this.jumpCd = 20; return s; }
     }
     // proyectiles que vienen hacia mí
     if (L.dodge > 0 && this.shieldT <= 0) {
       const inc = BATTLE.projectiles.find(p => p.owner !== f && p.delay <= 0 && Math.abs(p.y - (f.y - 50)) < 70 && sign(f.x - p.x) === sign(p.vx) && Math.abs(f.x - p.x) < 60 + Math.abs(p.vx) * 8);
-      if (inc && Math.random() < L.dodge) {
+      if (inc && simRandom() < L.dodge) {
         if (f.grounded) { this.shieldT = randi(8, 14); }
         else if (!f.airUsed.dodge) { press('shield'); return s; }
       }
@@ -212,7 +212,7 @@ class AIBrain {
     if (f.finalReady && tgt && Math.abs(tgt.x - f.x) < 520) { press('special'); return s; }
     if (orb && (!tgt || Math.abs(orb.x - f.x) < Math.abs(tgt.x - f.x) + 200)) { gx = orb.x; gy = orb.y + 40; mode = 'orb'; }
     else if (heal && f.percent > 40) { gx = heal.x; gy = heal.y; mode = 'item'; }
-    else if (wantItem && (wantItem === this.pickFor ? this.pickYes : (this.pickFor = wantItem, this.pickYes = Math.random() < 0.5))) { gx = wantItem.x; gy = wantItem.y; mode = 'pick'; }
+    else if (wantItem && (wantItem === this.pickFor ? this.pickYes : (this.pickFor = wantItem, this.pickYes = simRandom() < 0.5))) { gx = wantItem.x; gy = wantItem.y; mode = 'pick'; }
     // objetivos propios de cada modo
     const gm = BATTLE.rules.mode;
     if (gm === 'soccer' && BATTLE.ms.ball) return this.soccer(s, f, L, press, flickX);
@@ -247,21 +247,21 @@ class AIBrain {
     const grabOk = t => { const fx = (t.x - f.x) * f.face, sz = f.size(); return !!t && t.grounded && Math.abs(t.y - f.y) < 40 && fx > 14 * sz && fx < 70 * sz; };
     const face = stack ? f.face : sign(dx) || f.face, toward = stack ? 0 : sign(dx);
 
-    if (!f.grounded && f.state === 'air' && !f.airUsed.dodge && tgt && tgt.state === 'attack' && dist(tgt.x, tgt.y, f.x, f.y) < 120 && Math.random() < L.dodge * 0.25) { press('shield'); return s; }
+    if (!f.grounded && f.state === 'air' && !f.airUsed.dodge && tgt && tgt.state === 'attack' && dist(tgt.x, tgt.y, f.x, f.y) < 120 && simRandom() < L.dodge * 0.25) { press('shield'); return s; }
     // el torero espera la embestida con la verónica: la saca antes de que llegue el golpe
     if (f.id === 'puentin' && tgt && mode === 'fight' && f.grounded && tgt.state === 'attack' && tgt.move && tgt.move.def && this.cool <= 0 && Math.abs(tgt.x - f.x) < 150 && Math.abs(tgt.y - f.y) < 80) {
       const hs = tgt.move.def.hits || [], f0 = hs.length ? Math.min(...hs.map(h => h.f0)) : 0;
-      if (f0 - tgt.move.f >= 4 && Math.random() < L.shield * 0.5) { this.cool = L.react + 16; s.x = 0; s.y = 0; press('special'); return s; }
+      if (f0 - tgt.move.f >= 4 && simRandom() < L.shield * 0.5) { this.cool = L.react + 16; s.x = 0; s.y = 0; press('special'); return s; }
     }
     // ---------- defensa ----------
-    if (tgt && mode === 'fight' && f.grounded && this.shieldT <= 0 && tgt.state === 'attack' && Math.abs(tgt.x - f.x) < 140 && Math.abs(tgt.y - f.y) < 100 && Math.random() < L.shield) this.shieldT = randi(8, 20); // no se cubre de golpes de otra plataforma
+    if (tgt && mode === 'fight' && f.grounded && this.shieldT <= 0 && tgt.state === 'attack' && Math.abs(tgt.x - f.x) < 140 && Math.abs(tgt.y - f.y) < 100 && simRandom() < L.shield) this.shieldT = randi(8, 20); // no se cubre de golpes de otra plataforma
     if (f.state === 'shield') this.wasShield = 8;
     else this.wasShield--;
     if (this.shieldT > 0 && f.grounded) {
       s.shield = true;
       // fuera de escudo: agarrar o castigar si el rival quedó cerca
       // (A desde el escudo también es agarre: encimado o a la espalda no atrapaba nada y se repetía)
-      if (tgt && f.shieldStun === 0 && grabOk(tgt) && tgt.state === 'attack' && Math.random() < L.oos * 0.35) { this.shieldT = 0; press('grab'); }
+      if (tgt && f.shieldStun === 0 && grabOk(tgt) && tgt.state === 'attack' && simRandom() < L.oos * 0.35) { this.shieldT = 0; press('grab'); }
       return s;
     }
 
@@ -293,7 +293,7 @@ class AIBrain {
     const tOff = tgt.state === 'ledge' || (!tgt.grounded && !overFloor(tgt));
     // la decisión de cuidar la orilla dura medio segundo: sorteada cada cuadro, la CPU corría de ida y vuelta junto al borde
     if (!tOff) this.egT = 0;
-    else if (!(this.egT > 0)) { this.eg = L.edgeguard > 0 && Math.random() < L.edgeguard; this.egT = 30; }
+    else if (!(this.egT > 0)) { this.eg = L.edgeguard > 0 && simRandom() < L.edgeguard; this.egT = 30; }
     this.egT--;
     if (tOff && this.eg) {
       const side = tgt.x < 0 ? -1 : 1, edgeX = side < 0 ? st.left : st.right;
@@ -316,7 +316,7 @@ class AIBrain {
     }
 
     // proyectiles a distancia
-    if (adx > 320 && Math.abs(dy) < 120 && f.grounded && aiHasProj(f.id, 'n') && Math.random() < L.proj * 3 && this.cool <= 0) {
+    if (adx > 320 && Math.abs(dy) < 120 && f.grounded && aiHasProj(f.id, 'n') && simRandom() < L.proj * 3 && this.cool <= 0) {
       if (sign(dx) !== f.face) { s.x = sign(dx) * 0.4; return s; } // primero voltea: con la palanca de lado salía el especial de lado
       this.cool = L.react + 20; this.neutralT = 6; press('special'); return s;
     }
@@ -329,14 +329,14 @@ class AIBrain {
 
     // ---------- castigo: el rival está vulnerable ----------
     const vulnerable = ['land', 'down', 'dizzy', 'helpless'].includes(tgt.state) || (tgt.state === 'attack' && tgt.move && tgt.move.f > (tgt.move.def.dur * 0.6));
-    if (vulnerable && adx < range * 1.6 && Math.abs(dy) < 60 && f.grounded && Math.random() < L.punish && this.cool <= 0) {
+    if (vulnerable && adx < range * 1.6 && Math.abs(dy) < 60 && f.grounded && simRandom() < L.punish && this.cool <= 0) {
       this.cool = L.react;
       if (face !== f.face) { s.x = face * 0.4; return s; }
-      if (tgt.percent > 90 || tgt.state === 'dizzy') { flickX(face); press('attack'); } else if (Math.random() < 0.22 && grabOk(tgt)) press('grab'); else { s.x = face * 0.6; press('attack'); }
+      if (tgt.percent > 90 || tgt.state === 'dizzy') { flickX(face); press('attack'); } else if (simRandom() < 0.22 && grabOk(tgt)) press('grab'); else { s.x = face * 0.6; press('attack'); }
       return s;
     }
     // ---------- persecución aérea (juggle) ----------
-    if (tgt.state === 'hitstun' && dy < -60 && adx < 180 && tgt.x > st.left + 60 && tgt.x < st.right - 60 && Math.random() < L.juggle) {
+    if (tgt.state === 'hitstun' && dy < -60 && adx < 180 && tgt.x > st.left + 60 && tgt.x < st.right - 60 && simRandom() < L.juggle) {
       if (f.grounded && this.jumpCd <= 0) { press('jump'); s.x = face * 0.5; this.jumpCd = 14; return s; }
       if (!f.grounded) {
         s.x = sign(dx) * 0.9;
@@ -356,49 +356,49 @@ class AIBrain {
       if (!f.grounded && (this.backT > 0 || (!safeX(f.x + sign(dx) * 80) && !(tgt.x > st.left && tgt.x < st.right)))) { if (!(this.backT > 0)) this.backT = 18; s.x = sign(-f.x); }
       if (f.grounded && !safeX(f.x + sign(dx) * 60) && !(tgt.x > st.left && tgt.x < st.right)) s.x = 0;
       if (dy < -90 && (f.grounded || f.vy > 0) && this.jumpCd <= 0 && adx < 260) { press('jump'); this.jumpCd = 30 - L.t * 15; } // más arriba que el alcance: brinca (entre 90 y 110 se quedaba abajo)
-      if (dy > 80 && f.grounded && f.surface && f.surface.plat && adx < 200 && Math.random() < 0.08) { s.y = 1; this.ctrl.flickY = 0; this.ctrl.flickDirY = 1; }
-      if (!f.grounded && f.vy > 0 && dy > 60 && Math.random() < 0.05 + L.t * 0.1) s.y = 1;
-      if (Math.random() < 0.004 && f.grounded) press('jump');
+      if (dy > 80 && f.grounded && f.surface && f.surface.plat && adx < 200 && simRandom() < 0.08) { s.y = 1; this.ctrl.flickY = 0; this.ctrl.flickDirY = 1; }
+      if (!f.grounded && f.vy > 0 && dy > 60 && simRandom() < 0.05 + L.t * 0.1) s.y = 1;
+      if (simRandom() < 0.004 && f.grounded) press('jump');
       // a nivel alto, retrocede un poco para espaciar (baile)
-      if (L.t > 0.6 && adx < range * 1.4 && tgt.state === 'attack' && f.grounded && Math.random() < 0.3) s.x = -toward;
+      if (L.t > 0.6 && adx < range * 1.4 && tgt.state === 'attack' && f.grounded && simRandom() < 0.3) s.x = -toward;
       return s;
     }
     // ---------- en rango ----------
-    if (this.cool > 0) { if (Math.random() < 0.3) s.x = toward * 0.3; return s; }
-    if (Math.random() > L.aggro) { this.cool = randi(4, 12); return s; }
+    if (this.cool > 0) { if (simRandom() < 0.3) s.x = toward * 0.3; return s; }
+    if (simRandom() > L.aggro) { this.cool = randi(4, 12); return s; }
     // encimados: el jab empieza delante del cuerpo y el agarre también, así que no pegaban nunca (y se
     // repetían). Saltito y aéreo neutral, que pega alrededor del cuerpo
     if (stack && f.grounded && Math.abs(dy) < 40) { press('jump'); this.nairT = 5; this.nairMax = 24; this.cool = L.react + 8; return s; }
     // contra un escudo, golpe tras golpe no sirve: agarrarlo
-    if (tgt.state === 'shield' && f.grounded && grabOk(tgt) && Math.random() < 0.25 + L.t * 0.5) { this.cool = L.react + 6; press('grab'); return s; }
+    if (tgt.state === 'shield' && f.grounded && grabOk(tgt) && simRandom() < 0.25 + L.t * 0.5) { this.cool = L.react + 6; press('grab'); return s; }
     this.cool = L.react + randi(0, Math.round(8 * (1 - L.t)));
     const killPct = 110 - (tgt.weight() - 100) * 0.8;
     const high = tgt.percent > killPct * (1.3 - L.killSense * 0.4);
-    if (Math.random() < L.mistake) { press(pick(['attack', 'special', 'grab'])); return s; }
+    if (simRandom() < L.mistake) { press(pick(['attack', 'special', 'grab'])); return s; }
     if (!f.grounded) {
       if (dy < -50) s.y = -1; else if (dy > 50) s.y = 1; else s.x = face === f.face ? face : -f.face;
       press('attack'); return s;
     }
     if (dy < -70) {
-      if (high && Math.random() < 0.6) flickY(-1); else s.y = -0.6;
+      if (high && simRandom() < 0.6) flickY(-1); else s.y = -0.6;
       press('attack'); return s;
     }
-    if (face !== f.face && Math.random() < 0.6) { s.x = face * 0.6; return s; }
-    if (L.t > 0.6 && Math.random() < L.t) {
+    if (face !== f.face && simRandom() < 0.6) { s.x = face * 0.6; return s; }
+    if (L.t > 0.6 && simRandom() < L.t) {
       // espaciado: pegado → golpe rápido o agarre; a media distancia → golpe lateral o smash
-      if (adx < 45) { if (Math.random() < 0.16 && grabOk(tgt)) press('grab'); else if (high) { flickY(Math.random() < 0.5 ? 1 : -1); press('attack'); } else press('attack'); }
+      if (adx < 45) { if (simRandom() < 0.16 && grabOk(tgt)) press('grab'); else if (high) { flickY(simRandom() < 0.5 ? 1 : -1); press('attack'); } else press('attack'); }
       else { if (high) flickX(face); else s.x = face * 0.6; press('attack'); }
       return s;
     }
-    const r = Math.random();
+    const r = simRandom();
     if (r < 0.05 + L.t * 0.03 && grabOk(tgt)) { press('grab'); return s; }
     if (r < 0.2) {
       // el torero no saca la verónica al aire: sin embestida no sirve; mejor banderillas o revolera
-      if (f.id === 'puentin') { if (Math.random() < 0.5) s.x = face * 0.9; else s.y = 0.9; } else s.x = face * (Math.random() < 0.5 ? 0.9 : 0);
+      if (f.id === 'puentin') { if (simRandom() < 0.5) s.x = face * 0.9; else s.y = 0.9; } else s.x = face * (simRandom() < 0.5 ? 0.9 : 0);
       press('special'); return s;
     }
     if (high || r < 0.32) {
-      const k = Math.random();
+      const k = simRandom();
       if (k < 0.7) flickX(face); else if (k < 0.85) flickY(1); else flickY(-1);
       press('attack'); return s;
     }
@@ -511,12 +511,12 @@ class AIBrain {
     const behind = ball.x - goalDir * 58;
     const dx = behind - f.x, bd = dist(f.x, f.y - 50, ball.x, ball.y);
     const behindOk = sign(ball.x - f.x) === goalDir || Math.abs(ball.x - f.x) < 18;
-    if (bd < 95 && this.cool <= 0 && Math.random() < 0.35 + L.aggro * 0.6) {
+    if (bd < 95 && this.cool <= 0 && simRandom() < 0.35 + L.aggro * 0.6) {
       this.cool = Math.max(4, L.react);
       if (behindOk) {
         if (ball.y < f.y - 115) { s.y = -0.6; press('attack'); }
         else if (!f.grounded) { s.x = goalDir === f.face ? goalDir : -f.face; press('attack'); }
-        else if (Math.random() < 0.35 + L.t * 0.35) { flickX(goalDir); press('attack'); }
+        else if (simRandom() < 0.35 + L.t * 0.35) { flickX(goalDir); press('attack'); }
         else { s.x = goalDir * 0.6; press('attack'); }
         return s;
       }

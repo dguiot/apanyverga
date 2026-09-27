@@ -347,6 +347,7 @@ const Rumble = {
   },
   // strong: motor grande (grave), weak: motor chico (agudo), ms: duración, trig: gatillos Xbox (Edge/Chrome en Windows)
   play(dev, strong, weak, ms, trig) {
+    if (typeof BATTLE !== 'undefined' && BATTLE && BATTLE.resim) return false;
     if (!this.on || !dev || typeof dev !== 'string') return false;
     dev = this.resolve(dev);
     if (!dev || (!dev.startsWith('pad') && dev !== 'touch')) return false;
@@ -372,10 +373,11 @@ const Rumble = {
     return false;
   },
   stop(dev) {
+    if (typeof BATTLE !== 'undefined' && BATTLE && BATTLE.resim) return;
     delete this.cur[dev];
     try { const p = this.pad(dev); if (p && p.vibrationActuator && p.vibrationActuator.reset) { const r = p.vibrationActuator.reset(); if (r && r.catch) r.catch(() => {}); } } catch (e) { /* nada */ }
   },
-  stopAll() { for (const d of Object.keys(this.cur)) this.stop(d); if (navigator.vibrate) try { navigator.vibrate(0); } catch (e) { /* nada */ } },
+  stopAll() { if (typeof BATTLE !== 'undefined' && BATTLE && BATTLE.resim) return; for (const d of Object.keys(this.cur)) this.stop(d); if (navigator.vibrate) try { navigator.vibrate(0); } catch (e) { /* nada */ } },
   // quién siente algo de un peleador: solo personas en este aparato (no CPU, no jugadores remotos, no la demo)
   devOf(f) {
     const B = typeof BATTLE !== 'undefined' ? BATTLE : null;

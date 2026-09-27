@@ -6,6 +6,8 @@ class Battle {
   // setup: { players: [{port, char, dev|null, cpu:level|0}], stage, rules: {mode, stocks, time, items} }
   constructor(setup, opts = {}) {
     BATTLE = this;
+    this.rng = setup.seed === undefined ? null : new SimRNG(setup.seed);
+    SimRNG.run(this.rng, () => {
     this.setup = setup; this.demo = !!opts.demo; this.online = !!opts.online; this.view = !!opts.view;
     this.rules = Object.assign({ mode: 'stock', stocks: 3, time: 3, items: 2, teams: false, party: false }, setup.rules);
     if (this.rules.mode === 'soccer') this.rules.teams = true;
@@ -35,12 +37,20 @@ class Battle {
       this.fighters.push(f);
     });
     Modes.init(this);
+    });
     if (!this.demo) Audio8.playBattle();
   }
   get alive() { return this.fighters.filter(f => f.stocks > 0); }
 
   update() {
-    if (this.online) this.netTick();
+    return SimRNG.run(this.rng, () => {
+      this.advance();
+      // Turbo: 3 cuadros de pelea por cada 2 pasos, sin depender del reloj del menú.
+      if (this.mods && this.mods.turbo && this.t % 3 === 1 && !this.paused) this.advance();
+    });
+  }
+  advance() {
+    if (this.online && !this.resim) this.netTick();
     if (this.paused) return this.updatePause();
     // pausa
     for (const f of this.fighters) {
@@ -81,8 +91,29 @@ class Battle {
     }
     if (this.phase === 'end') {
       this.endT++;
-      if (this.endT === 150) APP.showResults(this.results());
+      if (this.endT === 150 && !this.resim) APP.showResults(this.results());
     }
+  }
+  checksum() {
+    // Centésimas y referencias del grafo; las etiquetas y efectos locales no cambian la pelea.
+    const omit = new Set(['ch', 'moves', 'def', 'throwDef', '_lastHit', '_t', 'clouds', 'stars', 'particles', 'light', 'grade', 'pose', 'swoosh', '_swoosh', '_ltx', '_lty', 'dev', 'netPeer', 'peer', 'label', 'uid', 'avPeer', 'why', 'fx', 'koFx', 'banners', 'cam', 'shake', 'flash', 'dim', 'camKick']);
+    let hash = 2166136261;
+    const seen = new Map();
+    const add = s => { for (let i = 0; i < s.length; i++) hash = Math.imul(hash ^ s.charCodeAt(i), 16777619) >>> 0; };
+    const visit = v => {
+      if (typeof v === 'function' || v === undefined) return;
+      if (v === null) { add('null;'); return; }
+      if (typeof v !== 'object') { add(typeof v + ':' + (typeof v === 'number' ? Math.round(v * 100) : v) + ';'); return; }
+      if (seen.has(v)) { add('@' + seen.get(v) + ';'); return; }
+      seen.set(v, seen.size);
+      if (v instanceof Map || v instanceof Set) { for (const x of v) visit(x); return; }
+      for (const k of Object.keys(v).sort()) {
+        if (omit.has(k) || typeof v[k] === 'function') continue;
+        add(k + ':'); visit(v[k]);
+      }
+    };
+    visit({ fighters: this.fighters, projectiles: this.projectiles, items: this.items, stage: this.stage, ms: this.ms, mods: this.mods, rules: this.rules, rng: this.rng, t: this.t, phase: this.phase, introT: this.introT, endT: this.endT, timer: this.timer, paused: this.paused, slow: this.slow, slowCd: this.slowCd });
+    return hash.toString(16).padStart(8, '0');
   }
   // online (anfitrión): leer los controles remotos y publicar el estado
   netTick() {

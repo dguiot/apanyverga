@@ -4,16 +4,18 @@
 // ============================================================
 let BATTLE = null; // estado de la pelea activa
 
-function shake(n) { if (BATTLE && !reducedMotion) BATTLE.shake = Math.max(BATTLE.shake, n); }
-function flash(a) { if (BATTLE) BATTLE.flash = Math.max(BATTLE.flash, a); }
-function dim(frames) { if (BATTLE) BATTLE.dim = Math.max(BATTLE.dim, frames); }
-function banner(txt, col) { if (BATTLE) BATTLE.banners.push({ txt, col: col || '#f1f5f9', t: 0 }); NetEv.push(['b', txt, col || '#f1f5f9']); }
+function shake(n) { if (BATTLE && !BATTLE.resim && !reducedMotion) BATTLE.shake = Math.max(BATTLE.shake, n); }
+function flash(a) { if (BATTLE && !BATTLE.resim) BATTLE.flash = Math.max(BATTLE.flash, a); }
+function dim(frames) { if (BATTLE && !BATTLE.resim) BATTLE.dim = Math.max(BATTLE.dim, frames); }
+function banner(txt, col) { if (BATTLE && BATTLE.resim) return; if (BATTLE) BATTLE.banners.push({ txt, col: col || '#f1f5f9', t: 0 }); NetEv.push(['b', txt, col || '#f1f5f9']); }
 function opponentsOf(f) { return BATTLE.fighters.filter(o => o !== f && !o.dead && o.stocks > 0 && !sameTeam(o, f)); }
 function countProj(f, type) { return BATTLE.projectiles.filter(p => p.owner === f && p.type === type).length; }
 
 // ---------- efectos ----------
 function spawnFx(type, x, y, o = {}) {
-  if (!BATTLE) return;
+  if (!BATTLE || BATTLE.resim) return;
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const pick = arr => arr[Math.floor(Math.random() * arr.length)];
   if (NetEv.on && NET_FX.has(type)) NetEv.push(['f', type, ri(x), ri(y), o.col || 0, type === 'wind' || type === 'claw' ? o.dir : (o.r ? ri(o.r) : 0), o.txt || 0, o.life || 0, o.ang ? Math.round(o.ang * 100) / 100 : 0]);
   const fx = Object.assign({ type, x, y, t: 0, life: 20, vx: 0, vy: 0, r: 10, col: '#fff' }, o);
   switch (type) {
@@ -44,6 +46,7 @@ function spawnFx(type, x, y, o = {}) {
 }
 // estela de humo detrás de quien sale volando (cuanto más rápido, más densa)
 function launchTrails(B) {
+  if (B.resim) return;
   for (const f of B.fighters) {
     const px = f._ltx, py = f._lty; f._ltx = f.x; f._lty = f.y;
     if (px === undefined || f.dead || f.state !== 'hitstun' || f.hitlag > 0) continue;
@@ -54,6 +57,7 @@ function launchTrails(B) {
   }
 }
 function updateFx() {
+  if (BATTLE.resim) return;
   for (const p of BATTLE.fx) {
     p.t++; p.x += p.vx; p.y += p.vy;
     if (p.type === 'coin') p.vy += 0.4;
@@ -199,7 +203,7 @@ function applyHit(att, t, hit, dir, opts = {}) {
   if (t.state === 'shield' && t.shieldHP > 0 && !opts.unblockable) {
     // parry: el escudo recién levantado detiene el golpe sin desgaste y deja al atacante expuesto
     // la CPU solo acierta un parry de vez en cuando (según su nivel); una persona siempre que lo clave
-    const cpuParry = !t.cpu || Math.random() < (t.brain && t.brain.L ? t.brain.L.lv : 5) * 0.03;
+    const cpuParry = !t.cpu || simRandom() < (t.brain && t.brain.L ? t.brain.L.lv : 5) * 0.03;
     if (t.sf <= PHYS.parry && cpuParry) {
       t.shieldStun = 0; t.invuln = Math.max(t.invuln, 10); t.vx = 0;
       if (att && !opts.proj) { att.hitlag = Math.max(att.hitlag, 12); att.vx = -dir * 3; att.parried = 30; }

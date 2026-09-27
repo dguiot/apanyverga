@@ -5,8 +5,6 @@
 APP.battleUpdate = function () {
   if (!this.battle) return;
   this.battle.update();
-  // Modo Fiesta "Turbo": un paso extra cada dos fotogramas (x1.5)
-  if (this.battle && this.battle.mods && this.battle.mods.turbo && this.t % 2 === 0 && !this.battle.paused) this.battle.update();
 };
 APP.battleDraw = function () { if (this.battle) this.battle.draw(); };
 

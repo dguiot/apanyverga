@@ -802,7 +802,7 @@ class Fighter {
     const B = BATTLE;
     Audio8.sfx('ko'); shake(18); Rumble.ko(this);
     if (B.phase === 'fight' && this.lastHitBy && this.lastHitBy !== this) Rumble.scored(this.lastHitBy);
-    B.koFx.push({ x: clamp(this.x, B.stage.blast.l, B.stage.blast.r), y: clamp(this.y - 40, B.stage.blast.t, B.stage.blast.b), col: this.color, t: 0 });
+    if (!B.resim) B.koFx.push({ x: clamp(this.x, B.stage.blast.l, B.stage.blast.r), y: clamp(this.y - 40, B.stage.blast.t, B.stage.blast.b), col: this.color, t: 0 });
     NetEv.push(['k', ri(clamp(this.x, B.stage.blast.l, B.stage.blast.r)), ri(clamp(this.y - 40, B.stage.blast.t, B.stage.blast.b)), this.color]);
     if (this.grabbing) this.releaseGrab();
     if (this.grabbedBy) this.grabbedBy.releaseGrab();
@@ -838,7 +838,7 @@ class Fighter {
   // ---------- pose ----------
   updatePose() {
     let tgt, k = 0.35, sq = 0; // sq: aplastamiento (+) o estiramiento (−)
-    const t = performance.now() / 1000;
+    const t = BATTLE.t / 60;
     switch (this.state) {
       case 'idle': tgt = stancePose(this, t); k = 0.28; break;
       case 'walk': this.phase += Math.abs(this.vx) * 0.085; tgt = walkPose2(this.phase); k = 0.4; break;
@@ -881,7 +881,7 @@ class Fighter {
     // aplastar al caer y al agacharse para saltar; estirar al despegar
     this.sq = lerp(this.sq || 0, sq, 0.45);
     this.pose.sx = 1 + this.sq * 0.6; this.pose.sy = 1 - this.sq;
-    recordSwoosh(this);
+    if (!BATTLE.resim) recordSwoosh(this);
   }
 
   // ---------- dibujo ----------
