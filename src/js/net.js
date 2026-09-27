@@ -49,13 +49,14 @@ function inviteCodeFromURL() {
   try { const c = new URLSearchParams(location.search).get('sala'); return c ? c.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6) || null : null; } catch (e) { return null; }
 }
 const Net = {
-  code: null, wantCode: inviteCodeFromURL(),
+  code: null, wantCode: inviteCodeFromURL(), lastRoomCode: null,
   room: null, user: null, ok: false, tried: false, conn: false,
   role: 'off', hostPeer: null, localDev: 'kb1', names: {}, asked: {},
   lob: { ph: 'lobby', ep: 0 }, lastLobJSON: '', view: null, lastSnap: null, lastEv: 0, lostHostT: 0,
   guest: { ch: 0, rdy: 0, cnt: BUTTONS.map(() => 0) },
   async init() {
     if (this.tried) return; this.tried = true;
+    try { this.lastRoomCode = localStorage.getItem('apyv-last-room-v1'); } catch (e) { /* sin almacenamiento */ }
     try {
       if (!window.claude || typeof window.claude.use !== 'function') return;
       this.room = await window.claude.use('room');
@@ -74,8 +75,14 @@ const Net = {
   byOf(peer) { const p = this.peers().find(x => x.peer === peer); return p && p.by ? p.by : null; },
   presOf(peer) { const p = this.peers().find(x => x.peer === peer); return p && p.presence && p.presence.g === 'golpazo' ? p.presence : null; },
   hosts() { return this.peers().filter(p => p.presence && p.presence.g === 'golpazo' && p.presence.role === 'host' && p.presence.lob); },
+  availableHosts() { return this.hosts().filter(h => !h.sameTab).sort((a, b) => Number(b.presence.code === this.lastRoomCode) - Number(a.presence.code === this.lastRoomCode)); },
   hostByCode(code) { return code ? this.hosts().find(h => !h.sameTab && h.presence.code === code) || null : null; },
   codeOf(peer) { const p = this.presOf(peer); return p && p.code ? p.code : null; },
+  rememberRoom(code) {
+    if (!code || code === this.lastRoomCode) return;
+    this.lastRoomCode = code;
+    try { localStorage.setItem('apyv-last-room-v1', code); } catch (e) { /* sin almacenamiento */ }
+  },
   // ---------- invitar ----------
   inviteURL() {
     if (!window.APYV_WEB || !this.code) return null;
@@ -121,6 +128,7 @@ const Net = {
 
   // ---------- papel de anfitrión ----------
   host() {
+    Tourney.stop();
     this.role = 'host'; this.localDev = 'local'; this.hostPeer = this.myPeer(); // un jugador por pantalla: juega con todo lo conectado
     this.lob = { ph: 'lobby', ep: (this.lob.ep || 0) + 1 };
     if (!this.code) this.code = roomCode(); // el mismo en toda la visita: el link que ya mandaste sigue sirviendo
@@ -128,12 +136,15 @@ const Net = {
     this.lastLobJSON = '';
   },
   join(peer) {
+    Tourney.stop();
+    this.rememberRoom(this.codeOf(peer));
     this.role = 'guest'; this.hostPeer = peer; this.localDev = 'local'; // igual que el anfitrión: todo lo conectado
     this.guest = { ch: randi(0, CHAR_ORDER.length - 1), rdy: 0, tm: -1, cnt: BUTTONS.map(() => 0) };
     this.lastSnap = null; this.lastEv = 0; this.view = null; this.lostHostT = 0;
     this.set({ role: 'guest', join: peer, ch: this.guest.ch, rdy: 0, tm: -1, lob: null, st: null });
   },
   leave() {
+    Tourney.stop();
     this.stopRollback();
     if (typeof AV !== 'undefined' && AV.on) AV.stop(true);
     this.role = 'off'; this.hostPeer = null; NetEv.on = false; this.view = null;
@@ -337,15 +348,27 @@ const Net = {
     if (this.rbCap !== cap) { this.rbCap = cap; this.set({ rbc: cap }); }
     if (this.role === 'host') {
       if (['modesel', 'charsel', 'stagesel'].includes(APP.screen)) { this.syncSlots(); this.publishLobby({ ph: 'lobby' }); }
+      if (Tourney.active && APP.screen === 'battle' && Tourney.match()) {
+        const m = Tourney.match();
+        for (const id of [m.a, m.b]) if (id >= 0 && Tourney.entrants[id]?.remote) {
+          Tourney.missing[id] = this.presOf(Tourney.entrants[id].remote) ? 0 : (Tourney.missing[id] || 0) + 1;
+          if (Tourney.missing[id] > 180) Tourney.interrupted = true;
+        }
+      }
     } else if (this.role === 'guest') {
       if (!this.rollbackSession) this.sendInput();
       const hp = this.hostPres();
       if (!hp || !hp.lob) {
-        if (++this.lostHostT > 150) { Toasts.push('El anfitrión cerró la sala'); this.leave(); APP.go('online'); }
+        if (++this.lostHostT > 300) { Toasts.push('Se perdió la sala. Puedes volver a entrar desde Jugar online.'); this.leave(); APP.go('online'); }
         return;
       }
       this.lostHostT = 0;
+      this.rememberRoom(hp.code);
       const lob = hp.lob;
+      if (lob.tr && (lob.ph === 'tour' || lob.ph === 'res')) Tourney.load(lob.tr);
+      if (lob.ph === 'tour' && lob.tr && APP.screen !== 'tournament') {
+        this.stopRollback(); APP.battle = null; this.view = null; BATTLE = null; APP.go('tournament');
+      }
       if (lob.ph === 'lobby' && APP.screen !== 'netroom') {
         if (['results', 'netview', 'vs'].includes(APP.screen)) { this.guest.rdy = 0; this.set({ rdy: 0 }); }
         this.stopRollback(); APP.battle = null; this.view = null; BATTLE = null; APP.go('netroom');
@@ -354,7 +377,8 @@ const Net = {
       if (lob.ph === 'game' && lob.set && (this.viewEp !== lob.ep || (!this.view && !this.rollbackSession))) {
         this.viewEp = lob.ep; this.stopRollback();
         const setup = this.decodeSetup(lob.set);
-        if (setup.rollback) {
+        const playing = setup.players.some(p => p.remote === this.myPeer());
+        if (setup.rollback && playing) {
           setup.players.forEach(p => { if (!p.cpu) p.dev = p.remote === this.myPeer() ? this.localDev : 'rb:' + p.port; });
           this.lob.ep = lob.ep; this.view = null; APP.startBattle(setup);
         } else { this.buildView(setup); APP.go('netview'); }

@@ -267,6 +267,7 @@ class Battle {
     if (this.dim > 0) { c.fillStyle = `rgba(6,10,20,${Math.min(0.5, this.dim / 30)})`; c.fillRect(0, 0, W, H); }
     this.drawOffscreen();
     this.drawNowPlaying();
+    if (typeof Prefs !== 'undefined' && Prefs.labels) this.drawFighterLabels();
     this.drawHUD();
     // con el marcador arriba (celular), lo de cada modo baja para no encimarse
     if (hudOnTop()) { c.save(); c.translate(0, 98); Modes.drawHUD(c, this); c.restore(); } else Modes.drawHUD(c, this);
@@ -357,6 +358,26 @@ class Battle {
       c.restore();
     }
   }
+  drawFighterLabels() {
+    for (const f of this.fighters) {
+      if (f.dead || f.hidden || f.stocks <= 0) continue;
+      const [x, y] = this.worldToScreen(f.x, f.y - 125 * f.size());
+      if (x < 30 || x > W - 30 || y < 80 || y > H - 110) continue;
+      const local = !f.cpu && (Net.role === 'off' || f.avPeer === Net.myPeer());
+      const tag = f.cpu ? 'CPU ' + (f.port + 1) : local ? 'TÚ · J' + (f.port + 1) : 'J' + (f.port + 1);
+      const status = f.finalReady ? 'FINAL' : f.state === 'dizzy' ? 'ATURDIDO' : f.shieldHP < 20 ? 'ESCUDO BAJO' : '';
+      const high = Prefs.contrast, width = status ? 156 : 100;
+      ctx.save();
+      ctx.fillStyle = high ? '#05070c' : 'rgba(6,8,14,.85)';
+      ctx.fillRect(x - width / 2, y - 16, width, status ? 44 : 27);
+      ctx.strokeStyle = f.color;
+      ctx.lineWidth = high || local ? 4 : 2;
+      ctx.strokeRect(x - width / 2, y - 16, width, status ? 44 : 27);
+      text(tag, x, y - 3, 15, high ? '#ffffff' : f.color, { body: true, weight: 800 });
+      if (status) text(status, x, y + 17, 12, status === 'ESCUDO BAJO' ? '#ffcc55' : '#ffffff', { body: true, weight: 800 });
+      ctx.restore();
+    }
+  }
   drawHUD() {
     const c = ctx, n = this.fighters.length;
     const cw = 268, gap = 14, total = n * cw + (n - 1) * gap;
@@ -365,7 +386,9 @@ class Battle {
       const x = x0, y = hudOnTop() ? 8 : H - 100;
       x0 += cw + gap;
       c.globalAlpha = f.stocks <= 0 ? 0.4 : 1;
-      slab(x, y, cw, 86, { skew: 0.25, edge: withAlpha(f.color, 0.95), lw: 2.5 });
+      slab(x, y, cw, 86, Prefs.contrast
+        ? { skew: 0.25, top: '#05070c', bottom: '#05070c', edge: f.color, lw: 4 }
+        : { skew: 0.25, edge: withAlpha(f.color, 0.95), lw: 2.5 });
       // retrato
       c.save(); slabPath(x + 14, y + 7, 84, 72, 0.25); c.clip();
       const pg = c.createLinearGradient(0, y, 0, y + 80); pg.addColorStop(0, withAlpha(f.color, 0.6)); pg.addColorStop(1, '#0b0e16');

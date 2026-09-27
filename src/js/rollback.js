@@ -198,6 +198,7 @@ class RollbackSession {
     this.ahead = leads.length ? Math.max(...leads) : 0;
     if (this.ahead > 1 && this.ticks % 3 === 0) return;
     this.simulate(this.frame++, false); this.advanceConfirmed();
+    if (this.host && Tourney.active && this.ticks % 2 === 0) Net.pushSnapshot(this.battle);
     for (const f of this.snapshots.keys()) if (f < this.frame - RB_WINDOW) this.snapshots.delete(f);
     // Se conserva un minuto de entradas para recuperar paquetes perdidos, sin crecer toda la visita.
     for (const m of [...this.real.values(), ...this.used.values(), this.hashes]) for (const f of m.keys()) if (f < this.frame - 3600) m.delete(f);

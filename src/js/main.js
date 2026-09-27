@@ -13,12 +13,12 @@ APP.battleDraw = function () { if (this.battle) { this.battle.draw(); if (this.b
 // quien usa lo suyo.
 // botón de cámara y voz (solo en las pantallas de una sala online)
 const AV_BTN = { x: W - 272, y: 14, w: 204, h: 40 };
-function avButtonShown() { return Net.ok && (Net.role === 'host' || Net.role === 'guest') && ['modesel', 'charsel', 'stagesel', 'netroom', 'results'].includes(APP.screen); }
+function avButtonShown() { return Net.ok && (Net.role === 'host' || Net.role === 'guest') && ['modesel', 'charsel', 'stagesel', 'netroom', 'results', 'tournament'].includes(APP.screen); }
 function kbShareNow() {
   let devs, full = false;
   if (Net.role === 'guest') { devs = [Net.localDev]; full = true; }
   else if (APP.screen === 'battle' && BATTLE && !BATTLE.demo) { devs = BATTLE.fighters.filter(f => !f.cpu && !f.netPeer).map(f => f.dev); full = true; }
-  else if (['charsel', 'stagesel', 'vs', 'results', 'netroom', 'modesel'].includes(APP.screen)) devs = APP.slots.filter(s => s.type === 'human' && !s.remote).map(s => s.dev);
+  else if (['charsel', 'stagesel', 'vs', 'results', 'netroom', 'modesel', 'tournament'].includes(APP.screen)) devs = APP.slots.filter(s => s.type === 'human' && !s.remote).map(s => s.dev);
   else return null;
   const kbs = devs.filter(d => d === 'kb1' || d === 'kb2');
   return kbs.length === 1 ? { dev: kbs[0], full } : null;

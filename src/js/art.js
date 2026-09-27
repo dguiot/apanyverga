@@ -46,13 +46,36 @@ const ART = {
   lowRes: 0,              // >0 mientras se pinta una miniatura (vista previa de escenario): capas chiquitas
   pxRes() { return this.lowRes || clamp(VIEW.scale * VIEW.dpr, 1, 2); },
   bgRes() { return this.lowRes || clamp(VIEW.scale * VIEW.dpr * 0.8, 0.7, 1.4); },
+  trim(bytes) {
+    const budget = (IS_XBOX ? 48 : 120) * 1024 * 1024;
+    let used = 0;
+    for (const old of this.store.values()) {
+      const cv = old && (old.img || old);
+      if (cv && cv.width && cv.height) used += cv.width * cv.height * 4;
+    }
+    for (const [oldKey, old] of this.store) {
+      if (used + bytes <= budget) break;
+      const cv = old && (old.img || old);
+      if (!cv || !cv.width || !cv.height) continue;
+      used -= cv.width * cv.height * 4;
+      this.store.delete(oldKey);
+    }
+  },
   // guarda lo que cuesta dibujar (se genera una vez por clave)
-  memo(key, make) { if (!this.store.has(key)) this.store.set(key, make()); return this.store.get(key); },
+  memo(key, make) {
+    if (this.store.has(key)) return this.store.get(key);
+    const value = make(), image = value && (value.img || value);
+    const bytes = image && image.width && image.height ? image.width * image.height * 4 : 0;
+    if (bytes) this.trim(bytes);
+    this.store.set(key, value);
+    return value;
+  },
   // lienzo horneado en coordenadas del mundo: {img, x, y, w, h}
   bake(key, x, y, w, h, draw, res) {
     // ninguna capa pasa de 4096 pixeles por lado (los mundos grandes miden más de 3000 de ancho)
     const R = Math.min(res || this.pxRes(), 4096 / Math.max(w, h, 1), this.lowRes || 9);
     return this.memo(key + '@' + R.toFixed(2), () => {
+      this.trim(Math.ceil(w * R) * Math.ceil(h * R) * 4);
       const cv = mkCanvas(w * R, h * R), c = cv.getContext('2d');
       c.scale(R, R); c.translate(-x, -y); draw(c);
       return { img: cv, x, y, w, h };
@@ -87,6 +110,7 @@ const ART = {
     });
   },
   drawGlow(c, x, y, r, col, a = 1) {
+    if (typeof Prefs !== 'undefined' && Prefs.fx === 'low') return;
     const pa = c.globalAlpha, pc = c.globalCompositeOperation;
     c.globalAlpha = pa * a; c.globalCompositeOperation = 'lighter';
     c.drawImage(this.glow(col), x - r, y - r, r * 2, r * 2);
@@ -252,6 +276,7 @@ const ART = {
   },
   // baja la calidad sola si dibujar un cuadro tarda demasiado
   measure(ms) {
+    if (typeof Prefs !== 'undefined' && Prefs.quality === 'sharp') return;
     this.frameMs = lerp(this.frameMs, ms, 0.05);
     if (this.hi && this.frameMs > 22) { if (++this.slow > 120) { this.hi = false; this.slow = 0; } }
     // ya sin brillo y todavía lento: menos pixeles (hasta 60%), una vez cada 3 s

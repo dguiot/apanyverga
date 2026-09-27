@@ -115,7 +115,7 @@ function wrapText(str, x, y, maxW, size, lh, col, align = 'center') {
 const APP = {
   screen: 'title', t: 0, idle: 0, battle: null, results: null, firstDev: null,
   slots: [{ type: 'none' }, { type: 'none' }, { type: 'none' }, { type: 'none' }],
-  rules: { mode: 'stock', stocks: 3, time: 3, items: 2, teams: false, party: false },
+  rules: { mode: 'stock', stocks: 3, time: 3, items: 2, teams: false, party: false, tournament: false },
   cpuLevel: 5, stageSel: 0, stageRow: 0, menuSel: 0, ctrlTab: 0, lastSetup: null, pendingSetup: null,
   bind: { col: 0, dev: 0, row: 0, msg: '' },
   go(s) {
@@ -125,7 +125,7 @@ const APP = {
     if (s === 'fame' && prev !== 'fame') Fame.open();
     // versión web: la primera vez que entras al online te pregunta cómo te llamas
     if (s === 'online' && window.APYV_WEB && Net.user && Net.user.askName) setTimeout(() => Net.user.askName(), 60);
-    if (['title', 'main', 'modesel', 'charsel', 'stagesel', 'controls', 'binds', 'fame'].includes(s)) Audio8.playSong('menu');
+    if (['title', 'main', 'modesel', 'charsel', 'stagesel', 'controls', 'binds', 'fame', 'settings', 'tournament'].includes(s)) Audio8.playSong('menu');
     if (s === 'modesel') this.modeSel = Math.max(0, MODES.findIndex(m => m.id === this.rules.mode));
   },
   startBattle(setup) {
@@ -148,9 +148,10 @@ const APP = {
     this.battle = new Battle(setup, { demo: true }); this.go('demo');
   },
   showResults(r) {
+    if (Tourney.active && Net.role !== 'guest') Tourney.record(r);
     this.results = r; BATTLE = null; this.battle = null; this.go('results'); Audio8.playSong('results');
     const rec = Net.role === 'host' ? Fame.recordOf(r, this.lastSetup) : null;
-    if (Net.role === 'host') { NetEv.on = false; Net.set({ st: null }); Net.publishLobby({ ph: 'res', res: Net.encodeResults(r), fm: rec }); }
+    if (Net.role === 'host') { NetEv.on = false; Net.set({ st: null }); Net.publishLobby({ ph: 'res', res: Net.encodeResults(r), fm: rec, tr: Tourney.active ? Tourney.snapshot() : null }); }
     if (rec) Fame.save(rec, false);
   },
   update() {
@@ -178,6 +179,10 @@ const APP = {
     TouchPad.draw();
     IOSFS.update();
     Toasts.draw();
+    if (Net.role === 'guest' && Net.lostHostT > 45) {
+      slab(W / 2 - 290, 60, 580, 52, { edge: '#ffbe0b' });
+      text('Reconectando con la sala… ' + Math.max(0, Math.ceil((300 - Net.lostHostT) / 60)) + ' s', W / 2, 86, 20, GOLD, { body: true, weight: 700 });
+    }
     const sx = W - 58, sy = 14;
     if (!['battle', 'demo', 'vs', 'netview'].includes(this.screen)) {
       slab(sx, sy, 46, 40, { skew: 0.2 });
@@ -204,11 +209,16 @@ const APP = {
     const cardsR = () => { const c = []; for (let i = 0; i <= NCH(); i++) c.push(this.cardRect(i)); return c; };
     switch (this.screen) {
       case 'title': case 'results': return { items: [] };
+      case 'tournament': return { items: [] };
+      case 'settings': {
+        const it = Array.from({ length: 5 }, (_, i) => R(290, 170 + i * 78, 700, 66));
+        return { items: it, cur: it[this.settingsSel], own: k => k === 'left' || k === 'right', sel: i => { this.settingsSel = i; } };
+      }
       case 'fame': return { items: [], own: k => k === 'up' || k === 'down' }; // ↑↓ recorre la tabla
       case 'main': { const it = this.mainOptions().map((o, i) => R(W / 2 - 230, this.mainY(i), 460, 50)); return { items: it, cur: it[this.menuSel], sel: i => { this.menuSel = i; } }; }
       case 'online': {
         if (!Net.ok) return { items: [] };
-        const n0 = Net.hosts().filter(h => !h.sameTab).length + 1, it = [];
+        const n0 = Net.availableHosts().length + 1, it = [];
         for (let i = 0; i < n0; i++) it.push(R(W / 2 - 300, 200 + i * 70, 600, 58));
         return { items: it, cur: it[clamp(this.onSel, 0, n0 - 1)], sel: i => { this.onSel = i; } };
       }
@@ -242,7 +252,7 @@ const APP = {
           sel: k => { if (k < cards.length) { this.stageSel = idx[k]; this.stageRow = 0; } else this.stageRow = k - cards.length + 1; } };
       }
       case 'binds': {
-        const B = this.bind, devs = Devices.list.map((x, i) => R(40, 120 + i * 62, 330, 52)), rows = this.bindRows(Devices.list[clamp(B.dev, 0, Devices.list.length - 1)]).map((r, i) => R(410, 116 + i * 40, 830, 36));
+        const B = this.bind, devs = Devices.list.map((x, i) => R(40, 120 + i * 62, 330, 52)), rows = this.bindRows(Devices.list[clamp(B.dev, 0, Devices.list.length - 1)]).map((r, i) => R(410, 112 + i * 35, 830, 32));
         if (B.col === 0) return { items: devs, cur: devs[clamp(B.dev, 0, devs.length - 1)], hide: rows, own: k => k === 'right', sel: i => { B.dev = i; } };
         return { items: rows, cur: rows[clamp(B.row, 0, rows.length - 1)], hide: devs, own: k => k === 'left', sel: i => { B.row = i; } };
       }
@@ -292,8 +302,8 @@ const APP = {
   demoDraw() { if (this.battle) this.battle.draw(); },
 
   // ---------------- MENÚ PRINCIPAL ----------------
-  mainOptions() { return ['Pelear', 'Jugar online', 'Salón de la fama', 'Cómo jugar', 'Configurar botones', `Sonido: ${({ all: 'Sí', fx: 'Solo efectos', off: 'No' })[Audio8.soundMode()]}`, `Vibración del control: ${Rumble.on ? 'Sí' : 'No'}`]; },
-  mainY(i) { return 228 + i * 58; },
+  mainOptions() { return ['Pelear', 'Jugar online', 'Torneo entre amigos', 'Salón de la fama', 'Cómo jugar', 'Configurar botones', 'Ajustes visuales', `Sonido: ${({ all: 'Sí', fx: 'Solo efectos', off: 'No' })[Audio8.soundMode()]}`, `Vibración del control: ${Rumble.on ? 'Sí' : 'No'}`]; },
+  mainY(i) { return 188 + i * 51; },
   mainUpdate() {
     const opts = this.mainOptions();
     for (const d of Devices.list) {
@@ -308,16 +318,27 @@ const APP = {
   mainChoose(i) {
     Audio8.sfx('confirm');
     if (i === 0) {
+      this.rules.tournament = false;
       // lugares que quedaron de una sala en línea (invitados, el aparato "local") no sirven aquí
       if (!this.slots.some(s => s.type === 'human') || this.slots.some(s => s.remote || s.dev === 'local')) this.slots = [{ type: 'human', dev: this.firstDev || 'kb1', cur: 0, ready: false, edit: 0 }, { type: 'none' }, { type: 'none' }, { type: 'none' }];
       this.modeBack = 'main'; this.go('modesel');
     }
     if (i === 1) { this.onSel = 0; this.go('online'); }
-    if (i === 2) this.go('fame');
-    if (i === 3) this.go('controls');
-    if (i === 4) { this.bind = { col: 0, dev: Math.max(0, Devices.list.indexOf(this.firstDev)), row: 0, msg: '' }; this.go('binds'); }
-    if (i === 5) Audio8.cycleSound();
-    if (i === 6) {
+    if (i === 2) {
+      this.rules.tournament = true;
+      this.rules.mode = 'stock';
+      this.rules.teams = false;
+      this.rules.party = false;
+      this.modeBack = 'main';
+      this.slots = [{ type: 'human', dev: this.firstDev || 'kb1', cur: 0, ready: false, edit: 0 }, { type: 'none' }, { type: 'none' }, { type: 'none' }];
+      this.go('charsel');
+    }
+    if (i === 3) this.go('fame');
+    if (i === 4) this.go('controls');
+    if (i === 5) { this.bind = { col: 0, dev: Math.max(0, Devices.list.indexOf(this.firstDev)), row: 0, msg: '' }; this.go('binds'); }
+    if (i === 6) { this.settingsSel = 0; this.go('settings'); }
+    if (i === 7) Audio8.cycleSound();
+    if (i === 8) {
       Rumble.set(!Rumble.on);
       // al prenderla, todos los controles conectados dan un tirón para comprobar que vibran
       if (Rumble.on) { const pads = Devices.list.filter(d => d.startsWith('pad')); for (const d of pads) Rumble.play(d, 0.6, 0.8, 260);
@@ -326,13 +347,13 @@ const APP = {
   },
   mainDraw() {
     drawMenuBG(1);
-    logo(W / 2, 118, 0.62);
+    logo(W / 2, 98, 0.5);
     this.mainOptions().forEach((o, i) => {
       const y = this.mainY(i), sel = i === this.menuSel || hover(W / 2 - 230, y, 460, 50);
       sfButton(o, W / 2 - 230 + (sel ? 12 : 0), y, 460, 50, sel);
     });
-    const desc = ['Hasta 4 jugadores en esta pantalla: 6 modos, equipos y Modo Fiesta', 'Pelea con tus amigos, cada quien desde su casa', 'Ranking de tus amigos por cuenta: victorias, rachas y KOs', 'Combinaciones de golpes y prueba de control', 'Cambia las teclas y los botones del control', 'Todo · solo efectos (sin música) · nada', 'El control vibra al pegar, al recibir golpes y al salir volando'][this.menuSel];
-    text(desc, W / 2, 660, 18, '#cbd5e1', { body: true, weight: 500 });
+    const desc = ['Hasta 4 jugadores en esta pantalla: 6 modos, equipos y Modo Fiesta', 'Pelea con tus amigos, cada quien desde su casa', 'Eliminación directa de 2 a 4 amigos, local o en una sala', 'Ranking de tus amigos por cuenta: victorias, rachas y KOs', 'Combinaciones de golpes y prueba de control', 'Cambia las teclas y los botones del control', 'Calidad, efectos, movimiento y contraste', 'Todo · solo efectos (sin música) · nada', 'El control vibra al pegar, al recibir golpes y al salir volando'][this.menuSel];
+    text(desc, W / 2, 662, 16, '#cbd5e1', { body: true, weight: 500 });
     text('A / J / Enter: aceptar   ·   B / K / Esc: volver', W / 2, 694, 14, MUTED, { body: true });
   },
 
@@ -394,10 +415,11 @@ const APP = {
     return this.go('main');
   },
   toggleTeams() {
+    if (this.rules.tournament) { this.rules.tournament = false; Toasts.push('Torneo desactivado: elegiste equipos'); }
     if (this.rules.mode === 'soccer') { Audio8.sfx('back'); Toasts.push('En Fútbol siempre se juega por equipos'); return; }
     this.rules.teams = !this.rules.teams; Audio8.sfx('menu');
   },
-  toggleParty() { this.rules.party = !this.rules.party; Audio8.sfx('menu'); },
+  toggleParty() { if (this.rules.tournament) { this.rules.tournament = false; Toasts.push('Torneo desactivado: elegiste Modo Fiesta'); } this.rules.party = !this.rules.party; Audio8.sfx('menu'); },
   modeContinue() {
     Audio8.sfx('confirm');
     if (!this.slots.some(s => s.type === 'human') && Net.role !== 'host') this.slots = [{ type: 'human', dev: this.firstDev || 'kb1', cur: 0, ready: false, edit: 0 }, { type: 'none' }, { type: 'none' }, { type: 'none' }];
@@ -481,7 +503,7 @@ const APP = {
         if (n.left || n.right) { S.focus = (S.focus + (n.left ? 3 : 1)) % 4; Audio8.sfx('menu'); continue; }
         if (F.type === 'cpu' && (n.up || n.down)) { F.level = clamp(F.level + (n.up ? 1 : -1), 1, AI_MAX); this.cpuLevel = F.level; Audio8.sfx('menu'); continue; }
         if (n.shield && this.teamsOn()) { const X = F.type !== 'none' && !F.remote ? F : S; X.team = X.team ? 0 : 1; Audio8.sfx('menu'); continue; }
-        if (n.confirm && F.type === 'none') { sl[S.focus] = this.newCPU(false, S.focus); S.edit = S.focus; Audio8.sfx('confirm'); continue; }
+        if (n.confirm && F.type === 'none' && !this.rules.tournament) { sl[S.focus] = this.newCPU(false, S.focus); S.edit = S.focus; Audio8.sfx('confirm'); continue; }
         if (n.confirm && F.type === 'cpu') { F.ready = false; S.edit = S.focus; Audio8.sfx('confirm'); continue; }
         if (n.grab && F.type === 'cpu') { sl[S.focus] = { type: 'none' }; Audio8.sfx('back'); continue; }
         if (n.back && S.focus !== si) { S.focus = si; Audio8.sfx('back'); continue; }
@@ -505,7 +527,7 @@ const APP = {
         else { sl[si] = { type: 'none' }; if (!sl.some(s => s.type === 'human')) { this.slots = sl.map(() => ({ type: 'none' })); return this.go('modesel'); } }
       } else if (n.jump && S.ready) {
         const free = sl.findIndex(s => s.type === 'none');
-        if (free >= 0) { sl[free] = this.newCPU(false, free); S.edit = free; S.focus = free; Audio8.sfx('confirm'); }
+        if (free >= 0 && !this.rules.tournament) { sl[free] = this.newCPU(false, free); S.edit = free; S.focus = free; Audio8.sfx('confirm'); }
       } else if (n.grab) {
         for (let i = 3; i >= 0; i--) if (sl[i].type === 'cpu') { sl[i] = { type: 'none' }; Audio8.sfx('back'); break; }
       }
@@ -526,6 +548,7 @@ const APP = {
       const r = this.slotRect(i), s = sl[i], b = this.slotButton(i);
       if (b && clickIn(b.x, b.y, b.w, b.h)) {
         if (b.kind === 'toCPU') {
+          if (this.rules.tournament) { Toasts.push('En el torneo solo participan personas'); continue; }
           if (sl.filter(x => x.type === 'human' && !x.remote).length <= 1) { Toasts.push('Necesitas al menos un jugador'); Audio8.sfx('back'); continue; }
           sl[i] = { type: 'cpu', cur: s.cur >= NCH() ? randi(0, NCH() - 1) : s.cur, ready: true, pick: s.pick || CHAR_ORDER[s.cur] || pick(CHAR_ORDER), level: this.cpuLevel, team: s.team };
           sl.forEach(x => { if (x.type === 'human' && x.edit === i) x.edit = sl.indexOf(x); });
@@ -540,7 +563,7 @@ const APP = {
       if (s.type !== 'none' && this.teamsOn() && clickIn(r.x + 86, r.y + 12, 108, 28)) { s.team = s.team ? 0 : 1; Audio8.sfx('menu'); continue; }
       if (s.remote) continue;
       if (clickIn(r.x, r.y, r.w, r.h - 100)) {
-        if (s.type === 'none') { sl[i] = this.newCPU(true, i); Audio8.sfx('confirm'); }
+        if (s.type === 'none' && !this.rules.tournament) { sl[i] = this.newCPU(true, i); Audio8.sfx('confirm'); }
         else if (s.type === 'cpu') { sl[i] = { type: 'none' }; Audio8.sfx('back'); }
         else if (s.type === 'human') s.ready = false;
       }
@@ -553,7 +576,7 @@ const APP = {
     if (this.screen !== 'charsel') return null;
     const s = this.slots[i], r = this.slotRect(i);
     if (s.type === 'cpu') return { kind: 'remove', x: r.x + r.w - 48, y: r.y + 10, w: 34, h: 30 };
-    if (s.type === 'human' && !s.remote && Net.role !== 'host') return { kind: 'toCPU', x: r.x + 160, y: r.y + r.h - 92, w: 116, h: 32 };
+    if (s.type === 'human' && !s.remote && Net.role !== 'host' && !this.rules.tournament) return { kind: 'toCPU', x: r.x + 160, y: r.y + r.h - 92, w: 116, h: 32 };
     return null;
   },
   teamsOn() { return this.rules.teams || this.rules.mode === 'soccer'; },
@@ -576,6 +599,10 @@ const APP = {
   },
   toStages() {
     const sl = this.slots;
+    if (this.rules.tournament && (sl.filter(s => s.type === 'human' && s.ready).length < 2 || sl.some(s => s.type === 'cpu'))) {
+      Toasts.push('El torneo necesita 2 a 4 personas listas, sin CPU');
+      return;
+    }
     if (sl.filter(s => s.type !== 'none').length < 2) {
       const free = sl.findIndex(s => s.type === 'none');
       sl[free] = this.newCPU(true, free);
@@ -761,6 +788,7 @@ const APP = {
   ruleRows() {
     const r = this.rules, m = MODE_BY_ID[r.mode] || MODES[0];
     const cycleMode = d => {
+      if (r.tournament) { r.tournament = false; Toasts.push('Torneo desactivado: cambiaste el modo'); }
       const i = MODES.findIndex(x => x.id === r.mode);
       r.mode = MODES[(i + d + MODES.length) % MODES.length].id;
       if (r.mode === 'soccer') { this.stageSel = this.soccerStage(); this.toStagesTeams(); }
@@ -773,9 +801,13 @@ const APP = {
       { label: 'Objetos', val: ['Ninguno', 'Pocos', 'Normal', 'Muchos'][r.items], ch: d => { r.items = (r.items + d + 4) % 4; } },
       { label: 'Equipos', val: this.teamsOn() ? 'Sí' : 'No', ch: () => { this.toggleTeams(); if (this.teamsOn()) this.toStagesTeams(); } },
       { label: 'Modo Fiesta', val: r.party ? 'Sí' : 'No', ch: () => this.toggleParty() },
+      { label: 'Torneo', val: r.tournament ? 'Sí' : 'No', ch: () => {
+        r.tournament = !r.tournament;
+        if (r.tournament) { r.mode = 'stock'; r.teams = false; r.party = false; }
+      } },
     ];
   },
-  ruleY(i) { return 390 + i * 38; },
+  ruleY(i) { return 374 + i * 35; },
   soccerStage() { return Math.max(0, STAGE_INFO.findIndex(s => s.id === 'stadium')); },
   stageLocked(i) { return this.rules.mode === 'soccer' && i !== this.soccerStage(); },
   // al cambiar a Fútbol desde aquí: equipos forzados y repartidos
@@ -833,6 +865,7 @@ const APP = {
     });
     const rules = Object.assign({}, this.rules, { teams });
     const setup = { players, stage: STAGE_INFO[this.stageSel].id, rules, party: rules.party ? pick(PARTY).id : null };
+    if (rules.tournament) { Tourney.begin(setup); return; }
     if (Net.role === 'host') Net.startMatch(setup);
     this.showVS(setup);
   },
@@ -888,11 +921,11 @@ const APP = {
     });
     if (this.rules.mode === 'soccer') text('El Fútbol se juega en el Estadio: tiene porterías', W / 2, 70, 13, TEAL, { body: true, weight: 700 });
     const rows = this.ruleRows();
-    slab(W / 2 - 320, 380, 640, 204, { skew: 0.08 });
+    slab(W / 2 - 320, 368, 640, 218, { skew: 0.08 });
     rows.forEach((row, i) => {
       const y = this.ruleY(i), sel = this.stageRow === i + 1;
-      if (sel) { slabPath(W / 2 - 290, y - 2, 580, 38, 0.3); ctx.fillStyle = 'rgba(255,197,61,.14)'; ctx.fill(); }
-      sfText(row.label, W / 2 - 250, y + 17, 26, sel ? GOLD : PAPER, { align: 'left' });
+      if (sel) { slabPath(W / 2 - 290, y - 2, 580, 34, 0.3); ctx.fillStyle = 'rgba(255,197,61,.14)'; ctx.fill(); }
+      sfText(row.label, W / 2 - 250, y + 17, 23, sel ? GOLD : PAPER, { align: 'left' });
       slab(W / 2 + 10, y, 50, 34, { skew: 0.25 }); sfText('‹', W / 2 + 35, y + 17, 28, PAPER);
       slab(W / 2 + 210, y, 50, 34, { skew: 0.25 }); sfText('›', W / 2 + 235, y + 17, 28, PAPER);
       const on = row.val === 'Sí';
@@ -966,7 +999,7 @@ const APP = {
       if (clickIn(40, 660, 170, 44)) this.go('main');
       return;
     }
-    const hosts = Net.hosts().filter(h => !h.sameTab);
+    const hosts = Net.availableHosts();
     const n0 = hosts.length + 1;
     this.onSel = clamp(this.onSel, 0, n0 - 1);
     if (Net.wantCode) {
@@ -1011,14 +1044,14 @@ const APP = {
       sfButton('‹ Volver', 40, 660, 170, 44, hover(40, 660, 170, 44));
       return;
     }
-    const hosts = Net.hosts().filter(h => !h.sameTab);
+    const hosts = Net.availableHosts();
     const here = Net.peers().filter(p => p.presence && p.presence.g === 'golpazo');
     text(`${Net.conn ? '● Conectado' : '○ Conectando…'}  ·  Aquí ahora: ${here.map(p => p.sameTab ? 'Tú' : Net.nameOf(p.peer)).join(', ') || 'solo tú'}`, W / 2, 96, 15, Net.conn ? TEAL : MUTED, { body: true, weight: 600 });
     const rows = [{ label: 'Crear sala', sub: 'Tú eres el anfitrión: eliges el escenario y las reglas' }].concat(hosts.map(h => {
       const lob = h.presence.lob || {}, sl = lob.sl || [];
       const used = sl.filter(x => x[0] !== 'n').length;
-      const ph = lob.ph === 'lobby' ? 'eligiendo personajes' : lob.ph === 'res' ? 'viendo resultados' : 'peleando (entra a ver)';
-      return { label: `Sala de ${Net.nameOf(h.peer)}`, sub: `${h.presence.code ? 'código ' + h.presence.code + ' · ' : ''}${used}/4 · ${ph}` };
+      const ph = lob.ph === 'lobby' ? 'eligiendo personajes' : lob.ph === 'tour' ? 'torneo en curso' : lob.ph === 'res' ? 'viendo resultados' : 'peleando (entra a ver)';
+      return { label: 'Sala de ' + Net.nameOf(h.peer) + (h.presence.code === Net.lastRoomCode ? ' · Última sala' : ''), sub: (h.presence.code ? 'código ' + h.presence.code + ' · ' : '') + used + '/4 · ' + ph };
     }));
     rows.forEach((r, i) => {
       const y = 200 + i * 70, sel = i === this.onSel || hover(W / 2 - 300, y, 600, 58);
@@ -1112,13 +1145,31 @@ const APP = {
     const dev = devs[B.dev], rows = this.bindRows(dev);
     const cap = pollCapture();
     if (cap) {
-      if (cap.bind) { Binds.bind(dev, rows[B.row].a, cap.bind); B.msg = `${rows[B.row].label}: ${bindName(cap.bind)}`; Audio8.sfx('confirm'); }
-      else { B.msg = 'Cancelado'; Audio8.sfx('back'); }
+      if (cap.bind) {
+        const action = B.guide ? B.guide[B.guideAt] : rows[B.row].a;
+        Binds.bind(dev, action, cap.bind);
+        B.msg = ACTION_LABEL[action] + ': ' + bindName(cap.bind);
+        Audio8.sfx('confirm');
+        if (B.guide && ++B.guideAt < B.guide.length) {
+          B.msg = 'Paso ' + (B.guideAt + 1) + '/' + B.guide.length + ': ' + ACTION_LABEL[B.guide[B.guideAt]];
+          startCapture(dev, B.guide[B.guideAt]);
+          return;
+        }
+        if (B.guide) { B.guide = null; B.msg = 'Configuración rápida terminada'; }
+      } else { B.guide = null; B.msg = 'Cancelado'; Audio8.sfx('back'); }
       B.cool = 12;
       return;
     }
     if (Capture.active) return;
     if (B.cool > 0) { B.cool--; return; }
+    const quick = () => {
+      B.col = 0;
+      B.guide = ['left', 'right', 'up', 'down', 'attack', 'special', 'jump', 'shield', 'grab', 'start'];
+      B.guideAt = 0;
+      B.msg = 'Paso 1/' + B.guide.length + ': Izquierda';
+      startCapture(dev, B.guide[0]);
+      Audio8.sfx('menu');
+    };
     const act = r => {
       const row = rows[r];
       if (row.kind === 'act') { startCapture(dev, row.a); B.msg = ''; Audio8.sfx('menu'); }
@@ -1130,6 +1181,7 @@ const APP = {
       if (B.col === 0) {
         if (n.up) { B.dev = (B.dev + devs.length - 1) % devs.length; Audio8.sfx('menu'); }
         if (n.down) { B.dev = (B.dev + 1) % devs.length; Audio8.sfx('menu'); }
+        if (n.start) return quick();
         if (n.right || n.confirm) { B.col = 1; B.row = 0; Audio8.sfx('menu'); }
         if (n.back) { Audio8.sfx('back'); return this.go('main'); }
       } else {
@@ -1140,7 +1192,8 @@ const APP = {
       }
     }
     devs.forEach((d, i) => { if (clickIn(40, 120 + i * 62, 330, 52)) { B.dev = i; B.col = 1; B.row = 0; } });
-    rows.forEach((r, i) => { if (clickIn(410, 116 + i * 40, 830, 36)) { B.col = 1; B.row = i; act(i); } });
+    rows.forEach((r, i) => { if (clickIn(410, 112 + i * 35, 830, 32)) { B.col = 1; B.row = i; act(i); } });
+    if (clickIn(40, 550, 330, 54)) quick();
     if (clickIn(40, 660, 170, 44)) this.go('main');
   },
   bindsDraw() {
@@ -1155,19 +1208,20 @@ const APP = {
       text(Binds.isCustom(d) ? 'personalizado' : 'de fábrica', 355 + (sel ? 10 : 0), y + 38, 11, sel && B.col === 0 ? INK : MUTED, { align: 'right', body: true, weight: 600 });
     });
     if (!padInfo.length) wrapText('¿Tu control no aparece? Empareja el control por Bluetooth y pulsa cualquier botón con el juego abierto.', 205, 120 + devs.length * 62 + 20, 320, 13, 18, MUTED);
+    sfButton('Configuración rápida', 40, 550, 330, 54, hover(40, 550, 330, 54));
     const rows = this.bindRows(dev);
-    slab(400, 104, 840, rows.length * 40 + 24, { skew: 0.03 });
+    slab(400, 104, 840, rows.length * 35 + 24, { skew: 0.03 });
     rows.forEach((r, i) => {
-      const y = 116 + i * 40, sel = B.col === 1 && i === B.row;
-      if (sel) { slabPath(410, y, 820, 36, 0.3); ctx.fillStyle = 'rgba(255,197,61,.18)'; ctx.fill(); }
-      sfText(r.label, 440, y + 18, 28, sel ? GOLD : PAPER, { align: 'left' });
+      const y = 112 + i * 35, sel = B.col === 1 && i === B.row;
+      if (sel) { slabPath(410, y, 820, 32, 0.3); ctx.fillStyle = 'rgba(255,197,61,.18)'; ctx.fill(); }
+      sfText(r.label, 440, y + 16, 24, sel ? GOLD : PAPER, { align: 'left' });
       const capturing = Capture.active && sel;
-      text(capturing ? (dev.startsWith('kb') ? 'Pulsa una tecla… (Esc cancela)' : 'Pulsa un botón o mueve un stick… (Esc cancela)') : r.val, 640, y + 19, 16, capturing ? GOLD : r.kind === 'reset' ? MUTED : '#e2e8f0', { align: 'left', body: true, weight: 600 });
-      if (r.kind === 'act' && r.a === 'smash' && !capturing) text('opcional: Smash con un solo botón', 1210, y + 19, 12, MUTED, { align: 'right', body: true, weight: 500 });
+      text(capturing ? (dev.startsWith('kb') ? 'Pulsa una tecla… (Esc cancela)' : 'Pulsa un botón o mueve un stick… (Esc cancela)') : r.val, 640, y + 16, 15, capturing ? GOLD : r.kind === 'reset' ? MUTED : '#e2e8f0', { align: 'left', body: true, weight: 600 });
+      if (r.kind === 'act' && r.a === 'smash' && !capturing) text('opcional: Smash con un solo botón', 1210, y + 16, 12, MUTED, { align: 'right', body: true, weight: 500 });
     });
     const tip = B.msg || (B.col === 0 ? '↑↓ elige dispositivo · A / → para editar' : 'A: cambiar (pulsa la nueva tecla o botón) · la anterior queda como alternativa · B: volver');
-    text(tip, 820, 116 + rows.length * 40 + 42, 15, B.msg ? TEAL : MUTED, { body: true, weight: 600 });
-    text('Se guarda en este navegador. Los controles se recuerdan por modelo.', 820, 116 + rows.length * 40 + 66, 13, MUTED, { body: true });
+    text(tip, 820, 592, 15, B.msg ? TEAL : MUTED, { body: true, weight: 600 });
+    text(Binds.saved === false ? 'No se pudo guardar en este navegador.' : Binds.saved ? 'Guardado en este dispositivo. Los controles se recuerdan por modelo.' : 'Se guardará en este dispositivo al cambiar un botón.', 820, 616, 13, Binds.saved === false ? '#ff9f1c' : MUTED, { body: true });
     sfButton('‹ Volver', 40, 660, 170, 44, hover(40, 660, 170, 44));
   },
 
@@ -1238,6 +1292,22 @@ const APP = {
   // ---------------- RESULTADOS ----------------
   resultsUpdate() {
     if (this.t < 40) return;
+    if (Tourney.active) {
+      if (Net.role === 'guest') {
+        for (const d of Devices.list) if (Devices.nav(d).back) { Net.leave(); return this.go('online'); }
+        return;
+      }
+      const view = () => {
+        if (Net.role === 'host') Net.publishLobby({ ph: 'tour', tr: Tourney.snapshot(), res: null });
+        this.go('tournament');
+      };
+      for (const d of Devices.list) {
+        const n = Devices.nav(d);
+        if (n.confirm || n.start || n.back) return view();
+      }
+      if (clickIn(W - 540, 648, 240, 52) || clickIn(W - 280, 648, 240, 52)) return view();
+      return;
+    }
     if (Net.role === 'guest') { for (const d of Devices.list) { const n = Devices.nav(d); if (n.back) { Net.leave(); return this.go('online'); } } return; }
     if (Net.role === 'host') {
       for (const d of Devices.list) {
@@ -1299,8 +1369,8 @@ const APP = {
       vals.forEach((v, j) => v === 'Fuera' ? sfText('Fuera', cx[j + 2] + 6, y, 22, '#ff8a8a') : sfText(`${v}`, cx[j + 2], y, 34, PAPER));
     });
     if (Net.role === 'guest') { slab(W - 540, 648, 500, 52, { skew: 0.3 }); sfText('Esperando al anfitrión…', W - 290, 674, 30, GOLD); return; }
-    sfButton('Revancha (A)', W - 540, 648, 240, 52, true);
-    sfButton(Net.role === 'host' ? 'A la sala (B)' : 'Personajes (B)', W - 280, 648, 240, 52, hover(W - 280, 648, 240, 52));
+    sfButton(Tourney.active ? 'Ver cuadro (A)' : 'Revancha (A)', W - 540, 648, 240, 52, true);
+    sfButton(Tourney.active ? 'Continuar (B)' : Net.role === 'host' ? 'A la sala (B)' : 'Personajes (B)', W - 280, 648, 240, 52, hover(W - 280, 648, 240, 52));
   },
 };
 
