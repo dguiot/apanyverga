@@ -134,6 +134,7 @@ const Net = {
     this.set({ role: 'guest', join: peer, ch: this.guest.ch, rdy: 0, tm: -1, lob: null, st: null });
   },
   leave() {
+    this.stopRollback();
     if (typeof AV !== 'undefined' && AV.on) AV.stop(true);
     this.role = 'off'; this.hostPeer = null; NetEv.on = false; this.view = null;
     this.set({ role: 'idle', join: null, lob: null, st: null, inp: null, rdy: 0 });
@@ -175,9 +176,23 @@ const Net = {
     }
   },
   startMatch(setup) {
+    setup.players.forEach((p, i) => { if (p.team === undefined || p.team === null) p.team = i % 2; });
     const enc = { pl: setup.players.map(p => [p.port, CHAR_ORDER.indexOf(p.char), p.cpu || 0, p.remote || (p.cpu ? null : ''), p.team || 0]), stg: STAGE_INFO.findIndex(s => s.id === setup.stage), ru: this.encRules(setup.rules), py: setup.party ? PARTY.findIndex(p => p.id === setup.party) : -1 };
+    const peers = [...new Set(setup.players.filter(p => !p.cpu && p.remote).map(p => p.remote))];
+    const rb = this.rollbackChoice() === '1' && window.APYV_WEB && peers.length && this.room && typeof this.room.fastReady === 'function' && this.room.fastReady(peers) && peers.every(p => this.presOf(p)?.rbc === 1);
+    setup.rollback = !!rb; enc.rb = rb ? 1 : 0;
+    if (rb) { setup.seed = (Math.random() * 4294967296) >>> 0; enc.sd = setup.seed; }
     this.lob.ep = (this.lob.ep || 0) + 1;
     this.publishLobby({ ph: 'vs', set: enc, res: null });
+  },
+  rollbackChoice() { try { return new URLSearchParams(location.search).get('rb'); } catch (e) { return null; } },
+  stopRollback() { if (this.rollbackSession) this.rollbackSession.stop(); this.rollbackSession = null; },
+  attachRollback(B) {
+    this.stopRollback();
+    const owners = {};
+    for (const p of B.setup.players) if (!p.cpu) owners[p.port] = p.remote || this.hostPeer;
+    this.rollbackSession = new RollbackSession(B, { myPeer: this.myPeer(), hostPeer: this.hostPeer, owners, ep: this.lob.ep, room: this.room });
+    B.fighters.forEach(f => { if (owners[f.port]) { f.label = owners[f.port] === this.myPeer() ? 'Tú' : this.nameOf(owners[f.port]); f.avPeer = owners[f.port]; } });
   },
   // foto del estado para los invitados
   pushSnapshot(B) {
@@ -237,6 +252,7 @@ const Net = {
       stage: (STAGE_INFO[enc.stg] || STAGE_INFO[0]).id,
       rules: this.decRules(enc.ru),
       party: enc.py >= 0 && PARTY[enc.py] ? PARTY[enc.py].id : null,
+      seed: enc.rb ? enc.sd : undefined, rollback: !!enc.rb,
     };
   },
   // construye la vista local (sin simular) para dibujar lo que manda el anfitrión
@@ -316,10 +332,12 @@ const Net = {
   // ---------- cada fotograma ----------
   tick() {
     if (!this.ok) return;
+    const cap = window.APYV_WEB && this.room && typeof this.room.fastReady === 'function' && this.rollbackChoice() !== '0' ? 1 : 0;
+    if (this.rbCap !== cap) { this.rbCap = cap; this.set({ rbc: cap }); }
     if (this.role === 'host') {
       if (['modesel', 'charsel', 'stagesel'].includes(APP.screen)) { this.syncSlots(); this.publishLobby({ ph: 'lobby' }); }
     } else if (this.role === 'guest') {
-      this.sendInput();
+      if (!this.rollbackSession) this.sendInput();
       const hp = this.hostPres();
       if (!hp || !hp.lob) {
         if (++this.lostHostT > 150) { Toasts.push('El anfitrión cerró la sala'); this.leave(); APP.go('online'); }
@@ -329,12 +347,19 @@ const Net = {
       const lob = hp.lob;
       if (lob.ph === 'lobby' && APP.screen !== 'netroom') {
         if (['results', 'netview', 'vs'].includes(APP.screen)) { this.guest.rdy = 0; this.set({ rdy: 0 }); }
-        this.view = null; BATTLE = null; APP.go('netroom');
+        this.stopRollback(); APP.battle = null; this.view = null; BATTLE = null; APP.go('netroom');
       }
       if (lob.ph === 'vs' && APP.screen !== 'vs' && lob.set) { APP.pendingSetup = this.decodeSetup(lob.set); APP.pendingSetup.net = true; APP.go('vs'); Audio8.sfx('go'); }
-      if (lob.ph === 'game' && lob.set && (!this.view || this.viewEp !== lob.ep)) { this.viewEp = lob.ep; this.buildView(this.decodeSetup(lob.set)); APP.go('netview'); }
+      if (lob.ph === 'game' && lob.set && this.viewEp !== lob.ep) {
+        this.viewEp = lob.ep; this.stopRollback();
+        const setup = this.decodeSetup(lob.set);
+        if (setup.rollback) {
+          setup.players.forEach(p => { if (!p.cpu) p.dev = p.remote === this.myPeer() ? this.localDev : 'rb:' + p.port; });
+          this.lob.ep = lob.ep; this.view = null; APP.startBattle(setup);
+        } else { this.buildView(setup); APP.go('netview'); }
+      }
       if (lob.ph === 'res' && lob.res && APP.screen !== 'results') {
-        APP.results = this.decodeResults(lob.res); BATTLE = null; this.view = null; APP.go('results'); Audio8.playSong('results');
+        this.stopRollback(); APP.battle = null; APP.results = this.decodeResults(lob.res); BATTLE = null; this.view = null; APP.go('results'); Audio8.playSong('results');
         if (lob.fm) Fame.save(lob.fm, true); // respaldo: si el anfitrión no pudo guardar la pelea, la guarda un invitado
       }
       if (APP.screen === 'netview' && this.view && hp.st && hp.st !== this.lastSnapObj) { this.lastSnapObj = hp.st; BATTLE = this.view; this.applySnapshot(this.view, hp.st); }
