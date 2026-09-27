@@ -81,6 +81,7 @@ const Audio8 = {
     s.start(t, Math.random() * 0.5); s.stop(t + dur + 0.02);
   },
   sfx(name, k = 1) {
+    if (typeof BATTLE !== 'undefined' && BATTLE && BATTLE.resim) return;
     if (typeof NetEv !== 'undefined' && NetEv.on) NetEv.push(['s', name, Math.round(k * 10) / 10]);
     if (!this.ready) return;
     switch (name) {
@@ -534,7 +535,7 @@ const Audio8 = {
     if (announce) this.nowPlaying = { title: this.SONGS[name].title, t: performance.now() };
     return name;
   },
-  stopSong() { this.song = null; },
+  stopSong() { if (!(typeof BATTLE !== 'undefined' && BATTLE && BATTLE.resim)) this.song = null; },
   tick() {
     if (this.ctx) this.duckCheck();
     if (!this.ready || !this.song || !this.musicOn) return;

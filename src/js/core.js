@@ -39,9 +39,25 @@ resize();
 const TAU = Math.PI * 2;
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
-const rand = (a, b) => a + Math.random() * (b - a);
+// Se activa solo dentro de la pelea; menús, dibujo y partículas conservan su azar.
+class SimRNG {
+  constructor(seed) { this.state = seed >>> 0; }
+  next() {
+    let n = this.state = (this.state + 0x6D2B79F5) >>> 0;
+    n = Math.imul(n ^ n >>> 15, n | 1);
+    n ^= n + Math.imul(n ^ n >>> 7, n | 61);
+    return ((n ^ n >>> 14) >>> 0) / 4294967296;
+  }
+  static run(rng, fn) {
+    const old = SimRNG.active; SimRNG.active = rng;
+    try { return fn(); } finally { SimRNG.active = old; }
+  }
+}
+SimRNG.active = null;
+const simRandom = () => SimRNG.active ? SimRNG.active.next() : Math.random();
+const rand = (a, b) => a + simRandom() * (b - a);
 const randi = (a, b) => Math.floor(rand(a, b + 1));
-const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+const pick = arr => arr[Math.floor(simRandom() * arr.length)];
 const sign = v => v < 0 ? -1 : v > 0 ? 1 : 0;
 const approach = (v, t, s) => v < t ? Math.min(v + s, t) : Math.max(v - s, t);
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);

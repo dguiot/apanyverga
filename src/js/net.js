@@ -18,7 +18,7 @@ const r1 = v => Math.round(v * 10) / 10, r2 = v => Math.round(v * 100) / 100, ri
 // Eventos del anfitrión que los invitados reproducen (efectos, sonidos, anuncios)
 const NetEv = {
   on: false, id: 0, buf: [],
-  push(e) { if (!this.on) return; this.buf.push([++this.id].concat(e)); if (this.buf.length > 28) this.buf.shift(); },
+  push(e) { if (!this.on || (BATTLE && BATTLE.resim)) return; this.buf.push([++this.id].concat(e)); if (this.buf.length > 28) this.buf.shift(); },
 };
 
 // Control remoto: lo que un invitado publica en su presence, leído por el anfitrión

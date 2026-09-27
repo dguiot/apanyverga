@@ -457,9 +457,25 @@ resize();
 const TAU = Math.PI * 2;
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;
-const rand = (a, b) => a + Math.random() * (b - a);
+// Se activa solo dentro de la pelea; menús, dibujo y partículas conservan su azar.
+class SimRNG {
+  constructor(seed) { this.state = seed >>> 0; }
+  next() {
+    let n = this.state = (this.state + 0x6D2B79F5) >>> 0;
+    n = Math.imul(n ^ n >>> 15, n | 1);
+    n ^= n + Math.imul(n ^ n >>> 7, n | 61);
+    return ((n ^ n >>> 14) >>> 0) / 4294967296;
+  }
+  static run(rng, fn) {
+    const old = SimRNG.active; SimRNG.active = rng;
+    try { return fn(); } finally { SimRNG.active = old; }
+  }
+}
+SimRNG.active = null;
+const simRandom = () => SimRNG.active ? SimRNG.active.next() : Math.random();
+const rand = (a, b) => a + simRandom() * (b - a);
 const randi = (a, b) => Math.floor(rand(a, b + 1));
-const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+const pick = arr => arr[Math.floor(simRandom() * arr.length)];
 const sign = v => v < 0 ? -1 : v > 0 ? 1 : 0;
 const approach = (v, t, s) => v < t ? Math.min(v + s, t) : Math.max(v - s, t);
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
@@ -1173,6 +1189,7 @@ const Rumble = {
   },
   // strong: motor grande (grave), weak: motor chico (agudo), ms: duración, trig: gatillos Xbox (Edge/Chrome en Windows)
   play(dev, strong, weak, ms, trig) {
+    if (typeof BATTLE !== 'undefined' && BATTLE && BATTLE.resim) return false;
     if (!this.on || !dev || typeof dev !== 'string') return false;
     dev = this.resolve(dev);
     if (!dev || (!dev.startsWith('pad') && dev !== 'touch')) return false;
@@ -1198,10 +1215,11 @@ const Rumble = {
     return false;
   },
   stop(dev) {
+    if (typeof BATTLE !== 'undefined' && BATTLE && BATTLE.resim) return;
     delete this.cur[dev];
     try { const p = this.pad(dev); if (p && p.vibrationActuator && p.vibrationActuator.reset) { const r = p.vibrationActuator.reset(); if (r && r.catch) r.catch(() => {}); } } catch (e) { /* nada */ }
   },
-  stopAll() { for (const d of Object.keys(this.cur)) this.stop(d); if (navigator.vibrate) try { navigator.vibrate(0); } catch (e) { /* nada */ } },
+  stopAll() { if (typeof BATTLE !== 'undefined' && BATTLE && BATTLE.resim) return; for (const d of Object.keys(this.cur)) this.stop(d); if (navigator.vibrate) try { navigator.vibrate(0); } catch (e) { /* nada */ } },
   // quién siente algo de un peleador: solo personas en este aparato (no CPU, no jugadores remotos, no la demo)
   devOf(f) {
     const B = typeof BATTLE !== 'undefined' ? BATTLE : null;
@@ -1803,6 +1821,7 @@ const Audio8 = {
     s.start(t, Math.random() * 0.5); s.stop(t + dur + 0.02);
   },
   sfx(name, k = 1) {
+    if (typeof BATTLE !== 'undefined' && BATTLE && BATTLE.resim) return;
     if (typeof NetEv !== 'undefined' && NetEv.on) NetEv.push(['s', name, Math.round(k * 10) / 10]);
     if (!this.ready) return;
     switch (name) {
@@ -2256,7 +2275,7 @@ const Audio8 = {
     if (announce) this.nowPlaying = { title: this.SONGS[name].title, t: performance.now() };
     return name;
   },
-  stopSong() { this.song = null; },
+  stopSong() { if (!(typeof BATTLE !== 'undefined' && BATTLE && BATTLE.resim)) this.song = null; },
   tick() {
     if (this.ctx) this.duckCheck();
     if (!this.ready || !this.song || !this.musicOn) return;
@@ -8739,16 +8758,18 @@ function swimPose(t) {
 // ============================================================
 let BATTLE = null; // estado de la pelea activa
 
-function shake(n) { if (BATTLE && !reducedMotion) BATTLE.shake = Math.max(BATTLE.shake, n); }
-function flash(a) { if (BATTLE) BATTLE.flash = Math.max(BATTLE.flash, a); }
-function dim(frames) { if (BATTLE) BATTLE.dim = Math.max(BATTLE.dim, frames); }
-function banner(txt, col) { if (BATTLE) BATTLE.banners.push({ txt, col: col || '#f1f5f9', t: 0 }); NetEv.push(['b', txt, col || '#f1f5f9']); }
+function shake(n) { if (BATTLE && !BATTLE.resim && !reducedMotion) BATTLE.shake = Math.max(BATTLE.shake, n); }
+function flash(a) { if (BATTLE && !BATTLE.resim) BATTLE.flash = Math.max(BATTLE.flash, a); }
+function dim(frames) { if (BATTLE && !BATTLE.resim) BATTLE.dim = Math.max(BATTLE.dim, frames); }
+function banner(txt, col) { if (BATTLE && BATTLE.resim) return; if (BATTLE) BATTLE.banners.push({ txt, col: col || '#f1f5f9', t: 0 }); NetEv.push(['b', txt, col || '#f1f5f9']); }
 function opponentsOf(f) { return BATTLE.fighters.filter(o => o !== f && !o.dead && o.stocks > 0 && !sameTeam(o, f)); }
 function countProj(f, type) { return BATTLE.projectiles.filter(p => p.owner === f && p.type === type).length; }
 
 // ---------- efectos ----------
 function spawnFx(type, x, y, o = {}) {
-  if (!BATTLE) return;
+  if (!BATTLE || BATTLE.resim) return;
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const pick = arr => arr[Math.floor(Math.random() * arr.length)];
   if (NetEv.on && NET_FX.has(type)) NetEv.push(['f', type, ri(x), ri(y), o.col || 0, type === 'wind' || type === 'claw' ? o.dir : (o.r ? ri(o.r) : 0), o.txt || 0, o.life || 0, o.ang ? Math.round(o.ang * 100) / 100 : 0]);
   const fx = Object.assign({ type, x, y, t: 0, life: 20, vx: 0, vy: 0, r: 10, col: '#fff' }, o);
   switch (type) {
@@ -8779,6 +8800,7 @@ function spawnFx(type, x, y, o = {}) {
 }
 // estela de humo detrás de quien sale volando (cuanto más rápido, más densa)
 function launchTrails(B) {
+  if (B.resim) return;
   for (const f of B.fighters) {
     const px = f._ltx, py = f._lty; f._ltx = f.x; f._lty = f.y;
     if (px === undefined || f.dead || f.state !== 'hitstun' || f.hitlag > 0) continue;
@@ -8789,6 +8811,7 @@ function launchTrails(B) {
   }
 }
 function updateFx() {
+  if (BATTLE.resim) return;
   for (const p of BATTLE.fx) {
     p.t++; p.x += p.vx; p.y += p.vy;
     if (p.type === 'coin') p.vy += 0.4;
@@ -8934,7 +8957,7 @@ function applyHit(att, t, hit, dir, opts = {}) {
   if (t.state === 'shield' && t.shieldHP > 0 && !opts.unblockable) {
     // parry: el escudo recién levantado detiene el golpe sin desgaste y deja al atacante expuesto
     // la CPU solo acierta un parry de vez en cuando (según su nivel); una persona siempre que lo clave
-    const cpuParry = !t.cpu || Math.random() < (t.brain && t.brain.L ? t.brain.L.lv : 5) * 0.03;
+    const cpuParry = !t.cpu || simRandom() < (t.brain && t.brain.L ? t.brain.L.lv : 5) * 0.03;
     if (t.sf <= PHYS.parry && cpuParry) {
       t.shieldStun = 0; t.invuln = Math.max(t.invuln, 10); t.vx = 0;
       if (att && !opts.proj) { att.hitlag = Math.max(att.hitlag, 12); att.vx = -dir * 3; att.parried = 30; }
@@ -10653,7 +10676,7 @@ class Fighter {
     const B = BATTLE;
     Audio8.sfx('ko'); shake(18); Rumble.ko(this);
     if (B.phase === 'fight' && this.lastHitBy && this.lastHitBy !== this) Rumble.scored(this.lastHitBy);
-    B.koFx.push({ x: clamp(this.x, B.stage.blast.l, B.stage.blast.r), y: clamp(this.y - 40, B.stage.blast.t, B.stage.blast.b), col: this.color, t: 0 });
+    if (!B.resim) B.koFx.push({ x: clamp(this.x, B.stage.blast.l, B.stage.blast.r), y: clamp(this.y - 40, B.stage.blast.t, B.stage.blast.b), col: this.color, t: 0 });
     NetEv.push(['k', ri(clamp(this.x, B.stage.blast.l, B.stage.blast.r)), ri(clamp(this.y - 40, B.stage.blast.t, B.stage.blast.b)), this.color]);
     if (this.grabbing) this.releaseGrab();
     if (this.grabbedBy) this.grabbedBy.releaseGrab();
@@ -10689,7 +10712,7 @@ class Fighter {
   // ---------- pose ----------
   updatePose() {
     let tgt, k = 0.35, sq = 0; // sq: aplastamiento (+) o estiramiento (−)
-    const t = performance.now() / 1000;
+    const t = BATTLE.t / 60;
     switch (this.state) {
       case 'idle': tgt = stancePose(this, t); k = 0.28; break;
       case 'walk': this.phase += Math.abs(this.vx) * 0.085; tgt = walkPose2(this.phase); k = 0.4; break;
@@ -10732,7 +10755,7 @@ class Fighter {
     // aplastar al caer y al agacharse para saltar; estirar al despegar
     this.sq = lerp(this.sq || 0, sq, 0.45);
     this.pose.sx = 1 + this.sq * 0.6; this.pose.sy = 1 - this.sq;
-    recordSwoosh(this);
+    if (!BATTLE.resim) recordSwoosh(this);
   }
 
   // ---------- dibujo ----------
@@ -10895,30 +10918,30 @@ class AIBrain {
     const flickX = d => { s.x = d; this.ctrl.flickX = -1; this.ctrl.flickDirX = d; };
     const flickY = d => { s.y = d; this.ctrl.flickY = -1; this.ctrl.flickDirY = d; };
     if (this.idleT > 0 && f.grounded && !['hitstun', 'grabbed', 'ledge'].includes(f.state)) { this.idleT--; return s; }
-    if (f.grounded && Math.random() < L.daydream) { this.idleT = randi(20, 50); return s; }
+    if (f.grounded && simRandom() < L.daydream) { this.idleT = randi(20, 50); return s; }
     if (f.state === 'respawn') { if (f.sf > 40 - L.t * 25) s.x = sign(-f.x) || 1; return s; }
-    if (f.state === 'grabbed') { if (Math.random() < 0.3 + L.t * 0.6) press(pick(['attack', 'jump', 'special'])); s.x = Math.random() > 0.5 ? 1 : -1; return s; }
+    if (f.state === 'grabbed') { if (simRandom() < 0.3 + L.t * 0.6) press(pick(['attack', 'jump', 'special'])); s.x = simRandom() > 0.5 ? 1 : -1; return s; }
     if (f.state === 'hitstun') {
-      if (Math.random() < L.di) { s.x = -sign(f.lx) * 0.9; s.y = f.ly < 0 ? 0.6 : -0.8; }
-      if (f.tumble && Math.random() < L.tech * 0.4 && f.x > st.left - 20 && f.x < st.right + 20) press('shield'); // fuera del escenario no: se volvería un esquive perdido
+      if (simRandom() < L.di) { s.x = -sign(f.lx) * 0.9; s.y = f.ly < 0 ? 0.6 : -0.8; }
+      if (f.tumble && simRandom() < L.tech * 0.4 && f.x > st.left - 20 && f.x < st.right + 20) press('shield'); // fuera del escenario no: se volvería un esquive perdido
       return s;
     }
     if (f.state === 'ledge') {
       if (f.sf > 10 + randi(0, Math.max(2, L.react))) {
-        const r = Math.random();
+        const r = simRandom();
         if (r < 0.45) s.x = -f.ledge.side; else if (r < 0.7) press('jump'); else if (r < 0.85) press('attack'); else press('shield');
       }
       return s;
     }
-    if (f.state === 'down') { if (Math.random() < 0.1 + L.t * 0.3) { if (Math.random() < 0.5) press('attack'); else s.x = pick([-1, 1]); } return s; }
+    if (f.state === 'down') { if (simRandom() < 0.1 + L.t * 0.3) { if (simRandom() < 0.5) press('attack'); else s.x = pick([-1, 1]); } return s; }
     if (f.state === 'holding') {
       if (f.sf > 8 + randi(0, 10)) {
         const t = f.grabbing;
-        if (t && t.percent < 50 && Math.random() < 0.5 && f.sf < 30) { if (f.sf % 8 === 0) press('attack'); return s; }
+        if (t && t.percent < 50 && simRandom() < 0.5 && f.sf < 30) { if (f.sf % 8 === 0) press('attack'); return s; }
         // lanzamiento según posición y %
         const toEdge = f.x > 0 ? 1 : -1;
         if (t && t.percent > 120 && Math.abs(f.x) < 150) s.y = -1;
-        else if (t && t.percent < 60 && L.juggle > 0.5) s.y = Math.random() < 0.5 ? -1 : 1;
+        else if (t && t.percent < 60 && L.juggle > 0.5) s.y = simRandom() < 0.5 ? -1 : 1;
         else s.x = toEdge;
       }
       return s;
@@ -10949,7 +10972,7 @@ class AIBrain {
       // debajo del piso: primero sale por la orilla más cercana (hacia el centro se queda atorada abajo)
       if (out < -8 && f.y > ly + 20) {
         s.x = lg.side;
-        if (f.jumps > 0 && f.vy > -2 && this.jumpCd <= 0 && Math.random() < L.recover) { press('jump'); this.jumpCd = 22; }
+        if (f.jumps > 0 && f.vy > -2 && this.jumpCd <= 0 && simRandom() < L.recover) { press('jump'); this.jumpCd = 22; }
         return s;
       }
       // más abajo que la orilla: se queda justo afuera (si se mete debajo choca con el piso por abajo),
@@ -10960,7 +10983,7 @@ class AIBrain {
         if (snapWin) s.x = toward;
         else { const tx = edgeX - toward * margin, dx = tx - f.x; s.x = Math.abs(dx) < 6 ? 0 : clamp(dx / 30, -1, 1); }
       }
-      if (Math.random() > L.recover) return s;
+      if (simRandom() > L.recover) return s;
       const below = f.y > ly - 40;
       const farX = Math.abs(f.x - edgeX);
       // alto y lejos: primero planea hacia la orilla; el salto y el especial se guardan para cuando baje
@@ -11004,17 +11027,17 @@ class AIBrain {
     // peligros que caen del cielo (rocas del volcán, cañonazos): salirse de abajo
     if (L.dodge > 0 && f.grounded) {
       const drop = BATTLE.projectiles.find(p => !p.owner && p.vy > 0 && p.y < f.y && f.y - p.y < 750 && Math.abs(p.x - f.x) < 80);
-      if (drop && Math.random() < L.dodge + 0.3) { s.x = sign(f.x - drop.x) || 1; return s; }
+      if (drop && simRandom() < L.dodge + 0.3) { s.x = sign(f.x - drop.x) || 1; return s; }
     }
     // el metro de las azoteas: si viene y estoy en la calle, brinco alto (se mantiene Salto para el salto completo)
-    if (st.id === 'city' && f.y > 450 && (st.trainWarn > 0 || (st.train && Math.sign(f.x - st.trainX) === st.trainDir && Math.abs(f.x - st.trainX) < 2600)) && Math.random() < L.dodge + 0.4) {
+    if (st.id === 'city' && f.y > 450 && (st.trainWarn > 0 || (st.train && Math.sign(f.x - st.trainX) === st.trainDir && Math.abs(f.x - st.trainX) < 2600)) && simRandom() < L.dodge + 0.4) {
       if (f.grounded || f.state === 'jumpsquat') { s.jump = true; return s; }
       if (f.jumps > 0 && f.vy > 0 && this.jumpCd <= 0) { press('jump'); this.jumpCd = 20; return s; }
     }
     // proyectiles que vienen hacia mí
     if (L.dodge > 0 && this.shieldT <= 0) {
       const inc = BATTLE.projectiles.find(p => p.owner !== f && p.delay <= 0 && Math.abs(p.y - (f.y - 50)) < 70 && sign(f.x - p.x) === sign(p.vx) && Math.abs(f.x - p.x) < 60 + Math.abs(p.vx) * 8);
-      if (inc && Math.random() < L.dodge) {
+      if (inc && simRandom() < L.dodge) {
         if (f.grounded) { this.shieldT = randi(8, 14); }
         else if (!f.airUsed.dodge) { press('shield'); return s; }
       }
@@ -11034,7 +11057,7 @@ class AIBrain {
     if (f.finalReady && tgt && Math.abs(tgt.x - f.x) < 520) { press('special'); return s; }
     if (orb && (!tgt || Math.abs(orb.x - f.x) < Math.abs(tgt.x - f.x) + 200)) { gx = orb.x; gy = orb.y + 40; mode = 'orb'; }
     else if (heal && f.percent > 40) { gx = heal.x; gy = heal.y; mode = 'item'; }
-    else if (wantItem && (wantItem === this.pickFor ? this.pickYes : (this.pickFor = wantItem, this.pickYes = Math.random() < 0.5))) { gx = wantItem.x; gy = wantItem.y; mode = 'pick'; }
+    else if (wantItem && (wantItem === this.pickFor ? this.pickYes : (this.pickFor = wantItem, this.pickYes = simRandom() < 0.5))) { gx = wantItem.x; gy = wantItem.y; mode = 'pick'; }
     // objetivos propios de cada modo
     const gm = BATTLE.rules.mode;
     if (gm === 'soccer' && BATTLE.ms.ball) return this.soccer(s, f, L, press, flickX);
@@ -11069,21 +11092,21 @@ class AIBrain {
     const grabOk = t => { const fx = (t.x - f.x) * f.face, sz = f.size(); return !!t && t.invuln <= 0 && t.starTime <= 0 && t.grounded && Math.abs(t.y - f.y) < 40 && fx > 14 * sz && fx < 70 * sz; };
     const face = stack ? f.face : sign(dx) || f.face, toward = stack ? 0 : sign(dx);
 
-    if (!f.grounded && f.state === 'air' && !f.airUsed.dodge && tgt && tgt.state === 'attack' && dist(tgt.x, tgt.y, f.x, f.y) < 120 && Math.random() < L.dodge * 0.25) { press('shield'); return s; }
+    if (!f.grounded && f.state === 'air' && !f.airUsed.dodge && tgt && tgt.state === 'attack' && dist(tgt.x, tgt.y, f.x, f.y) < 120 && simRandom() < L.dodge * 0.25) { press('shield'); return s; }
     // el torero espera la embestida con la verónica: la saca antes de que llegue el golpe
     if (f.id === 'puentin' && tgt && mode === 'fight' && f.grounded && tgt.state === 'attack' && tgt.move && tgt.move.def && this.cool <= 0 && Math.abs(tgt.x - f.x) < 150 && Math.abs(tgt.y - f.y) < 80) {
       const hs = tgt.move.def.hits || [], f0 = hs.length ? Math.min(...hs.map(h => h.f0)) : 0;
-      if (f0 - tgt.move.f >= 4 && Math.random() < L.shield * 0.5) { this.cool = L.react + 16; s.x = 0; s.y = 0; press('special'); return s; }
+      if (f0 - tgt.move.f >= 4 && simRandom() < L.shield * 0.5) { this.cool = L.react + 16; s.x = 0; s.y = 0; press('special'); return s; }
     }
     // ---------- defensa ----------
-    if (tgt && mode === 'fight' && f.grounded && this.shieldT <= 0 && tgt.state === 'attack' && Math.abs(tgt.x - f.x) < 140 && Math.abs(tgt.y - f.y) < 100 && Math.random() < L.shield) this.shieldT = randi(8, 20); // no se cubre de golpes de otra plataforma
+    if (tgt && mode === 'fight' && f.grounded && this.shieldT <= 0 && tgt.state === 'attack' && Math.abs(tgt.x - f.x) < 140 && Math.abs(tgt.y - f.y) < 100 && simRandom() < L.shield) this.shieldT = randi(8, 20); // no se cubre de golpes de otra plataforma
     if (f.state === 'shield') this.wasShield = 8;
     else this.wasShield--;
     if (this.shieldT > 0 && f.grounded) {
       s.shield = true;
       // fuera de escudo: agarrar o castigar si el rival quedó cerca
       // (A desde el escudo también es agarre: encimado o a la espalda no atrapaba nada y se repetía)
-      if (tgt && f.shieldStun === 0 && grabOk(tgt) && tgt.state === 'attack' && Math.random() < L.oos * 0.35) { this.shieldT = 0; press('grab'); }
+      if (tgt && f.shieldStun === 0 && grabOk(tgt) && tgt.state === 'attack' && simRandom() < L.oos * 0.35) { this.shieldT = 0; press('grab'); }
       return s;
     }
 
@@ -11115,7 +11138,7 @@ class AIBrain {
     const tOff = tgt.state === 'ledge' || (!tgt.grounded && !overFloor(tgt));
     // la decisión de cuidar la orilla dura medio segundo: sorteada cada cuadro, la CPU corría de ida y vuelta junto al borde
     if (!tOff) this.egT = 0;
-    else if (!(this.egT > 0)) { this.eg = L.edgeguard > 0 && Math.random() < L.edgeguard; this.egT = 30; }
+    else if (!(this.egT > 0)) { this.eg = L.edgeguard > 0 && simRandom() < L.edgeguard; this.egT = 30; }
     this.egT--;
     if (tOff && this.eg) {
       const side = tgt.x < 0 ? -1 : 1, edgeX = side < 0 ? st.left : st.right;
@@ -11138,7 +11161,7 @@ class AIBrain {
     }
 
     // proyectiles a distancia
-    if (adx > 320 && Math.abs(dy) < 120 && f.grounded && aiHasProj(f.id, 'n') && Math.random() < L.proj * 3 && this.cool <= 0) {
+    if (adx > 320 && Math.abs(dy) < 120 && f.grounded && aiHasProj(f.id, 'n') && simRandom() < L.proj * 3 && this.cool <= 0) {
       if (sign(dx) !== f.face) { s.x = sign(dx) * 0.4; return s; } // primero voltea: con la palanca de lado salía el especial de lado
       this.cool = L.react + 20; this.neutralT = 6; press('special'); return s;
     }
@@ -11151,14 +11174,14 @@ class AIBrain {
 
     // ---------- castigo: el rival está vulnerable ----------
     const vulnerable = ['land', 'down', 'dizzy', 'helpless'].includes(tgt.state) || (tgt.state === 'attack' && tgt.move && tgt.move.f > (tgt.move.def.dur * 0.6));
-    if (vulnerable && adx < range * 1.6 && Math.abs(dy) < 60 && f.grounded && Math.random() < L.punish && this.cool <= 0) {
+    if (vulnerable && adx < range * 1.6 && Math.abs(dy) < 60 && f.grounded && simRandom() < L.punish && this.cool <= 0) {
       this.cool = L.react;
       if (face !== f.face) { s.x = face * 0.4; return s; }
-      if (tgt.percent > 90 || tgt.state === 'dizzy') { flickX(face); press('attack'); } else if (Math.random() < 0.22 && grabOk(tgt)) press('grab'); else { s.x = face * 0.6; press('attack'); }
+      if (tgt.percent > 90 || tgt.state === 'dizzy') { flickX(face); press('attack'); } else if (simRandom() < 0.22 && grabOk(tgt)) press('grab'); else { s.x = face * 0.6; press('attack'); }
       return s;
     }
     // ---------- persecución aérea (juggle) ----------
-    if (tgt.state === 'hitstun' && dy < -60 && adx < 180 && tgt.x > st.left + 60 && tgt.x < st.right - 60 && Math.random() < L.juggle) {
+    if (tgt.state === 'hitstun' && dy < -60 && adx < 180 && tgt.x > st.left + 60 && tgt.x < st.right - 60 && simRandom() < L.juggle) {
       if (f.grounded && this.jumpCd <= 0) { press('jump'); s.x = face * 0.5; this.jumpCd = 14; return s; }
       if (!f.grounded) {
         s.x = sign(dx) * 0.9;
@@ -11178,49 +11201,49 @@ class AIBrain {
       if (!f.grounded && (this.backT > 0 || (!safeX(f.x + sign(dx) * 80) && !(tgt.x > st.left && tgt.x < st.right)))) { if (!(this.backT > 0)) this.backT = 18; s.x = sign(-f.x); }
       if (f.grounded && !safeX(f.x + sign(dx) * 60) && !(tgt.x > st.left && tgt.x < st.right)) s.x = 0;
       if (dy < -90 && (f.grounded || f.vy > 0) && this.jumpCd <= 0 && adx < 260) { press('jump'); this.jumpCd = 30 - L.t * 15; } // más arriba que el alcance: brinca (entre 90 y 110 se quedaba abajo)
-      if (dy > 80 && f.grounded && f.surface && f.surface.plat && adx < 200 && Math.random() < 0.08) { s.y = 1; this.ctrl.flickY = 0; this.ctrl.flickDirY = 1; }
-      if (!f.grounded && f.vy > 0 && dy > 60 && Math.random() < 0.05 + L.t * 0.1) s.y = 1;
-      if (Math.random() < 0.004 && f.grounded) press('jump');
+      if (dy > 80 && f.grounded && f.surface && f.surface.plat && adx < 200 && simRandom() < 0.08) { s.y = 1; this.ctrl.flickY = 0; this.ctrl.flickDirY = 1; }
+      if (!f.grounded && f.vy > 0 && dy > 60 && simRandom() < 0.05 + L.t * 0.1) s.y = 1;
+      if (simRandom() < 0.004 && f.grounded) press('jump');
       // a nivel alto, retrocede un poco para espaciar (baile)
-      if (L.t > 0.6 && adx < range * 1.4 && tgt.state === 'attack' && f.grounded && Math.random() < 0.3) s.x = -toward;
+      if (L.t > 0.6 && adx < range * 1.4 && tgt.state === 'attack' && f.grounded && simRandom() < 0.3) s.x = -toward;
       return s;
     }
     // ---------- en rango ----------
-    if (this.cool > 0) { if (Math.random() < 0.3) s.x = toward * 0.3; return s; }
-    if (Math.random() > L.aggro) { this.cool = randi(4, 12); return s; }
+    if (this.cool > 0) { if (simRandom() < 0.3) s.x = toward * 0.3; return s; }
+    if (simRandom() > L.aggro) { this.cool = randi(4, 12); return s; }
     // encimados: el jab empieza delante del cuerpo y el agarre también, así que no pegaban nunca (y se
     // repetían). Saltito y aéreo neutral, que pega alrededor del cuerpo
     if (stack && f.grounded && Math.abs(dy) < 40) { press('jump'); this.nairT = 5; this.nairMax = 24; this.cool = L.react + 8; return s; }
     // contra un escudo, golpe tras golpe no sirve: agarrarlo
-    if (tgt.state === 'shield' && f.grounded && grabOk(tgt) && Math.random() < 0.25 + L.t * 0.5) { this.cool = L.react + 6; press('grab'); return s; }
+    if (tgt.state === 'shield' && f.grounded && grabOk(tgt) && simRandom() < 0.25 + L.t * 0.5) { this.cool = L.react + 6; press('grab'); return s; }
     this.cool = L.react + randi(0, Math.round(8 * (1 - L.t)));
     const killPct = 110 - (tgt.weight() - 100) * 0.8;
     const high = tgt.percent > killPct * (1.3 - L.killSense * 0.4);
-    if (Math.random() < L.mistake) { press(pick(['attack', 'special', 'grab'])); return s; }
+    if (simRandom() < L.mistake) { press(pick(['attack', 'special', 'grab'])); return s; }
     if (!f.grounded) {
       if (dy < -50) s.y = -1; else if (dy > 50) s.y = 1; else s.x = face === f.face ? face : -f.face;
       press('attack'); return s;
     }
     if (dy < -70) {
-      if (high && Math.random() < 0.6) flickY(-1); else s.y = -0.6;
+      if (high && simRandom() < 0.6) flickY(-1); else s.y = -0.6;
       press('attack'); return s;
     }
-    if (face !== f.face && Math.random() < 0.6) { s.x = face * 0.6; return s; }
-    if (L.t > 0.6 && Math.random() < L.t) {
+    if (face !== f.face && simRandom() < 0.6) { s.x = face * 0.6; return s; }
+    if (L.t > 0.6 && simRandom() < L.t) {
       // espaciado: pegado → golpe rápido o agarre; a media distancia → golpe lateral o smash
-      if (adx < 45) { if (Math.random() < 0.16 && grabOk(tgt)) press('grab'); else if (high) { flickY(Math.random() < 0.5 ? 1 : -1); press('attack'); } else press('attack'); }
+      if (adx < 45) { if (simRandom() < 0.16 && grabOk(tgt)) press('grab'); else if (high) { flickY(simRandom() < 0.5 ? 1 : -1); press('attack'); } else press('attack'); }
       else { if (high) flickX(face); else s.x = face * 0.6; press('attack'); }
       return s;
     }
-    const r = Math.random();
+    const r = simRandom();
     if (r < 0.05 + L.t * 0.03 && grabOk(tgt)) { press('grab'); return s; }
     if (r < 0.2) {
       // el torero no saca la verónica al aire: sin embestida no sirve; mejor banderillas o revolera
-      if (f.id === 'puentin') { if (Math.random() < 0.5) s.x = face * 0.9; else s.y = 0.9; } else s.x = face * (Math.random() < 0.5 ? 0.9 : 0);
+      if (f.id === 'puentin') { if (simRandom() < 0.5) s.x = face * 0.9; else s.y = 0.9; } else s.x = face * (simRandom() < 0.5 ? 0.9 : 0);
       press('special'); return s;
     }
     if (high || r < 0.32) {
-      const k = Math.random();
+      const k = simRandom();
       if (k < 0.7) flickX(face); else if (k < 0.85) flickY(1); else flickY(-1);
       press('attack'); return s;
     }
@@ -11333,12 +11356,12 @@ class AIBrain {
     const behind = ball.x - goalDir * 58;
     const dx = behind - f.x, bd = dist(f.x, f.y - 50, ball.x, ball.y);
     const behindOk = sign(ball.x - f.x) === goalDir || Math.abs(ball.x - f.x) < 18;
-    if (bd < 95 && this.cool <= 0 && Math.random() < 0.35 + L.aggro * 0.6) {
+    if (bd < 95 && this.cool <= 0 && simRandom() < 0.35 + L.aggro * 0.6) {
       this.cool = Math.max(4, L.react);
       if (behindOk) {
         if (ball.y < f.y - 115) { s.y = -0.6; press('attack'); }
         else if (!f.grounded) { s.x = goalDir === f.face ? goalDir : -f.face; press('attack'); }
-        else if (Math.random() < 0.35 + L.t * 0.35) { flickX(goalDir); press('attack'); }
+        else if (simRandom() < 0.35 + L.t * 0.35) { flickX(goalDir); press('attack'); }
         else { s.x = goalDir * 0.6; press('attack'); }
         return s;
       }
@@ -11371,7 +11394,7 @@ const r1 = v => Math.round(v * 10) / 10, r2 = v => Math.round(v * 100) / 100, ri
 // Eventos del anfitrión que los invitados reproducen (efectos, sonidos, anuncios)
 const NetEv = {
   on: false, id: 0, buf: [],
-  push(e) { if (!this.on) return; this.buf.push([++this.id].concat(e)); if (this.buf.length > 28) this.buf.shift(); },
+  push(e) { if (!this.on || (BATTLE && BATTLE.resim)) return; this.buf.push([++this.id].concat(e)); if (this.buf.length > 28) this.buf.shift(); },
 };
 
 // Control remoto: lo que un invitado publica en su presence, leído por el anfitrión
@@ -11977,6 +12000,8 @@ class Battle {
   // setup: { players: [{port, char, dev|null, cpu:level|0}], stage, rules: {mode, stocks, time, items} }
   constructor(setup, opts = {}) {
     BATTLE = this;
+    this.rng = setup.seed === undefined ? null : new SimRNG(setup.seed);
+    SimRNG.run(this.rng, () => {
     this.setup = setup; this.demo = !!opts.demo; this.online = !!opts.online; this.view = !!opts.view;
     this.rules = Object.assign({ mode: 'stock', stocks: 3, time: 3, items: 2, teams: false, party: false }, setup.rules);
     if (this.rules.mode === 'soccer') this.rules.teams = true;
@@ -12006,12 +12031,20 @@ class Battle {
       this.fighters.push(f);
     });
     Modes.init(this);
+    });
     if (!this.demo) Audio8.playBattle();
   }
   get alive() { return this.fighters.filter(f => f.stocks > 0); }
 
   update() {
-    if (this.online) this.netTick();
+    return SimRNG.run(this.rng, () => {
+      this.advance();
+      // Turbo: 3 cuadros de pelea por cada 2 pasos, sin depender del reloj del menú.
+      if (this.mods && this.mods.turbo && this.t % 3 === 1 && !this.paused) this.advance();
+    });
+  }
+  advance() {
+    if (this.online && !this.resim) this.netTick();
     if (this.paused) return this.updatePause();
     // pausa
     for (const f of this.fighters) {
@@ -12052,8 +12085,29 @@ class Battle {
     }
     if (this.phase === 'end') {
       this.endT++;
-      if (this.endT === 150) APP.showResults(this.results());
+      if (this.endT === 150 && !this.resim) APP.showResults(this.results());
     }
+  }
+  checksum() {
+    // Centésimas y referencias del grafo; las etiquetas y efectos locales no cambian la pelea.
+    const omit = new Set(['ch', 'moves', 'def', 'throwDef', '_lastHit', '_t', 'clouds', 'stars', 'particles', 'light', 'grade', 'pose', 'swoosh', '_swoosh', '_ltx', '_lty', 'dev', 'netPeer', 'peer', 'label', 'uid', 'avPeer', 'why', 'fx', 'koFx', 'banners', 'cam', 'shake', 'flash', 'dim', 'camKick']);
+    let hash = 2166136261;
+    const seen = new Map();
+    const add = s => { for (let i = 0; i < s.length; i++) hash = Math.imul(hash ^ s.charCodeAt(i), 16777619) >>> 0; };
+    const visit = v => {
+      if (typeof v === 'function' || v === undefined) return;
+      if (v === null) { add('null;'); return; }
+      if (typeof v !== 'object') { add(typeof v + ':' + (typeof v === 'number' ? Math.round(v * 100) : v) + ';'); return; }
+      if (seen.has(v)) { add('@' + seen.get(v) + ';'); return; }
+      seen.set(v, seen.size);
+      if (v instanceof Map || v instanceof Set) { for (const x of v) visit(x); return; }
+      for (const k of Object.keys(v).sort()) {
+        if (omit.has(k) || typeof v[k] === 'function') continue;
+        add(k + ':'); visit(v[k]);
+      }
+    };
+    visit({ fighters: this.fighters, projectiles: this.projectiles, items: this.items, stage: this.stage, ms: this.ms, mods: this.mods, rules: this.rules, rng: this.rng, t: this.t, phase: this.phase, introT: this.introT, endT: this.endT, timer: this.timer, paused: this.paused, slow: this.slow, slowCd: this.slowCd });
+    return hash.toString(16).padStart(8, '0');
   }
   // online (anfitrión): leer los controles remotos y publicar el estado
   netTick() {
@@ -14053,8 +14107,6 @@ APP.fameDraw = function () {
 APP.battleUpdate = function () {
   if (!this.battle) return;
   this.battle.update();
-  // Modo Fiesta "Turbo": un paso extra cada dos fotogramas (x1.5)
-  if (this.battle && this.battle.mods && this.battle.mods.turbo && this.t % 2 === 0 && !this.battle.paused) this.battle.update();
 };
 APP.battleDraw = function () { if (this.battle) this.battle.draw(); };
 
