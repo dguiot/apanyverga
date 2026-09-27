@@ -179,9 +179,10 @@ const Net = {
     setup.players.forEach((p, i) => { if (p.team === undefined || p.team === null) p.team = i % 2; });
     const enc = { pl: setup.players.map(p => [p.port, CHAR_ORDER.indexOf(p.char), p.cpu || 0, p.remote || (p.cpu ? null : ''), p.team || 0]), stg: STAGE_INFO.findIndex(s => s.id === setup.stage), ru: this.encRules(setup.rules), py: setup.party ? PARTY.findIndex(p => p.id === setup.party) : -1 };
     const peers = [...new Set(setup.players.filter(p => !p.cpu && p.remote).map(p => p.remote))];
-    const rb = this.rollbackChoice() === '1' && window.APYV_WEB && peers.length && this.room && typeof this.room.fastReady === 'function' && this.room.fastReady(peers) && peers.every(p => this.presOf(p)?.rbc === 1);
+    const rb = this.rollbackChoice() !== '0' && window.APYV_WEB && peers.length && this.room && typeof this.room.fastReady === 'function' && this.room.fastReady(peers) && peers.every(p => this.presOf(p)?.rbc === 1);
     setup.rollback = !!rb; enc.rb = rb ? 1 : 0;
     if (rb) { setup.seed = (Math.random() * 4294967296) >>> 0; enc.sd = setup.seed; }
+    else delete setup.seed;
     this.lob.ep = (this.lob.ep || 0) + 1;
     this.publishLobby({ ph: 'vs', set: enc, res: null });
   },
@@ -350,7 +351,7 @@ const Net = {
         this.stopRollback(); APP.battle = null; this.view = null; BATTLE = null; APP.go('netroom');
       }
       if (lob.ph === 'vs' && APP.screen !== 'vs' && lob.set) { APP.pendingSetup = this.decodeSetup(lob.set); APP.pendingSetup.net = true; APP.go('vs'); Audio8.sfx('go'); }
-      if (lob.ph === 'game' && lob.set && this.viewEp !== lob.ep) {
+      if (lob.ph === 'game' && lob.set && (this.viewEp !== lob.ep || (!this.view && !this.rollbackSession))) {
         this.viewEp = lob.ep; this.stopRollback();
         const setup = this.decodeSetup(lob.set);
         if (setup.rollback) {

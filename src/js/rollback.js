@@ -16,6 +16,7 @@ class RollbackSession {
     this.snapshots = new Map(); this.hashes = new Map(); this.events = new Map(); this.cpuAt = new Map();
     this.rollbackFrom = null; this.running = false; this.stopped = false; this.off = [];
     this.metrics = { rollbacks: 0, resimFrames: 0, resimMs: 0, saveMs: 0, stalls: 0 };
+    this.metrics.desyncs = 0; this.codec = new RBStateCodec(battle); this.checkpoints = new Map(); this.pendingChecks = new Map(); this.lastResync = -Infinity; this.rollbackTimes = [];
     this.clocks = new Map(); this.rtts = new Map(); this.pings = new Map(); this.pingSeq = 0; this.lastPing = -Infinity; this.ticks = 0; this.resimAvg = 0; this.ahead = 0;
     this.ports = Object.keys(this.owners).map(Number); this.local = this.ports.filter(p => this.owners[p] === this.myPeer);
     for (const p of this.ports) {
@@ -25,6 +26,7 @@ class RollbackSession {
     if (opts.room) {
       for (const k of ['ri', 'rq', 'rp', 'rp2']) this.off.push(opts.room.onFast(k, e => this.receive(k, e.data, e.peer)));
       this.off.push(opts.room.onState('rcpu', e => this.receive('rcpu', e.data, e.peer)));
+      for (const k of ['rc', 'rs', 'rrs']) this.off.push(opts.room.onState(k, e => this.receive(k, e.data, e.peer)));
     }
   }
   stop() { this.stopped = true; this.off.forEach(fn => fn()); this.off = []; }
@@ -46,6 +48,15 @@ class RollbackSession {
   }
   receive(k, v, peer) {
     if (this.stopped || !v || v.ep !== this.ep) return;
+    if (k === 'rc' && this.host && Object.values(this.owners).includes(peer)) {
+      if (!Number.isInteger(v.f) || v.f < 0 || v.f > this.frame + 120 || typeof v.h !== 'string') return;
+      const checkpoint = this.checkpoints.get(v.f);
+      if (checkpoint) this.compareCheck(peer, v.f, v.h);
+      else { this.pendingChecks.set(peer + ':' + v.f, { peer, f: v.f, h: v.h }); if (this.pendingChecks.size > 32) this.pendingChecks.delete(this.pendingChecks.keys().next().value); }
+      return;
+    }
+    if (k === 'rrs' && this.host && Object.values(this.owners).includes(peer)) { this.sendState(peer); return; }
+    if (k === 'rs' && !this.host && peer === this.hostPeer) { this.loadAuthority(v); return; }
     if (k === 'rp') { this.send('rp2', { ep: this.ep, id: v.id }, peer); return; }
     if (k === 'rp2') {
       const pending = this.pings.get(v.id);
@@ -63,7 +74,7 @@ class RollbackSession {
       return;
     }
     if (k === 'rcpu') {
-      if (peer !== this.hostPeer || !this.ports.includes(v.p) || !Number.isInteger(v.f) || v.f < 0 || !Array.isArray(v.a) || v.a.length > 16) return;
+      if (peer !== this.hostPeer || !this.ports.includes(v.p) || !Number.isInteger(v.f) || v.f < 0 || !Number.isInteger(v.first) || v.first < 0 || v.first > v.f || !Array.isArray(v.a) || v.a.length > 16 || !v.a.every(a => Array.isArray(a) && a.length === 5 && a.every((x, i) => Number.isInteger(x) && Math.abs(x) <= (i === 4 ? 1023 : 100)))) return;
       this.cpuAt.set(v.p, v.f); this.events.set(v.p, v);
       for (let i = 0; i < v.a.length; i++) this.put(v.p, v.first + i, v.a[i]);
       if (v.f < this.frame) this.rollbackFrom = Math.min(this.rollbackFrom ?? v.f, v.f);
@@ -89,7 +100,39 @@ class RollbackSession {
     if (old && !rbSame(old, a)) this.rollbackFrom = Math.min(this.rollbackFrom ?? f, f);
   }
   advanceConfirmed() {
-    while (this.confirmed + 1 < this.frame && this.ports.every(p => this.real.get(p).has(this.confirmed + 1) || (this.cpuAt.has(p) && this.confirmed + 1 >= this.cpuAt.get(p)))) this.confirmed++;
+    while (this.confirmed + 1 < this.frame && this.ports.every(p => this.real.get(p).has(this.confirmed + 1) || (this.cpuAt.has(p) && this.confirmed + 1 >= this.cpuAt.get(p)))) {
+      this.confirmed++;
+      if (this.confirmed % 30 === 29) this.checkConfirmed(this.confirmed);
+    }
+  }
+  checkConfirmed(f) {
+    const state = f === this.frame - 1 ? this.battle.saveState() : this.snapshots.get(f + 1);
+    if (!state) return;
+    this.checkpoints.set(f, { state, hash: this.hashes.get(f) });
+    while (this.checkpoints.size > 4) this.checkpoints.delete(this.checkpoints.keys().next().value);
+    if (!this.host) this.send('rc', { ep: this.ep, f, h: this.hashes.get(f) }, this.hostPeer, true);
+    else for (const [key, c] of this.pendingChecks) if (c.f <= f) { this.compareCheck(c.peer, c.f, c.h); this.pendingChecks.delete(key); }
+  }
+  compareCheck(peer, f, h) {
+    const checkpoint = this.checkpoints.get(f);
+    if (checkpoint && checkpoint.hash !== h) { this.metrics.desyncs++; this.sendState(peer, f); }
+  }
+  sendState(peer, f) {
+    if (f === undefined) f = [...this.checkpoints.keys()].at(-1);
+    const checkpoint = this.checkpoints.get(f); if (!checkpoint) return;
+    const inputs = this.ports.map(p => ({ p, first: Math.max(0, f - 7), a: Array.from({ length: Math.min(8, f + 1) }, (_, i) => this.real.get(p).get(Math.max(0, f - 7) + i) || this.used.get(p).get(Math.max(0, f - 7) + i) || RB_NEUTRAL) }));
+    this.send('rs', { ep: this.ep, f, h: checkpoint.hash, state: this.codec.encode(checkpoint.state), inputs, events: [...this.events.values()] }, peer, true);
+  }
+  loadAuthority(v) {
+    if (!Number.isInteger(v.f) || v.f < 0 || v.f > this.frame + 3600 || !Array.isArray(v.inputs) || !Array.isArray(v.events)) return;
+    let state; try { state = this.codec.decode(v.state); } catch (e) { return; }
+    const end = Math.max(this.frame, v.f + 1), t = performance.now();
+    for (const e of v.events) if (this.ports.includes(e.p)) { this.events.set(e.p, e); this.cpuAt.set(e.p, e.f); }
+    for (const x of v.inputs) if (this.ports.includes(x.p) && Array.isArray(x.a)) for (let i = 0; i < x.a.length; i++) this.real.get(x.p).set(x.first + i, x.a[i]);
+    this.battle.loadState(state); this.snapshots.clear(); this.checkpoints.clear(); this.confirmed = v.f; this.rollbackFrom = null; this.hashes.set(v.f, v.h);
+    for (let f = v.f + 1; f < end; f++) this.simulate(f, true);
+    this.frame = end; this.metrics.desyncs++; this.metrics.resimFrames += end - v.f - 1; this.metrics.resimMs = performance.now() - t; this.advanceConfirmed();
+    while (this.snapshots.size > 8) this.snapshots.delete(this.snapshots.keys().next().value);
   }
   simulate(f, resim) {
     const b = this.battle; BATTLE = b; b.resim = resim;
@@ -111,11 +154,16 @@ class RollbackSession {
     const from = this.rollbackFrom; this.rollbackFrom = null;
     if (from !== null && from < this.frame) {
       const s = this.snapshots.get(from);
-      if (!s) { this.rollbackFrom = from; return false; }
+      if (!s) {
+        this.rollbackFrom = from;
+        if (!this.host && this.now() - this.lastResync > 1000) { this.lastResync = this.now(); this.send('rrs', { ep: this.ep }, this.hostPeer, true); }
+        return false;
+      }
       const t = performance.now(); this.battle.loadState(s);
       for (let f = from; f < this.frame; f++) this.simulate(f, true);
       this.metrics.rollbacks++; this.metrics.resimFrames += this.frame - from; this.metrics.resimMs = performance.now() - t;
       this.resimAvg = this.resimAvg * 0.9 + this.metrics.resimMs * 0.1;
+      this.rollbackTimes.push(this.now());
     }
     this.advanceConfirmed(); return true;
   }
@@ -131,6 +179,7 @@ class RollbackSession {
   tick() {
     if (this.stopped) return;
     this.ticks++;
+    this.rollbackTimes = this.rollbackTimes.filter(t => this.now() - t < 1000);
     if (this.now() - this.lastPing >= 1000) {
       this.lastPing = this.now();
       const peers = this.host ? [...new Set(Object.values(this.owners).filter(p => p !== this.myPeer))] : [this.hostPeer];
@@ -163,8 +212,11 @@ class RollbackSession {
   }
   drawDebug() {
     if (!new URLSearchParams(location.search).has('netdbg')) return;
-    ctx.save(); ctx.fillStyle = 'rgba(0,0,0,.8)'; ctx.fillRect(12, 12, 330, 74);
+    this.rollbackTimes = this.rollbackTimes.filter(t => this.now() - t < 1000);
+    ctx.save(); ctx.fillStyle = 'rgba(0,0,0,.8)'; ctx.fillRect(12, 12, 370, 128);
     text('Red ' + Math.round(Math.max(0, ...this.rtts.values())) + ' ms · entrada ' + this.delay + ' cuadros', 24, 34, 15, '#fff', { align: 'left', body: true });
-    text('Adelanto ' + this.ahead.toFixed(1) + ' · re-simulación ' + this.resimAvg.toFixed(1) + ' ms', 24, 61, 14, '#fff', { align: 'left', body: true }); ctx.restore();
+    text('Adelanto ' + this.ahead.toFixed(1) + ' · rollback/s ' + this.rollbackTimes.length, 24, 61, 14, '#fff', { align: 'left', body: true });
+    text('Re-simulados ' + this.metrics.resimFrames + ' · desync ' + this.metrics.desyncs, 24, 88, 14, '#fff', { align: 'left', body: true });
+    text('Guardar ' + this.metrics.saveMs.toFixed(2) + ' ms · re-simular ' + this.metrics.resimMs.toFixed(2) + ' ms', 24, 115, 14, '#fff', { align: 'left', body: true }); ctx.restore();
   }
 }
