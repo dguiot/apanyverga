@@ -120,8 +120,9 @@ function text(str, x, y, size, color, opts = {}) {
   ctx.fillText(str, x, y);
 }
 
-const PLAYER_COLORS = ['#e63946', '#3a86ff', '#ffbe0b', '#2dc653'];
-const PLAYER_TAGS = ['J1', 'J2', 'J3', 'J4'];
+const MAX_FIGHTERS = 6, MAX_ONLINE_HUMANS = 4;
+const PLAYER_COLORS = ['#e63946', '#3a86ff', '#ffbe0b', '#2dc653', '#bd72e8', '#ff8a3d'];
+const PLAYER_TAGS = ['J1', 'J2', 'J3', 'J4', 'J5', 'J6'];
 
 // ---------- Mouse / táctil para menús ----------
 const Pointer = { x: -1, y: -1, down: false, clicked: false, moved: false };
