@@ -80,10 +80,9 @@ function logo(x, y, s = 1) {
 }
 // Orden fijo de la portada y de la selección: las caras de persona repartidas entre los demás
 // (en la selección quedan tres por fila, nunca dos juntas). Los que se agreguen después van al final.
-const ROSTER = ['torito', 'daniel', 'chilazo', 'nicole', 'dino', 'mariachi', 'nacho', 'axo', 'puentin', 'chispa', 'michi', 'robes', 'luchador', 'pablo', 'chupa', 'centella'];
+const ROSTER = ['torito', 'daniel', 'chilazo', 'nicole', 'dino', 'mariachi', 'nacho', 'axo', 'puentin', 'chispa', 'michi', 'robes', 'luchador', 'pablo', 'chupa'];
 CHAR_ORDER.sort((a, b) => (ROSTER.includes(a) ? ROSTER.indexOf(a) : 99) - (ROSTER.includes(b) ? ROSTER.indexOf(b) : 99));
 const NCH = () => CHAR_ORDER.length; // la tarjeta NCH() es "Aleatorio"
-const freshSlots = (dev) => Array.from({ length: MAX_FIGHTERS }, (_, i) => i === 0 && dev ? { type: 'human', dev, cur: 0, ready: false, edit: 0 } : { type: 'none' });
 function lineupX(i) { const n = CHAR_ORDER.length, sp = Math.min(215, (W - 150) / (n - 1)); return W / 2 + (i - (n - 1) / 2) * sp; }
 function lineup(y, scale) {
   CHAR_ORDER.forEach((id, i) => {
@@ -115,7 +114,7 @@ function wrapText(str, x, y, maxW, size, lh, col, align = 'center') {
 
 const APP = {
   screen: 'title', t: 0, idle: 0, battle: null, results: null, firstDev: null,
-  slots: freshSlots(),
+  slots: [{ type: 'none' }, { type: 'none' }, { type: 'none' }, { type: 'none' }],
   rules: { mode: 'stock', stocks: 3, time: 3, items: 2, teams: false, party: false, tournament: false },
   cpuLevel: 5, stageSel: 0, stageRow: 0, menuSel: 0, ctrlTab: 0, lastSetup: null, pendingSetup: null,
   bind: { col: 0, dev: 0, row: 0, msg: '' },
@@ -231,9 +230,9 @@ const APP = {
         const si = this.humanSlot(Net.role === 'host' ? 'local' : d);
         if (si < 0) return false; // quien no se ha unido: A lo une
         const S = this.slots[si], T = this.slots[S.edit] || S, cards = cardsR();
-        const slots = this.slots.map((_, i) => this.slotRect(i)), bodies = slots.map(r => R(r.x, r.y, r.w, r.h - 36));
+        const slots = [0, 1, 2, 3].map(i => this.slotRect(i)), bodies = slots.map(r => R(r.x, r.y, r.w, r.h - 100));
         if (T === S && S.ready) {
-          const fi = S.focus >= 0 && S.focus < this.slots.length ? S.focus : si, F = this.slots[fi];
+          const fi = S.focus >= 0 && S.focus < 4 ? S.focus : si, F = this.slots[fi];
           return { items: slots, cur: slots[fi], hide: cards.concat(bodies), sel: i => { S.focus = i; }, own: k => grid(k) || (F.type === 'cpu' && !F.remote && (k === 'up' || k === 'down')) };
         }
         return { items: cards, cur: cards[clamp(T.cur, 0, NCH())], sel: i => { T.cur = i; }, own: k => grid(k) || (T.type === 'cpu' && (k === 'up' || k === 'down')) };
@@ -321,7 +320,7 @@ const APP = {
     if (i === 0) {
       this.rules.tournament = false;
       // lugares que quedaron de una sala en línea (invitados, el aparato "local") no sirven aquí
-      if (!this.slots.some(s => s.type === 'human') || this.slots.some(s => s.remote || s.dev === 'local')) this.slots = freshSlots(this.firstDev || 'kb1');
+      if (!this.slots.some(s => s.type === 'human') || this.slots.some(s => s.remote || s.dev === 'local')) this.slots = [{ type: 'human', dev: this.firstDev || 'kb1', cur: 0, ready: false, edit: 0 }, { type: 'none' }, { type: 'none' }, { type: 'none' }];
       this.modeBack = 'main'; this.go('modesel');
     }
     if (i === 1) { this.onSel = 0; this.go('online'); }
@@ -331,7 +330,7 @@ const APP = {
       this.rules.teams = false;
       this.rules.party = false;
       this.modeBack = 'main';
-      this.slots = freshSlots(this.firstDev || 'kb1');
+      this.slots = [{ type: 'human', dev: this.firstDev || 'kb1', cur: 0, ready: false, edit: 0 }, { type: 'none' }, { type: 'none' }, { type: 'none' }];
       this.go('charsel');
     }
     if (i === 3) this.go('fame');
@@ -353,7 +352,7 @@ const APP = {
       const y = this.mainY(i), sel = i === this.menuSel || hover(W / 2 - 230, y, 460, 50);
       sfButton(o, W / 2 - 230 + (sel ? 12 : 0), y, 460, 50, sel);
     });
-    const desc = ['Hasta 6 luchadores en esta pantalla: 6 modos, equipos y Modo Fiesta', 'Hasta 4 amigos online y 2 CPU en la misma pelea', 'Eliminación directa de 2 a 4 amigos, local o en una sala', 'Ranking de tus amigos por cuenta: victorias, rachas y KOs', 'Combinaciones de golpes y prueba de control', 'Cambia las teclas y los botones del control', 'Calidad, efectos, movimiento y contraste', 'Todo · solo efectos (sin música) · nada', 'El control vibra al pegar, al recibir golpes y al salir volando'][this.menuSel];
+    const desc = ['Hasta 4 jugadores en esta pantalla: 6 modos, equipos y Modo Fiesta', 'Pelea con tus amigos, cada quien desde su casa', 'Eliminación directa de 2 a 4 amigos, local o en una sala', 'Ranking de tus amigos por cuenta: victorias, rachas y KOs', 'Combinaciones de golpes y prueba de control', 'Cambia las teclas y los botones del control', 'Calidad, efectos, movimiento y contraste', 'Todo · solo efectos (sin música) · nada', 'El control vibra al pegar, al recibir golpes y al salir volando'][this.menuSel];
     text(desc, W / 2, 662, 16, '#cbd5e1', { body: true, weight: 500 });
     text('A / J / Enter: aceptar   ·   B / K / Esc: volver', W / 2, 694, 14, MUTED, { body: true });
   },
@@ -423,7 +422,7 @@ const APP = {
   toggleParty() { if (this.rules.tournament) { this.rules.tournament = false; Toasts.push('Torneo desactivado: elegiste Modo Fiesta'); } this.rules.party = !this.rules.party; Audio8.sfx('menu'); },
   modeContinue() {
     Audio8.sfx('confirm');
-    if (!this.slots.some(s => s.type === 'human') && Net.role !== 'host') this.slots = freshSlots(this.firstDev || 'kb1');
+    if (!this.slots.some(s => s.type === 'human') && Net.role !== 'host') this.slots = [{ type: 'human', dev: this.firstDev || 'kb1', cur: 0, ready: false, edit: 0 }, { type: 'none' }, { type: 'none' }, { type: 'none' }];
     if (this.rules.mode === 'soccer') this.stageSel = Math.max(0, STAGE_INFO.findIndex(s => s.id === 'stadium'));
     this.slots.forEach((sl, i) => { if (sl.type !== 'none' && sl.team === undefined) sl.team = i % 2; });
     this.go('charsel');
@@ -497,15 +496,14 @@ const APP = {
       if (n.start && allReadyBefore) return this.toStages();
       if (S.edit !== si && (!sl[S.edit] || sl[S.edit].type !== 'cpu')) S.edit = si;
       const T = sl[S.edit];
-      // ya listo: la cruceta recorre los seis lugares en dos filas; sobre una CPU, ↑↓ cambia su nivel
+      // ya listo: con ←→ el cursor recorre los cuatro lugares para agregar, editar o quitar CPUs
       if (T === S && S.ready) {
-        if (!(S.focus >= 0 && S.focus < sl.length)) S.focus = si;
+        if (!(S.focus >= 0 && S.focus < 4)) S.focus = si;
         const F = sl[S.focus];
-        if (n.left || n.right) { const row = Math.floor(S.focus / 3), col = S.focus % 3; S.focus = row * 3 + (col + (n.left ? 2 : 1)) % 3; Audio8.sfx('menu'); continue; }
+        if (n.left || n.right) { S.focus = (S.focus + (n.left ? 3 : 1)) % 4; Audio8.sfx('menu'); continue; }
         if (F.type === 'cpu' && (n.up || n.down)) { F.level = clamp(F.level + (n.up ? 1 : -1), 1, AI_MAX); this.cpuLevel = F.level; Audio8.sfx('menu'); continue; }
-        if (n.up || n.down) { S.focus = (S.focus + 3) % sl.length; Audio8.sfx('menu'); continue; }
         if (n.shield && this.teamsOn()) { const X = F.type !== 'none' && !F.remote ? F : S; X.team = X.team ? 0 : 1; Audio8.sfx('menu'); continue; }
-        if (n.confirm && F.type === 'none' && !this.rules.tournament && this.cpuAllowed(S.focus)) { sl[S.focus] = this.newCPU(false, S.focus); S.edit = S.focus; Audio8.sfx('confirm'); continue; }
+        if (n.confirm && F.type === 'none' && !this.rules.tournament) { sl[S.focus] = this.newCPU(false, S.focus); S.edit = S.focus; Audio8.sfx('confirm'); continue; }
         if (n.confirm && F.type === 'cpu') { F.ready = false; S.edit = S.focus; Audio8.sfx('confirm'); continue; }
         if (n.grab && F.type === 'cpu') { sl[S.focus] = { type: 'none' }; Audio8.sfx('back'); continue; }
         if (n.back && S.focus !== si) { S.focus = si; Audio8.sfx('back'); continue; }
@@ -528,10 +526,10 @@ const APP = {
         else if (Net.role === 'host' && si === 0) return this.go('modesel'); // la sala sigue abierta; desde el modo se cierra
         else { sl[si] = { type: 'none' }; if (!sl.some(s => s.type === 'human')) { this.slots = sl.map(() => ({ type: 'none' })); return this.go('modesel'); } }
       } else if (n.jump && S.ready) {
-        const free = sl.findIndex((s, i) => s.type === 'none' && this.cpuAllowed(i));
+        const free = sl.findIndex(s => s.type === 'none');
         if (free >= 0 && !this.rules.tournament) { sl[free] = this.newCPU(false, free); S.edit = free; S.focus = free; Audio8.sfx('confirm'); }
       } else if (n.grab) {
-        for (let i = sl.length - 1; i >= 0; i--) if (sl[i].type === 'cpu') { sl[i] = { type: 'none' }; Audio8.sfx('back'); break; }
+        for (let i = 3; i >= 0; i--) if (sl[i].type === 'cpu') { sl[i] = { type: 'none' }; Audio8.sfx('back'); break; }
       }
     }
     // ratón
@@ -546,7 +544,7 @@ const APP = {
         Audio8.sfx('confirm');
       }
     }
-    for (let i = 0; i < sl.length; i++) {
+    for (let i = 0; i < 4; i++) {
       const r = this.slotRect(i), s = sl[i], b = this.slotButton(i);
       if (b && clickIn(b.x, b.y, b.w, b.h)) {
         if (b.kind === 'toCPU') {
@@ -559,13 +557,13 @@ const APP = {
         continue;
       }
       if (s.type === 'cpu') {
-        if (clickIn(r.x + 250, r.y + r.h - 74, 34, 30)) { s.level = clamp(s.level - 1, 1, AI_MAX); this.cpuLevel = s.level; Audio8.sfx('menu'); continue; }
-        if (clickIn(r.x + r.w - 44, r.y + r.h - 74, 34, 30)) { s.level = clamp(s.level + 1, 1, AI_MAX); this.cpuLevel = s.level; Audio8.sfx('menu'); continue; }
+        if (clickIn(r.x + 150, r.y + r.h - 94, 34, 30)) { s.level = clamp(s.level - 1, 1, AI_MAX); this.cpuLevel = s.level; Audio8.sfx('menu'); continue; }
+        if (clickIn(r.x + r.w - 44, r.y + r.h - 94, 34, 30)) { s.level = clamp(s.level + 1, 1, AI_MAX); this.cpuLevel = s.level; Audio8.sfx('menu'); continue; }
       }
       if (s.type !== 'none' && this.teamsOn() && clickIn(r.x + 86, r.y + 12, 108, 28)) { s.team = s.team ? 0 : 1; Audio8.sfx('menu'); continue; }
       if (s.remote) continue;
-      if (clickIn(r.x, r.y, r.w, r.h - 36)) {
-        if (s.type === 'none' && !this.rules.tournament && this.cpuAllowed(i)) { sl[i] = this.newCPU(true, i); Audio8.sfx('confirm'); }
+      if (clickIn(r.x, r.y, r.w, r.h - 100)) {
+        if (s.type === 'none' && !this.rules.tournament) { sl[i] = this.newCPU(true, i); Audio8.sfx('confirm'); }
         else if (s.type === 'cpu') { sl[i] = { type: 'none' }; Audio8.sfx('back'); }
         else if (s.type === 'human') s.ready = false;
       }
@@ -574,12 +572,11 @@ const APP = {
     if (clickIn(40, 660, 150, 40)) { Audio8.sfx('back'); this.slots.forEach(x => { if (x.type === 'human' && !x.remote) x.ready = false; }); return this.go('modesel'); }
   },
   // botón de cada ranura: una persona local pasa a CPU; una CPU se quita
-  cpuAllowed(i) { return Net.role !== 'host' || i >= MAX_ONLINE_HUMANS; },
   slotButton(i) {
     if (this.screen !== 'charsel') return null;
     const s = this.slots[i], r = this.slotRect(i);
     if (s.type === 'cpu') return { kind: 'remove', x: r.x + r.w - 48, y: r.y + 10, w: 34, h: 30 };
-    if (s.type === 'human' && !s.remote && Net.role !== 'host' && !this.rules.tournament) return { kind: 'toCPU', x: r.x + r.w - 110, y: r.y + 10, w: 96, h: 30 };
+    if (s.type === 'human' && !s.remote && Net.role !== 'host' && !this.rules.tournament) return { kind: 'toCPU', x: r.x + 160, y: r.y + r.h - 92, w: 116, h: 32 };
     return null;
   },
   teamsOn() { return this.rules.teams || this.rules.mode === 'soccer'; },
@@ -602,7 +599,7 @@ const APP = {
   },
   toStages() {
     const sl = this.slots;
-    if (this.rules.tournament && (sl.filter(s => s.type === 'human' && s.ready).length < 2 || sl.filter(s => s.type === 'human').length > 4 || sl.some(s => s.type === 'cpu'))) {
+    if (this.rules.tournament && (sl.filter(s => s.type === 'human' && s.ready).length < 2 || sl.some(s => s.type === 'cpu'))) {
       Toasts.push('El torneo necesita 2 a 4 personas listas, sin CPU');
       return;
     }
@@ -625,7 +622,7 @@ const APP = {
     return { x: x0 + (i % cols) * (w + gap) + (cols - inRow) * (w + gap) / 2, y: rows > 1 ? 62 + row * (h + 8) : 70, w, h };
   },
   cardRow(cur, dir) { const n = NCH() + 1, cols = this.cardCols(); return cols >= n ? (cur === NCH() ? 0 : NCH()) : (cur + dir * cols + n * 2) % n; },
-  slotRect(i) { const w = 390, gap = 14, x0 = (W - (3 * w + 2 * gap)) / 2; return { x: x0 + (i % 3) * (w + gap), y: 338 + Math.floor(i / 3) * 158, w, h: 148 }; },
+  slotRect(i) { const w = 292, gap = 14, x0 = (W - (4 * w + 3 * gap)) / 2; return { x: x0 + i * (w + gap), y: 340, w, h: 300 }; },
   charselDraw(opts = {}) {
     drawMenuBG(2);
     sfText(opts.title || (Net.role === 'host' ? 'Tu sala online' : 'Selección de personaje'), W / 2, 36, 44, PAPER);
@@ -671,7 +668,7 @@ const APP = {
       else if (ab) text(`Habilidad · ${ab.name}: ${ab.desc}`, W / 2, 314, 13, GOLD, { body: true, weight: 600 });
     } else if (hint) { text('Lugar libre', W / 2, 295, 14, '#e2e8f0', { body: true, weight: 600 }); text(hint, W / 2, 314, 13, TEAL, { body: true, weight: 700 }); }
     else text('Personaje aleatorio', W / 2, 304, 15, '#e2e8f0', { body: true, weight: 600 });
-    for (let i = 0; i < sl.length; i++) this.drawSlot(i);
+    for (let i = 0; i < 4; i++) this.drawSlot(i);
     sfButton(this.screen === 'netroom' ? '‹ Salir' : '‹ Volver', 40, 660, 150, 40, hover(40, 660, 150, 40));
     const allReady = sl.some(s => s.type !== 'none') && sl.every(s => s.type === 'none' || s.ready);
     if (opts.footer) text(opts.footer, W / 2, 677, 15, GOLD, { body: true, weight: 700 });
@@ -683,7 +680,7 @@ const APP = {
       ctx.restore();
     } else {
       const inSlots = sl.some((h, hi) => h.type === 'human' && !h.remote && h.ready && h.edit === hi);
-      text(inSlots ? '←→↑↓ moverte por los lugares · A agregar o cambiar CPU · ↑↓ sobre CPU: nivel · LB/RB quitar · B regresar' + (this.teamsOn() ? ' · Escudo: equipo' : '')
+      text(inSlots ? '←→ moverte entre los lugares · A agregar o cambiar CPU · ↑↓ nivel · LB/RB quitar CPU · B regresar' + (this.teamsOn() ? ' · Escudo: equipo' : '')
         : (Net.role === 'host' ? 'Tus amigos aparecen aquí al unirse · ←→ elegir · A confirmar · X/Y agregar CPU · ↑↓ nivel · B cerrar la sala' : '←→ elegir · A confirmar · B volver · luego ←→ para agregar CPUs') + (this.teamsOn() ? ' · Escudo: cambiar de equipo' : ''), W / 2, 677, 14, MUTED, { body: true, weight: 500 });
     }
   },
@@ -693,39 +690,75 @@ const APP = {
     if (Net.role !== 'host') return null;
     return s.remote || (this.slots.find(x => x.type === 'human' && !x.remote) === s ? Net.myPeer() : null);
   },
-  drawSlotCompact(i) {
-    const r = this.slotRect(i), s = this.slots[i], col = PLAYER_COLORS[i], teams = this.screen === 'netroom' ? !!this.netTeams : this.teamsOn();
-    slab(r.x, r.y, r.w, r.h, { skew: 0.08, top: s.type === 'none' ? '#171e2a' : withAlpha(col, 0.34), bottom: '#080c15', edge: teams && s.type !== 'none' ? TEAM_COLORS[s.team || 0] : col, lw: 2.5 });
-    slabPath(r.x + 12, r.y + 10, 66, 29, 0.3); ctx.fillStyle = col; ctx.fill();
-    sfText(s.type === 'cpu' ? 'CPU' : PLAYER_TAGS[i], r.x + 45, r.y + 25, 22, INK, { stroke: null });
+  drawSlot(i) {
+    const r = this.slotRect(i), s = this.slots[i], col = PLAYER_COLORS[i];
     if (s.type === 'none') {
-      sfText('Lugar libre', r.x + 176, r.y + 57, 34, PAPER);
-      text(Net.role === 'host' && i < MAX_ONLINE_HUMANS ? 'Reservado para un amigo online' : 'A / J: unirte o agregar CPU', r.x + 175, r.y + 91, 16, MUTED, { body: true, weight: 600 });
-      this.drawSlotFocus(i); return;
+      slab(r.x, r.y, r.w, r.h, { skew: 0.08, top: 'rgba(20,24,34,.6)', bottom: 'rgba(8,10,16,.7)', edge: 'rgba(154,167,184,.25)' });
+      sfText(PLAYER_TAGS[i], r.x + r.w / 2, r.y + 100, 70, withAlpha(col, 0.45), { stroke: null });
+      text('Pulsa A / J para unirte', r.x + r.w / 2, r.y + 160, 16, '#cbd5e1', { body: true, weight: 600 });
+      if (this.slotFocusers(i).length) { this.drawSlotFocus(i); return; }
+      text('X·Y / Espacio: agregar CPU', r.x + r.w / 2, r.y + 186, 14, MUTED, { body: true, weight: 500 });
+      text('(o haz clic aquí)', r.x + r.w / 2, r.y + 208, 13, MUTED, { body: true });
+      return;
     }
-    const id = s.ready ? s.pick : s.cur >= NCH() ? null : CHAR_ORDER[s.cur];
-    ctx.save(); slabPath(r.x + 12, r.y + 47, 104, 88, 0.15); ctx.clip();
-    ctx.fillStyle = withAlpha(col, 0.25); ctx.fillRect(r.x + 12, r.y + 47, 104, 88);
-    if (id) drawBust(ctx, id, r.x + 16, r.y + 45, 96, 105, s.ready ? 'happy' : 'normal');
-    else sfText('?', r.x + 64, r.y + 92, 70, GOLD);
+    const id = s.ready ? s.pick : (s.cur >= NCH() ? null : CHAR_ORDER[s.cur]);
+    ctx.save();
+    slabPath(r.x, r.y, r.w, r.h, 0.08); ctx.clip();
+    const g = ctx.createLinearGradient(r.x, 0, r.x + r.w, 0);
+    g.addColorStop(0, withAlpha(col, 0.45)); g.addColorStop(0.6, 'rgba(12,15,22,.95)'); g.addColorStop(1, 'rgba(8,10,16,.98)');
+    ctx.fillStyle = g; ctx.fillRect(r.x, r.y, r.w, r.h);
+    if (id) {
+      ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.beginPath(); ctx.ellipse(r.x + 88, r.y + 262, 44, 8, 0, 0, TAU); ctx.fill();
+      ctx.save(); ctx.translate(r.x + 88, r.y + 262); const k = 1.72 * CHARS[id].size; ctx.scale(k, k);
+      drawCharacter(ctx, id, s.ready ? (i % 2 ? POSES.win2 : POSES.win1) : mkPose(Object.assign({}, POSES.idle, { bodyY: Math.sin(this.t * 0.07 + i) * 2 })), {});
+      ctx.restore();
+    } else sfText('?', r.x + 88, r.y + 160, 140, GOLD);
     ctx.restore();
-    sfText(id ? CHARS[id].name : 'Aleatorio', r.x + 130, r.y + 63, fitSize(id ? CHARS[id].name : 'Aleatorio', r.w - 160, 32), PAPER, { align: 'left' });
-    text(s.type === 'cpu' ? `Nv ${s.level} · ${AI_NAMES[s.level]}` : devLabel(s.dev), r.x + 132, r.y + 92, 14, MUTED, { body: true, align: 'left', weight: 600 });
-    if (teams) { slabPath(r.x + 87, r.y + 10, 116, 29, 0.3); ctx.fillStyle = TEAM_COLORS[s.team || 0]; ctx.fill(); sfText(`Equipo ${TEAM_NAMES[s.team || 0]}`, r.x + 145, r.y + 25, 16, PAPER); }
+    const teams = this.screen === 'netroom' ? !!this.netTeams : this.teamsOn();
+    slabPath(r.x, r.y, r.w, r.h, 0.08); ctx.lineWidth = teams ? 5 : 3; ctx.strokeStyle = teams ? TEAM_COLORS[s.team || 0] : col; ctx.stroke();
+    if (teams) {
+      slabPath(r.x + 86, r.y + 12, 108, 28, 0.3); ctx.fillStyle = TEAM_COLORS[s.team || 0]; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.stroke();
+      sfText(`Equipo ${TEAM_NAMES[s.team || 0]}`, r.x + 140, r.y + 26, 18, PAPER);
+    }
+    slabPath(r.x + 14, r.y + 12, 66, 28, 0.3); ctx.fillStyle = col; ctx.fill();
+    sfText(s.type === 'cpu' ? 'CPU' : PLAYER_TAGS[i], r.x + 47, r.y + 26, 24, INK, { stroke: null });
+    // con cámara y voz: su cara en vivo en la esquina de su tarjeta
     const cam = s.type === 'human' && typeof AV !== 'undefined' ? AV.videoFor(this.slotPeer(s)) : null;
-    if (cam) { ctx.save(); slabPath(r.x + r.w - 80, r.y + 47, 68, 51, 0.12); ctx.clip(); drawVideoCover(ctx, cam.v, r.x + r.w - 80, r.y + 47, 68, 51, cam.mirror); ctx.restore(); }
+    if (cam) {
+      const cx = r.x + r.w - 84, cy = r.y + 8, cw2 = 72, ch2 = 50;
+      ctx.save(); roundRect(ctx, cx, cy, cw2, ch2, 10); ctx.clip(); drawVideoCover(ctx, cam.v, cx, cy, cw2, ch2, cam.mirror); ctx.restore();
+      roundRect(ctx, cx, cy, cw2, ch2, 10); ctx.lineWidth = 2; ctx.strokeStyle = col; ctx.stroke();
+      ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.arc(cx + 9, cy + 9, 3.5, 0, TAU); ctx.fill();
+    } else text(s.type === 'cpu' ? '' : devLabel(s.dev), r.x + r.w - 18, r.y + 26, 13, '#cbd5e1', { align: 'right', body: true, weight: 600 });
+    sfText(id ? CHARS[id].name : 'Aleatorio', r.x + 220, r.y + 70, 36, PAPER);
+    if (id) {
+      text(CHARS[id].title, r.x + 220, r.y + 96, 13, MUTED, { body: true, weight: 600 });
+      let by = r.y + 116;
+      for (const [k, v] of Object.entries(CHARS[id].bars)) {
+        text(k.toUpperCase(), r.x + 168, by + 5, 10, MUTED, { align: 'left', body: true, weight: 700 });
+        for (let j = 0; j < 5; j++) { slabPath(r.x + 168 + j * 22, by + 13, 19, 8, 0.5); ctx.fillStyle = j < v ? GOLD : 'rgba(154,167,184,.22)'; ctx.fill(); }
+        by += s.type === 'cpu' || this.slotButton(i) ? 23 : 30; // deja espacio para el nivel de la CPU o el botón → CPU
+      }
+    }
     if (s.type === 'cpu') {
-      const y = r.y + r.h - 74;
-      slab(r.x + 250, y, 34, 30, { skew: 0.2 }); sfText('‹', r.x + 267, y + 15, 29, PAPER);
-      slab(r.x + r.w - 44, y, 34, 30, { skew: 0.2 }); sfText('›', r.x + r.w - 27, y + 15, 29, PAPER);
+      const ly = r.y + r.h - 94;
+      slab(r.x + 150, ly, 34, 30, { skew: 0.25 }); sfText('‹', r.x + 167, ly + 15, 30, PAPER);
+      slab(r.x + r.w - 44, ly, 34, 30, { skew: 0.25 }); sfText('›', r.x + r.w - 27, ly + 15, 30, PAPER);
+      const lvCol = s.level >= 8 ? RED : s.level >= 6 ? '#ff9f1c' : GOLD;
+      sfText(`Nv ${s.level}`, r.x + 214, ly + 14, 26, lvCol);
+      text(AI_NAMES[s.level], r.x + 214, ly + 40, 12, MUTED, { body: true, weight: 600 });
     }
     const btn = this.slotButton(i);
-    if (btn) { slab(btn.x, btn.y, btn.w, btn.h, { skew: 0.2 }); sfText(btn.kind === 'remove' ? '✕' : '→ CPU', btn.x + btn.w / 2, btn.y + btn.h / 2, btn.kind === 'remove' ? 22 : 19, PAPER); }
-    slab(r.x + 128, r.y + r.h - 33, r.w - 142, 26, s.ready ? { top: '#34d399', bottom: '#059669' } : {});
-    sfText(s.ready ? '¡Listo!' : 'Eligiendo…', r.x + (r.w + 128) / 2, r.y + r.h - 20, 20, s.ready ? INK : PAPER, { stroke: null });
+    if (btn) {
+      const hv = hover(btn.x, btn.y, btn.w, btn.h);
+      if (btn.kind === 'remove') { slab(btn.x, btn.y, btn.w, btn.h, { skew: 0.25, top: hv ? '#ff5d6c' : 'rgba(40,46,60,.95)', bottom: hv ? '#b3122a' : 'rgba(20,24,34,.95)' }); sfText('✕', btn.x + btn.w / 2, btn.y + btn.h / 2, 22, PAPER); }
+      else { slab(btn.x, btn.y, btn.w, btn.h, { skew: 0.25, top: hv ? '#ffd76a' : 'rgba(40,46,60,.95)', bottom: hv ? '#e0a01a' : 'rgba(20,24,34,.95)', edge: hv ? '#fff3c4' : undefined }); sfText('→ CPU', btn.x + btn.w / 2, btn.y + btn.h / 2, 22, hv ? INK : PAPER, { stroke: hv ? null : undefined }); }
+    }
+    const status = s.ready ? '¡Listo!' : (s.type === 'cpu' ? 'Eligiendo CPU…' : 'Eligiendo…');
+    slab(r.x + 16, r.y + r.h - 46, r.w - 32, 34, s.ready ? { top: '#34d399', bottom: '#059669', edge: '#a7f3d0' } : {});
+    sfText(status, r.x + r.w / 2, r.y + r.h - 29, 26, s.ready ? INK : PAPER, { stroke: s.ready ? null : undefined });
     this.drawSlotFocus(i);
   },
-  drawSlot(i) { this.drawSlotCompact(i); },
   // quién tiene el cursor de lugares aquí (jugadores de esta pantalla que ya están listos)
   slotFocusers(i) {
     if (this.screen !== 'charsel') return [];
@@ -739,7 +772,7 @@ const APP = {
     slabPath(r.x - 5 - pulse, r.y - 5 - pulse, r.w + 10 + pulse * 2, r.h + 10 + pulse * 2, 0.08); ctx.lineWidth = 4; ctx.strokeStyle = col; ctx.stroke();
     slabPath(r.x + r.w / 2 - 34, r.y - 13, 68, 22, 0.3); ctx.fillStyle = col; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.stroke();
     sfText(who.map(w => PLAYER_TAGS[w.hi]).join(' ') + ' ▼', r.x + r.w / 2, r.y - 2, 17, INK, { stroke: null });
-    if (s.type === 'none') text('A: agregar CPU', r.x + r.w / 2, r.y + 100, 17, GOLD, { body: true, weight: 700 });
+    if (s.type === 'none') text('A: agregar CPU', r.x + r.w / 2, r.y + 232, 17, GOLD, { body: true, weight: 700 });
   },
   // qué hacen los botones con el cursor puesto en ese lugar (va en la franja de arriba)
   slotHint() {
@@ -780,9 +813,8 @@ const APP = {
   // al cambiar a Fútbol desde aquí: equipos forzados y repartidos
   toStagesTeams() { this.balanceTeams(); },
   stageRect(i) {
-    const n = STAGE_INFO.length, dense = n > 8, cols = dense ? 3 : n > 6 ? 4 : n > 4 ? 3 : n;
-    const w = cols === 4 ? 293 : cols === 3 ? 390 : 286, h = dense ? 86 : cols >= 3 ? 138 : 258, gap = dense ? 10 : 16, x0 = (W - (cols * w + (cols - 1) * gap)) / 2;
-    return { x: x0 + (i % cols) * (w + gap), y: (dense ? 70 : 80) + Math.floor(i / cols) * (h + gap), w, h, cols };
+    const n = STAGE_INFO.length, cols = n > 6 ? 4 : n > 4 ? 3 : n, w = cols === 4 ? 293 : cols === 3 ? 390 : 286, h = cols >= 3 ? 138 : 258, gap = 16, x0 = (W - (cols * w + (cols - 1) * gap)) / 2;
+    return { x: x0 + (i % cols) * (w + gap), y: 80 + Math.floor(i / cols) * (h + gap), w, h, cols };
   },
   stageselUpdate() {
     const rows = this.ruleRows(), N = STAGE_INFO.length, cols = this.stageRect(0).cols;
@@ -864,8 +896,7 @@ const APP = {
     STAGE_INFO.forEach((info, i) => {
       const r = this.stageRect(i), sel = i === this.stageSel, locked = this.stageLocked(i), wide = r.cols >= 3, narrow = r.cols === 4;
       const pk = info.id + (info.id === 'stadium' && this.rules.mode === 'soccer' ? ':futbol' : ''); // el estadio de Fútbol lleva porterías
-      const dense = STAGE_INFO.length > 8;
-      const pw = dense ? 120 : narrow ? 124 : wide ? 190 : r.w - 16, ph = wide ? r.h - 16 : 164;
+      const pw = narrow ? 124 : wide ? 190 : r.w - 16, ph = wide ? r.h - 16 : 164;
       const old = this.previews[pk], ok = old && old.k === VIEW.k && old.w === pw && old.h === ph;
       if (!ok && fresh++ === 0) this.previews[pk] = this.stageThumb(info, pk !== info.id, pw, ph, wide);
       const ready = !!this.previews[pk] && (ok || this.previews[pk] !== old);
@@ -879,8 +910,8 @@ const APP = {
       ctx.restore();
       if (wide) {
         const tx = r.x + pw + 22, tw = r.w - pw - 34;
-        sfText(info.name, tx, r.y + (dense ? 22 : 26), fitSize(info.name, tw, dense ? 21 : narrow ? 22 : 28), sel ? GOLD : PAPER, { align: 'left' });
-        wrapText(info.desc, tx, r.y + (dense ? 43 : narrow ? 48 : 58), tw, dense ? 11 : narrow ? 11 : 13, dense ? 13 : narrow ? 14 : 17, '#cbd5e1', 'left');
+        sfText(info.name, tx, r.y + 26, fitSize(info.name, tw, narrow ? 22 : 28), sel ? GOLD : PAPER, { align: 'left' });
+        wrapText(info.desc, tx, r.y + (narrow ? 48 : 58), tw, narrow ? 11 : 13, narrow ? 14 : 17, '#cbd5e1', 'left');
         if (info.big) { slabPath(r.x + r.w - 104, r.y + r.h - 34, 86, 22, 0.3); ctx.fillStyle = TEAL; ctx.fill(); sfText('Gigante', r.x + r.w - 61, r.y + r.h - 23, 16, INK, { stroke: null }); }
       } else {
         sfText(info.name, r.x + r.w / 2, r.y + 196, 30, sel ? GOLD : PAPER);
@@ -934,9 +965,9 @@ const APP = {
       fade.addColorStop(0, 'rgba(7,9,15,0)'); fade.addColorStop(0.5, 'rgba(7,9,15,.95)');
       ctx.fillStyle = fade; ctx.fillRect(x - 60, 380, cw + 120, H - 380);
       ctx.restore();
-      sfText(CHARS[p.char].name, x + cw / 2, 560, fitSize(CHARS[p.char].name, cw - 12, n > 4 ? 44 : n > 2 ? 64 : 92), PAPER);
-      sfText(p.cpu ? `CPU · Nv ${p.cpu}` : PLAYER_TAGS[p.port], x + cw / 2, 618, n > 4 ? 23 : 30, col);
-      text(CHARS[p.char].title, x + cw / 2, 652, n > 4 ? 12 : 15, MUTED, { body: true, weight: 600 });
+      sfText(CHARS[p.char].name, x + cw / 2, 560, n > 2 ? 64 : 92, PAPER);
+      sfText(p.cpu ? `CPU · Nv ${p.cpu}` : PLAYER_TAGS[p.port], x + cw / 2, 618, 30, col);
+      text(CHARS[p.char].title, x + cw / 2, 652, 15, MUTED, { body: true, weight: 600 });
     });
     for (let i = 1; i < n; i++) {
       if (split > 0 && i !== split) continue; // por equipos: un solo VS entre Rojo y Azul
@@ -979,7 +1010,7 @@ const APP = {
     }
     const choose = i => {
       Audio8.sfx('confirm');
-      if (i === 0) { Net.host(); this.slots = freshSlots('local'); this.modeBack = 'online'; return this.go('modesel'); }
+      if (i === 0) { Net.host(); this.slots = [{ type: 'human', dev: 'local', cur: 0, ready: false, edit: 0 }, { type: 'none' }, { type: 'none' }, { type: 'none' }]; this.modeBack = 'online'; return this.go('modesel'); }
       const h = hosts[i - 1]; Net.join(h.peer); this.go('netroom');
     };
     for (const d of Devices.list) {
@@ -1018,9 +1049,9 @@ const APP = {
     text(`${Net.conn ? '● Conectado' : '○ Conectando…'}  ·  Aquí ahora: ${here.map(p => p.sameTab ? 'Tú' : Net.nameOf(p.peer)).join(', ') || 'solo tú'}`, W / 2, 96, 15, Net.conn ? TEAL : MUTED, { body: true, weight: 600 });
     const rows = [{ label: 'Crear sala', sub: 'Tú eres el anfitrión: eliges el escenario y las reglas' }].concat(hosts.map(h => {
       const lob = h.presence.lob || {}, sl = lob.sl || [];
-      const used = sl.filter(x => x[0] === 'h').length;
+      const used = sl.filter(x => x[0] !== 'n').length;
       const ph = lob.ph === 'lobby' ? 'eligiendo personajes' : lob.ph === 'tour' ? 'torneo en curso' : lob.ph === 'res' ? 'viendo resultados' : 'peleando (entra a ver)';
-      return { label: 'Sala de ' + Net.nameOf(h.peer) + (h.presence.code === Net.lastRoomCode ? ' · Última sala' : ''), sub: (h.presence.code ? 'código ' + h.presence.code + ' · ' : '') + used + '/4 personas · ' + ph };
+      return { label: 'Sala de ' + Net.nameOf(h.peer) + (h.presence.code === Net.lastRoomCode ? ' · Última sala' : ''), sub: (h.presence.code ? 'código ' + h.presence.code + ' · ' : '') + used + '/4 · ' + ph };
     }));
     rows.forEach((r, i) => {
       const y = 200 + i * 70, sel = i === this.onSel || hover(W / 2 - 300, y, 600, 58);
@@ -1326,18 +1357,16 @@ const APP = {
     const cx = [700, 820, 980, 1055, 1135, 1210];
     cols.forEach((c, i) => text(c, cx[i], 100, 13, GOLD, { body: true, weight: 700 }));
     R.ranked.forEach((p, i) => {
-      const dense = R.ranked.length > 4, step = dense ? 82 : 110, rh = dense ? 72 : 94;
-      const y = (dense ? 148 : 160) + i * step, rc = teams ? TEAM_COLORS[p.team || 0] : p.color, top = teams ? p.win : i === 0 && !R.draw;
-      slabPath(680, y - rh / 2, 550, rh, 0.15); ctx.fillStyle = top ? withAlpha(rc, 0.28) : 'rgba(30,36,50,.7)'; ctx.fill();
-      if (teams) { slabPath(680, y - rh / 2, 12, rh, 0.15); ctx.fillStyle = rc; ctx.fill(); }
-      sfText(`${i + 1}º`, cx[0], y, dense ? 32 : 44, top ? GOLD : PAPER);
-      const ps = dense ? 56 : 76;
-      ctx.save(); slabPath(730, y - ps / 2, ps, ps, 0.15); ctx.clip(); ctx.fillStyle = withAlpha(rc, 0.4); ctx.fillRect(730, y - ps / 2, ps, ps); drawPortrait(ctx, p.id, 730 + ps / 2, y, dense ? 24 : 32, top ? 'happy' : 'sad'); ctx.restore();
-      sfText(CHARS[p.id].name, 860, y - 10, fitSize(CHARS[p.id].name, 105, dense ? 24 : 30), PAPER, { align: 'left' });
-      text(`${who(p)}${teams ? ' · ' + TEAM_NAMES[p.team || 0] : ''}`, 862, y + 16, 12, rc, { body: true, weight: 700, align: 'left' });
+      const y = 160 + i * 110, rc = teams ? TEAM_COLORS[p.team || 0] : p.color, top = teams ? p.win : i === 0 && !R.draw;
+      slabPath(680, y - 46, 550, 94, 0.15); ctx.fillStyle = top ? withAlpha(rc, 0.28) : 'rgba(30,36,50,.7)'; ctx.fill();
+      if (teams) { slabPath(680, y - 46, 12, 94, 0.15); ctx.fillStyle = rc; ctx.fill(); }
+      sfText(`${i + 1}º`, cx[0], y, 44, top ? GOLD : PAPER);
+      ctx.save(); slabPath(730, y - 38, 76, 76, 0.15); ctx.clip(); ctx.fillStyle = withAlpha(rc, 0.4); ctx.fillRect(730, y - 38, 80, 76); drawPortrait(ctx, p.id, 768, y, 32, top ? 'happy' : 'sad'); ctx.restore();
+      sfText(CHARS[p.id].name, 860, y - 10, 30, PAPER, { align: 'left' });
+      text(`${who(p)}${teams ? ' · ' + TEAM_NAMES[p.team || 0] : ''}`, 862, y + 18, 13, rc, { body: true, weight: 700, align: 'left' });
       const v0 = first === 'Vidas' ? (p.stocks > 0 ? p.stocks : 'Fuera') : first === 'KOs' ? p.kos : p.score;
       const vals = [v0, p.kos, p.falls, `${p.dealt}%`];
-      vals.forEach((v, j) => v === 'Fuera' ? sfText('Fuera', cx[j + 2] + 6, y, 22, '#ff8a8a') : sfText(`${v}`, cx[j + 2], y, dense ? 27 : 34, PAPER));
+      vals.forEach((v, j) => v === 'Fuera' ? sfText('Fuera', cx[j + 2] + 6, y, 22, '#ff8a8a') : sfText(`${v}`, cx[j + 2], y, 34, PAPER));
     });
     if (Net.role === 'guest') { slab(W - 540, 648, 500, 52, { skew: 0.3 }); sfText('Esperando al anfitrión…', W - 290, 674, 30, GOLD); return; }
     sfButton(Tourney.active ? 'Ver cuadro (A)' : 'Revancha (A)', W - 540, 648, 240, 52, true);

@@ -66,13 +66,13 @@ const STAGE_DEFS = {
       surf(130, -140, 170, 14, { plat: 1, move: (t, s) => [s.bx, s.by - Math.sin(t * 0.02) * 22] }),
       surf(-85, -275, 170, 14, { plat: 1, move: (t, s) => [s.bx + Math.sin(t * 0.011) * 150, s.by] }),
     ],
-    wind: 0, windDir: 1, nextEvent: 1800, windCount: 0,
+    wind: 0, windDir: 1, nextEvent: 900,
     clouds: Array.from({ length: 14 }, (_, i) => ({ x: rand(-1600, 1600), y: rand(-700, 200), s: rand(0.6, 1.6), z: rand(0.2, 0.6) })),
     update() {
       this.nextEvent--;
       if (this.nextEvent === 90) { this.windDir = pick([-1, 1]); warnBanner(this.windDir > 0 ? '¡Ráfaga de viento! →' : '← ¡Ráfaga de viento!', '#8ecae6'); }
-      if (this.nextEvent === 0) { this.wind = 260; this.windCount++; Audio8.sfx('wind'); }
-      if (this.nextEvent < 0 && this.wind <= 0) this.nextEvent = this.windCount >= 2 ? 9999999 : randi(3000, 3600);
+      if (this.nextEvent === 0) { this.wind = 260; Audio8.sfx('wind'); }
+      if (this.nextEvent < 0 && this.wind <= 0) this.nextEvent = randi(900, 1400);
       if (this.wind > 0) {
         this.wind--;
         const k = Math.min(1, this.wind / 40, (260 - this.wind) / 30);
@@ -139,18 +139,17 @@ const STAGE_DEFS = {
       surf(170, -150, 160, 14, { plat: 1 }),
       surf(-80, -290, 160, 14, { plat: 1, move: (t, s) => [s.bx + Math.sin(t * 0.009) * 60, s.by] }),
     ],
-    lavaY: 460, lavaBase: 460, lavaPhase: 'idle', lavaT: 0, nextEvent: 2100, lavaCount: 0, rockT: 600, rockCount: 0,
+    lavaY: 460, lavaBase: 460, lavaPhase: 'idle', lavaT: 0, nextEvent: 1100, rockT: 300,
     update() {
       this.nextEvent--;
-      if (this.lavaPhase === 'idle' && this.nextEvent <= 0) { this.lavaPhase = 'warn'; this.lavaCount++; this.lavaT = 150; warnBanner('¡LA LAVA SUBE! ¡A las plataformas!', '#ff6d00'); Audio8.sfx('rumble'); }
+      if (this.lavaPhase === 'idle' && this.nextEvent <= 0) { this.lavaPhase = 'warn'; this.lavaT = 150; warnBanner('¡LA LAVA SUBE! ¡A las plataformas!', '#ff6d00'); Audio8.sfx('rumble'); }
       if (this.lavaPhase === 'warn') { shake(2); if (--this.lavaT <= 0) { this.lavaPhase = 'rise'; this.lavaT = 0; } }
       else if (this.lavaPhase === 'rise') { this.lavaY = approach(this.lavaY, -60, 4.4); if (this.lavaY <= -60) { this.lavaPhase = 'hold'; this.lavaT = 320; } }
       else if (this.lavaPhase === 'hold') { if (this.lavaT % 20 === 0) spawnFx('ember', rand(-600, 600), this.lavaY); if (--this.lavaT <= 0) this.lavaPhase = 'fall'; }
-      else if (this.lavaPhase === 'fall') { this.lavaY = approach(this.lavaY, this.lavaBase, 3); if (this.lavaY >= this.lavaBase) { this.lavaPhase = 'idle'; this.nextEvent = this.lavaCount >= 2 ? 9999999 : randi(3200, 3900); } }
+      else if (this.lavaPhase === 'fall') { this.lavaY = approach(this.lavaY, this.lavaBase, 3); if (this.lavaY >= this.lavaBase) { this.lavaPhase = 'idle'; this.nextEvent = randi(1300, 1800); } }
       const erupting = this.lavaPhase !== 'idle';
-      if (this.rockCount < 6 && --this.rockT <= 0) {
-        this.rockCount++;
-        this.rockT = erupting ? randi(100, 150) : randi(600, 900);
+      if (--this.rockT <= 0) {
+        this.rockT = erupting ? randi(30, 55) : randi(200, 360);
         const x = rand(this.left - 80, this.right + 80);
         spawnFx('target', x, this.floorY(x), { life: 72, col: '#ff6d00' });
         spawnProjectile(null, { type: 'rock', x, y: this.floorY(x) - 1200, vx: 0, vy: 17, grav: 0, r: 24, life: 200, dmg: 12, ang: 70, bkb: 8, kbg: 8, col: '#ff6d00', effect: 'fire', explodeGround: 1 });
@@ -210,10 +209,10 @@ const STAGE_DEFS = {
         surf(250, -115, 180, 14, { plat: 1, move: bob }),
         surf(-470, -100, 150, 14, { plat: 1, move: bob }),
       ],
-      nextCannon: 1800, nextWave: 2700, wave: 0, waveDir: 1, waveX: 0, cannonCount: 0, waveCount: 0,
+      nextCannon: 600, nextWave: 1700, wave: 0, waveDir: 1, waveX: 0,
       update() {
-        if (this.cannonCount < 2 && --this.nextCannon <= 0) {
-          this.cannonCount++; this.nextCannon = randi(3000, 3600);
+        if (--this.nextCannon <= 0) {
+          this.nextCannon = randi(520, 800);
           warnBanner('¡Cañonazos!', '#ffbe0b');
           for (let i = 0; i < 3; i++) {
             const x = rand(this.left + 40, this.right - 40);
@@ -221,8 +220,8 @@ const STAGE_DEFS = {
             spawnProjectile(null, { type: 'cannon', x: 1300, y: -300, delay: 70 + i * 25, toX: x, r: 20, life: 400, dmg: 14, ang: 60, bkb: 9, kbg: 10, col: '#222', explodeGround: 1, grav: 0.35 });
           }
         }
-        if (this.waveCount < 2 && --this.nextWave === 120) { this.waveDir = pick([-1, 1]); warnBanner(this.waveDir > 0 ? '¡Ola gigante! →' : '← ¡Ola gigante!', '#48cae4'); }
-        if (this.waveCount < 2 && this.nextWave <= 0 && !this.wave) { this.waveCount++; this.wave = 150; this.waveX = this.waveDir > 0 ? -1300 : 1300; Audio8.sfx('splash'); }
+        if (--this.nextWave === 120) { this.waveDir = pick([-1, 1]); warnBanner(this.waveDir > 0 ? '¡Ola gigante! →' : '← ¡Ola gigante!', '#48cae4'); }
+        if (this.nextWave <= 0 && !this.wave) { this.wave = 150; this.waveX = this.waveDir > 0 ? -1300 : 1300; Audio8.sfx('splash'); }
         if (this.wave > 0) {
           this.wave--; this.waveX += this.waveDir * 18;
           for (const f of BATTLE.fighters) {
@@ -232,7 +231,7 @@ const STAGE_DEFS = {
               if (!f.waveHit) { f.waveHit = 1; applyHit(null, f, { dmg: 4, ang: 50, bkb: 6, kbg: 2, sfx: 'splash' }, this.waveDir); }
             }
           }
-          if (this.wave === 0) { this.nextWave = randi(3300, 3900); for (const f of BATTLE.fighters) f.waveHit = 0; }
+          if (this.wave === 0) { this.nextWave = randi(1500, 2100); for (const f of BATTLE.fighters) f.waveHit = 0; }
         }
       },
       drawBG(c, cam) {
@@ -297,16 +296,16 @@ const STAGE_DEFS = {
       solids: [surf(-380, 0, 760, 50, { ledge: 1 })],
       plats: [surf(0, 0, 150, 14, { plat: 1, move: orbit(0) }), surf(0, 0, 150, 14, { plat: 1, move: orbit(Math.PI) })],
       stars: Array.from({ length: 160 }, () => ({ x: rand(0, W), y: rand(0, H), z: rand(0.1, 1) })),
-      nextMeteor: 1900, meteorCount: 0, zeroG: 0, nextZero: 2600, zeroCount: 0,
+      nextMeteor: 700, zeroG: 0, nextZero: 1600,
       update() {
-        if (this.meteorCount < 2 && --this.nextMeteor <= 0) {
-          this.meteorCount++; this.nextMeteor = randi(3000, 3600);
+        if (--this.nextMeteor <= 0) {
+          this.nextMeteor = randi(600, 900);
           const d = pick([-1, 1]);
           warnBanner(d > 0 ? '¡Alerta de meteorito! →' : '← ¡Alerta de meteorito!', '#ff9f1c');
           spawnProjectile(null, { type: 'meteor', x: -1300 * d, y: rand(-700, -350), vx: 10.5 * d, vy: 4.2, delay: 80, r: 34, life: 400, dmg: 16, ang: 40, bkb: 10, kbg: 11, col: '#ff9f1c', pierce: 1, effect: 'fire' });
         }
-        if (this.zeroCount < 2 && --this.nextZero === 0) { this.zeroCount++; warnBanner('¡GRAVEDAD CERO!', '#48cae4'); this.zeroG = 360; }
-        if (this.zeroG > 0) { this.zeroG--; this.grav = this.baseGrav * 0.4; if (this.zeroG === 0) { this.grav = this.baseGrav; this.nextZero = randi(3300, 3900); } }
+        if (--this.nextZero === 0) { warnBanner('¡GRAVEDAD CERO!', '#48cae4'); this.zeroG = 480; }
+        if (this.zeroG > 0) { this.zeroG--; this.grav = this.baseGrav * 0.4; if (this.zeroG === 0) { this.grav = this.baseGrav; this.nextZero = randi(1500, 2100); } }
       },
       drawBG(c, cam) {
         c.fillStyle = '#060b1a'; c.fillRect(0, 0, W, H);

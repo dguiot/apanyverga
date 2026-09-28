@@ -1,7 +1,7 @@
 {
   "name": "A pan y verga",
   "short_name": "A pan y verga",
-  "description": "…y se nos acabó el pan. Peleas para hasta 6 luchadores, local u online.",
+  "description": "…y se nos acabó el pan. Peleas para hasta 4, en la misma pantalla o en línea.",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",

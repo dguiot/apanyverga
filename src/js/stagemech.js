@@ -265,12 +265,12 @@ STAGE_MECH.city = {
 // ---------------- Estadio: riego automático ----------------
 const SPRINKLERS = [-840, -420, 0, 420, 840];
 STAGE_MECH.stadium = {
-  init(st) { st.wet = 0; st.riegoWarn = 0; st.nextRiego = 2400; st.riegoCount = 0; },
+  init(st) { st.wet = 0; st.riegoWarn = 0; st.nextRiego = 1300; },
   update() {
     if (this.soccer) return;
     if (this.wet > 0) { this.wet--; if (this.wet % 40 === 0) Audio8.sfx('splash', 0.35); return; }
     if (this.riegoWarn > 0) { if (--this.riegoWarn === 0) { this.wet = 540; Audio8.sfx('splash'); } return; }
-    if (this.riegoCount < 2 && --this.nextRiego <= 0) { this.riegoCount++; this.nextRiego = randi(3300, 3900); this.riegoWarn = 100; warnBanner('¡Riego automático! La cancha va a resbalar', '#48cae4'); }
+    if (--this.nextRiego <= 0) { this.nextRiego = randi(1500, 2100); this.riegoWarn = 100; warnBanner('¡Riego automático! La cancha va a resbalar', '#48cae4'); }
   },
   slick(f) { return this.wet > 0 && f.surface === this.solids[0] ? 0.22 : 1; },
   draw(c) {

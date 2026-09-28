@@ -57,13 +57,12 @@ STAGE_DEFS.xochi = () => {
     ],
     light: { dir: [0.8, -0.6], rim: '#ffcf9a', rimA: 0.6, shade: 'rgba(40,30,70,.32)', amb: 'rgba(255,170,120,.05)' },
     grade: { bloom: 0.2, bloomPow: 3, top: 'rgba(40,80,150,.25)', bottom: 'rgba(120,70,60,.2)', vig: 0.55 },
-    nextSplash: 1800, splashCount: 0, axo: null,
+    nextSplash: 780, axo: null,
     update() {
       // el ajolote gigante sale del agua y avienta una ola por la cubierta
       if (!this.axo) {
-        if (this.splashCount >= 2) return;
         if (--this.nextSplash === 100) { this.axoSide = pick([-1, 1]); warnBanner(this.axoSide < 0 ? '← ¡Salpicón del ajolote gigante!' : '¡Salpicón del ajolote gigante! →', '#ff8fab'); }
-        if (this.nextSplash <= 0) { this.splashCount++; this.axo = { t: 0, side: this.axoSide }; Audio8.sfx('splash'); }
+        if (this.nextSplash <= 0) { this.axo = { t: 0, side: this.axoSide }; Audio8.sfx('splash'); }
         return;
       }
       const a = this.axo; a.t++;
@@ -73,7 +72,7 @@ STAGE_DEFS.xochi = () => {
         spawnProjectile(null, { type: 'wave', x: a.side * 500, y: fy - 22, vx: -a.side * 9.5, vy: 0, r: 30, life: 125, dmg: 6, ang: 55, bkb: 9, kbg: 3, ground: 1, pierce: 1, reflect: 0, col: '#a9def9' });
         for (let i = 0; i < 10; i++) spawnFx('spark', a.side * 600 + rand(-40, 40), fy + rand(0, 30), { col: '#e6f8ff' });
       }
-      if (a.t > 110) { this.axo = null; this.nextSplash = randi(3300, 3900); }
+      if (a.t > 110) { this.axo = null; this.nextSplash = randi(900, 1300); }
     },
     drawBG(c, cam) {
       const t = this.t;
@@ -192,16 +191,15 @@ STAGE_DEFS.pyramid = () => {
     plats: [surf(-165, -385, 330, 14, { plat: 1, roof: 1 }), slab(-1330, 40, 0), slab(1140, 40, 2), slab(-860, -170, 1), slab(670, -170, 3)],
     light: { dir: [-0.75, -0.66], rim: '#fff1c8', rimA: 0.7, shade: 'rgba(60,40,30,.34)', amb: 'rgba(255,200,140,.05)' },
     grade: { bloom: 0.22, bloomPow: 3, top: 'rgba(40,90,170,.2)', bottom: 'rgba(160,90,40,.22)', vig: 0.5 },
-    nextSerp: 1900, serpCount: 0, serp: null,
+    nextSerp: 900, serp: null,
     update() {
       // Quetzalcóatl cruza a la altura de una terraza
       if (!this.serp) {
-        if (this.serpCount >= 2) return;
         if (--this.nextSerp === 130) {
           this.serpDir = pick([-1, 1]); this.serpY = pick([140, -60, -270, -470]);
           warnBanner(this.serpDir > 0 ? '¡Quetzalcóatl! →' : '← ¡Quetzalcóatl!', '#2ec4b6');
         }
-        if (this.nextSerp <= 0) { this.serpCount++; this.serp = { x: this.serpDir > 0 ? -2800 : 2800, y: this.serpY, dir: this.serpDir, t: 0 }; Audio8.sfx('wind'); }
+        if (this.nextSerp <= 0) { this.serp = { x: this.serpDir > 0 ? -2800 : 2800, y: this.serpY, dir: this.serpDir, t: 0 }; Audio8.sfx('wind'); }
         return;
       }
       const sp = this.serp; sp.t++; sp.x += sp.dir * 21;
@@ -214,7 +212,7 @@ STAGE_DEFS.pyramid = () => {
           if (circleRect(px, py, k === 0 ? 46 : 32, hb.x, hb.y, hb.w, hb.h)) { f.serpCd = sp.t + 50; applyHit(null, f, { dmg: 12, ang: 65, bkb: 11, kbg: 6, sfx: 'bighit' }, sp.dir, { unblockable: true }); }
         }
       }
-      if (Math.abs(sp.x) > 3600) { this.serp = null; this.nextSerp = randi(3300, 3900); for (const f of BATTLE.fighters) f.serpCd = 0; }
+      if (Math.abs(sp.x) > 3600) { this.serp = null; this.nextSerp = randi(1200, 1700); for (const f of BATTLE.fighters) f.serpCd = 0; }
     },
     drawBG(c, cam) {
       const t = this.t;

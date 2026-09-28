@@ -165,13 +165,13 @@ const Net = {
     const me = this.myPeer(); if (!me) return;
     const guests = this.guestsOf(me);
     const sl = APP.slots;
-    for (let i = 0; i < MAX_ONLINE_HUMANS; i++) if (sl[i].remote && !guests.find(g => g.peer === sl[i].remote)) { Toasts.push(`${sl[i].name || 'Un jugador'} salió de la sala`); sl[i] = { type: 'none' }; }
+    for (let i = 0; i < 4; i++) if (sl[i].remote && !guests.find(g => g.peer === sl[i].remote)) { Toasts.push(`${sl[i].name || 'Un jugador'} salió de la sala`); sl[i] = { type: 'none' }; }
     for (const g of guests) {
       let s = sl.find(x => x.remote === g.peer);
       if (!s) {
         if (this.lob.ph !== 'lobby') continue; // espectador hasta la próxima
-        const free = sl.slice(1, MAX_ONLINE_HUMANS).findIndex(x => x.type === 'none') + 1;
-        if (free <= 0) continue;
+        const free = sl.findIndex(x => x.type === 'none');
+        if (free < 0) continue;
         sl[free] = s = { type: 'human', remote: g.peer, dev: 'net:' + g.peer, cur: 0, ready: false, team: free % 2 };
         Audio8.sfx('confirm'); Toasts.push(`${this.nameOf(g.peer)} entró a tu sala`);
       }
@@ -230,7 +230,6 @@ const Net = {
     if (st.id === 'pyramid') sg.push(st.serp ? 1 : 0, st.serp ? ri(st.serp.x) : 0, st.serp ? st.serp.y : 0, st.serp ? st.serp.dir : 0, st.serp ? st.serp.t : 0);
     if (st.id === 'xochi') sg.push(st.axo ? st.axo.t : 0, st.axo ? st.axo.side : 0);
     if (st.id === 'stadium') sg.push(st.wet || 0, st.riegoWarn || 0);
-    if (st.id === 'rain') sg.push(st.boltWarn, st.boltSide, st.boltFlash, st.boltCount);
     // estado del modo
     const ms = B.ms || {}, mode = B.rules.mode;
     let md = null;
@@ -323,7 +322,6 @@ const Net = {
     if (st.id === 'pyramid') st.serp = s[1] ? { x: s[2], y: s[3], dir: s[4], t: s[5] } : null;
     if (st.id === 'xochi') st.axo = s[1] ? { t: s[1], side: s[2] } : null;
     if (st.id === 'stadium') { st.wet = s[1] || 0; st.riegoWarn = s[2] || 0; }
-    if (st.id === 'rain') { st.boltWarn = s[1] || 0; st.boltSide = s[2] || 0; st.boltFlash = s[3] || 0; st.boltCount = s[4] || 0; }
     const md = snap.m, ms = B.ms || (B.ms = {});
     if (md && B.rules.mode === 'koth') { ms.zone = { si: md[0], off: md[1], w: md[2] }; ms.zoneT = md[3]; ms.contested = !!md[4]; ms.holder = md[5]; }
     if (md && B.rules.mode === 'bomb') ms.bomb = Object.assign(ms.bomb || {}, { holder: md[0], t: md[1] });
