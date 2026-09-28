@@ -13,7 +13,7 @@ const ITEM_DEFS = {
   shroom: { name: 'Champiñón', kind: 'consume', w: 1.2 },
   orb:    { name: 'Orbe Final', kind: 'orb', w: 0.7 },
 };
-const ITEM_FREQ = { 0: 0, 1: 1000, 2: 560, 3: 300 };
+const ITEM_FREQ = { 0: 0, 1: 1800, 2: 1050, 3: 600 };
 
 function updateItems() {
   const B = BATTLE, st = B.stage;

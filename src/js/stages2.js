@@ -28,12 +28,13 @@ STAGE_DEFS.city = () => {
       surf(-320, -250, 180, 14, { plat: 1, sign: 'TACOS 24H' }),
       surf(140, -250, 180, 14, { plat: 1, sign: 'GOLPAZO' }),
     ],
-    train: 0, trainX: 0, trainDir: 1, nextTrain: 700, trainWarn: 0,
+    train: 0, trainX: 0, trainDir: 1, nextTrain: 1800, trainWarn: 0, trainCount: 0,
     update() {
       if (this.train <= 0) {
+        if (this.trainCount >= 2) return;
         if (--this.nextTrain === 120) { this.trainDir = pick([-1, 1]); warnBanner(this.trainDir > 0 ? '¡Viene el metro! →' : '← ¡Viene el metro!', '#48cae4'); this.trainWarn = 120; }
         if (this.trainWarn > 0) this.trainWarn--;
-        if (this.nextTrain <= 0) { this.train = 1; this.trainX = this.trainDir > 0 ? -2600 : 2600; Audio8.sfx('rumble'); }
+        if (this.nextTrain <= 0) { this.trainCount++; this.train = 1; this.trainX = this.trainDir > 0 ? -2600 : 2600; Audio8.sfx('rumble'); }
         return;
       }
       this.trainX += this.trainDir * 46;
@@ -42,7 +43,7 @@ STAGE_DEFS.city = () => {
         if (f.dead || f.intangibleToStage() || f.trainCd > 0) { if (f.trainCd > 0) f.trainCd--; continue; }
         if (rectRect(r, f.hurtbox())) { f.trainCd = 40; applyHit(null, f, { dmg: 20, ang: 28, bkb: 16, kbg: 6, sfx: 'bighit' }, this.trainDir, { unblockable: true }); }
       }
-      if (Math.abs(this.trainX) > 3800) { this.train = 0; this.nextTrain = randi(800, 1100); }
+      if (Math.abs(this.trainX) > 3800) { this.train = 0; this.nextTrain = randi(3300, 3900); }
       if (this.t % 6 === 0) shake(1.5);
     },
     drawBG(c, cam) {
@@ -144,13 +145,13 @@ STAGE_DEFS.stadium = (opts = {}) => {
       surf(-105, -390, 210, 14, { plat: 1, move: (t, s) => [s.bx + Math.sin(t * 0.008) * 260, s.by] }),
     ],
     goals: soccer ? { l: -930, r: 930, top: -236 } : null,
-    nextBall: 900, wave: 0,
+    nextBall: 1800, ballCount: 0, wave: 0,
     update() {
       this.wave = (this.wave + 1) % 600;
       if (this.soccer) return;
-      if (--this.nextBall === 90) warnBanner('¡Balonazo desde la tribuna!', '#f4f6fa');
-      if (this.nextBall <= 0) {
-        this.nextBall = randi(900, 1300);
+      if (this.ballCount < 2 && --this.nextBall === 90) warnBanner('¡Balonazo desde la tribuna!', '#f4f6fa');
+      if (this.ballCount < 2 && this.nextBall <= 0) {
+        this.ballCount++; this.nextBall = randi(3300, 3900);
         const d = pick([-1, 1]);
         spawnProjectile(null, { type: 'ball', x: -d * 1500, y: -700, vx: d * rand(9, 13), vy: -2, grav: 0.35, bounce: -11, r: 24, life: 360, dmg: 8, ang: 50, bkb: 7, kbg: 7, pierce: 1 });
       }

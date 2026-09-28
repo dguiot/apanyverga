@@ -18,8 +18,8 @@ class Battle {
     this.timer = this.rules.time * 60 * 60; this.paused = false; this.pauseSel = 0; this.pauser = null; this.slow = 0;
     this.cam = { x: 0, y: -150, z: 0.8 };
     const n = setup.players.length;
-    const spread = Math.min(1.6, (this.stage.right - this.stage.left) / 900);
-    const spawnX = (n === 2 ? [-240, 240] : n === 3 ? [-280, 0, 280] : [-300, -100, 100, 300]).map(x => x * spread);
+    const spawnWidth = Math.min(this.stage.right - this.stage.left - 140, n <= 4 ? 600 : 900);
+    const spawnX = Array.from({ length: n }, (_, i) => (i - (n - 1) / 2) * spawnWidth / Math.max(1, n - 1));
     setup.players.forEach((p, i) => {
       let ctrl, brain = null;
       if (p.cpu) { brain = new AIBrain(p.cpu); ctrl = brain.ctrl; }
@@ -378,11 +378,34 @@ class Battle {
       ctx.restore();
     }
   }
+  drawCompactHUD() {
+    const c = ctx, n = this.fighters.length, gap = 8, cw = Math.floor((W - 36 - (n - 1) * gap) / n), x0 = (W - n * cw - (n - 1) * gap) / 2;
+    this.fighters.forEach((f, i) => {
+      const x = x0 + i * (cw + gap), y = hudOnTop() ? 8 : H - 100, m = this.rules.mode;
+      c.globalAlpha = f.stocks <= 0 ? 0.4 : 1;
+      slab(x, y, cw, 86, { skew: 0.2, top: Prefs.contrast ? '#05070c' : '#172033', bottom: '#070b14', edge: f.color, lw: 2.5 });
+      c.save(); slabPath(x + 7, y + 7, 57, 68, 0.2); c.clip();
+      c.fillStyle = withAlpha(f.color, 0.45); c.fillRect(x + 7, y + 7, 57, 68);
+      const cam = typeof AV !== 'undefined' && f.avPeer ? AV.videoFor(f.avPeer) : null;
+      if (cam) drawVideoCover(c, cam.v, x + 7, y + 7, 57, 68, cam.mirror);
+      else drawPortrait(c, f.id, x + 35, y + 42, 25, f.dead ? 'ko' : f.flinch > 0 ? 'hurt' : 'normal');
+      c.restore();
+      sfText(CHARS[f.id].name, x + 70, y + 18, fitSize(CHARS[f.id].name, cw - 78, 19), PAPER, { align: 'left' });
+      text(f.cpu ? `CPU ${f.brain ? f.brain.L.lv : ''}` : f.label || PLAYER_TAGS[f.port], x + 70, y + 34, 11, f.color, { body: true, align: 'left', weight: 700 });
+      const value = m === 'hp' ? `${Math.ceil(f.hp || 0)}` : `${Math.floor(f.percent)}%`;
+      const heat = m === 'hp' ? ((f.hp || 0) / (f.maxHp || HP_MAX) < 0.3 ? RED : PAPER) : f.percent < 80 ? PAPER : f.percent < 160 ? GOLD : RED;
+      sfText(value, x + cw - 10, y + 64, fitSize(value, cw - 88, 36), heat, { align: 'right' });
+      const score = stockMode(m) ? `${f.stocks} vidas` : m === 'soccer' ? `${f.score} goles` : `${f.score} pts`;
+      text(score, x + 71, y + 75, 11, MUTED, { body: true, align: 'left', weight: 700 });
+      c.globalAlpha = 1;
+    });
+  }
   drawHUD() {
     const c = ctx, n = this.fighters.length;
     const cw = 268, gap = 14, total = n * cw + (n - 1) * gap;
     let x0 = (W - total) / 2;
-    for (const f of this.fighters) {
+    if (n > 4) this.drawCompactHUD();
+    else for (const f of this.fighters) {
       const x = x0, y = hudOnTop() ? 8 : H - 100;
       x0 += cw + gap;
       c.globalAlpha = f.stocks <= 0 ? 0.4 : 1;
