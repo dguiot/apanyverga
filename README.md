@@ -1,6 +1,6 @@
-# A pan y verga
+# Esmash Bros
 
-*…y se nos acabó el pan.*
+*(antes «A pan y verga»)*
 
 Juego de peleas estilo Smash para hasta 4 jugadores: en la misma pantalla (teclado, controles o
 pantalla táctil) o en línea, cada quien desde su casa, con cámara y voz.
@@ -14,7 +14,8 @@ desde el ícono (así abre sin barras y de lado, siempre).
 **Xbox (Edge):** Edge arranca con el control manejando el navegador (flecha de ratón, B = atrás).
 Pulsa **A** una vez (enciende el sonido), luego **mantén presionado ☰ Menú** y elige
 **«Usar controles de juego»**; el juego lo avisa en pantalla y el aviso se quita solo. Para salir de
-ese modo, vuelve a mantener ☰ Menú. En la consola el juego pinta a 1280×720 y la tele lo estira.
+ese modo, vuelve a mantener ☰ Menú. En la consola arranca en calidad *Rápida* (modo ligero y menos
+pixeles; se cambia en *Ajustes*), y si aun así no alcanza los 60 cuadros por segundo baja la nitidez solo.
 
 ## Cómo funciona la versión web
 

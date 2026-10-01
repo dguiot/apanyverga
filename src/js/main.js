@@ -44,11 +44,10 @@ function step() {
 function render() {
   ctx.setTransform(VIEW.scale * VIEW.dpr, 0, 0, VIEW.scale * VIEW.dpr, 0, 0);
   ctx.clearRect(0, 0, W, H);
-  const t0 = performance.now();
   try { APP.draw(); } catch (e) { console.error(e); }
-  if (APP.screen === 'battle') ART.measure(performance.now() - t0);
 }
 function frame(now) {
+  if (APP.screen === 'battle' && BATTLE && BATTLE.phase === 'fight' && !BATTLE.paused) ART.measure(now - lastT);
   acc += Math.min(120, now - lastT); lastT = now;
   let n = 0;
   while (acc >= STEP && n < 5) { step(); acc -= STEP; n++; }

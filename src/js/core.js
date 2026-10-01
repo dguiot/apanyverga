@@ -1,6 +1,6 @@
 'use strict';
 // ============================================================
-//  A PAN Y VERGA (antes Súper Golpazo) — núcleo: lienzo, utilidades, entrada
+//  ESMASH BROS (antes A pan y verga y Súper Golpazo) — núcleo: lienzo, utilidades, entrada
 // ============================================================
 const W = 1280, H = 720;
 const canvas = document.getElementById('game');
@@ -106,7 +106,12 @@ function withAlpha(col, a) {
 const FONT_DISPLAY = '"Teko", "Impact", "Arial Narrow", sans-serif';
 const FONT_BODY = '"Barlow", "Segoe UI", "Helvetica Neue", Arial, sans-serif';
 
+// a dónde dibujan text(), sfText(), slab()…: la pantalla, o un lienzo guardado mientras se prepara una pieza
+// que no cambia (ART.sprite). Así lo caro se pinta una vez y luego solo se copia
+const UI = { c: ctx };
+function withCtx(c, fn) { const p = UI.c; UI.c = c; try { return fn(c); } finally { UI.c = p; } }
 function text(str, x, y, size, color, opts = {}) {
+  const ctx = UI.c;
   ctx.font = `${opts.weight || ''} ${size}px ${opts.display === false ? FONT_BODY : (opts.body ? FONT_BODY : FONT_DISPLAY)}`.trim();
   ctx.textAlign = opts.align || 'center';
   ctx.textBaseline = opts.baseline || 'middle';

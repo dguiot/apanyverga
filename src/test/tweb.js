@@ -34,7 +34,7 @@ const { spawn } = require('child_process');
   await A.evaluate(() => localStorage.clear()); await A.reload(); await A.waitForTimeout(400);
   ok('versión web: se instala el adaptador de Supabase', await A.evaluate(() => window.APYV_WEB === true && window.claude && window.claude.web === true));
   ok('versión web: con las fotos de las caras', await A.evaluate(() => typeof FACE_DATA !== 'undefined' && Object.keys(FACE_IMG).length === 6), await A.evaluate(() => Object.keys(FACE_IMG).join(',')));
-  ok('versión web: título y viewport para celular', await A.evaluate(() => document.title === 'A pan y verga' && !!document.querySelector('meta[name=viewport]')));
+  ok('versión web: título y viewport para celular', await A.evaluate(() => document.title === 'Esmash Bros' && !!document.querySelector('meta[name=viewport]')));
   const B = await mk('Beto');
   await A.waitForTimeout(800);
   // ---- A crea la sala

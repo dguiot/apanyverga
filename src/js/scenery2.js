@@ -475,7 +475,7 @@ SCENERY.stadium = {
     c.fillStyle = sg; c.fillRect(sx - 150, sy + 8, 300, 112);
     const B = BATTLE;
     if (B && B.ms && B.ms.goals) text(`${B.ms.goals[0]}  -  ${B.ms.goals[1]}`, sx, sy + 66, 64, '#ffc53d', { weight: 700 });
-    else text('A PAN Y VERGA', sx, sy + 66, 44, '#ffc53d', { weight: 700 });
+    else text('ESMASH BROS', sx, sy + 66, 44, '#ffc53d', { weight: 700 });
     ART.drawGlow(c, sx, sy + 64, 200, '#3a86ff', 0.25);
   },
   drawStage(c) {

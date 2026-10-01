@@ -1,5 +1,5 @@
 -- ============================================================
---  A pan y verga · base de datos de la versión web
+--  Esmash Bros (antes A pan y verga) · base de datos de la versión web
 --  Supabase → SQL Editor → New query → pega todo esto → Run. Se puede correr más de una vez.
 --
 --  apyv_players  el nombre que escribe cada quien (uno por sesión anónima)

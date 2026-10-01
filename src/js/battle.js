@@ -241,7 +241,17 @@ class Battle {
   draw() {
     const c = ctx, cam = this.cam, st = this.stage;
     ART.light = st.light || null;
-    st.drawBG(c, cam);
+    if (ART.lite) {
+      // modo ligero: el fondo (cielo, nubes, montañas: lo que más pixeles pinta) a media resolución y estirado.
+      // Es lo lejano y ya va suave; cuesta la cuarta parte
+      const bk = (VIEW.k || 1) * 0.5, bw = Math.ceil(W * bk), bh = Math.ceil(H * bk);
+      if (!ART.bgCv || ART.bgCv.width !== bw || ART.bgCv.height !== bh) ART.bgCv = mkCanvas(bw, bh);
+      const b = ART.bgCv.getContext('2d');
+      b.setTransform(bk, 0, 0, bk, 0, 0); b.clearRect(0, 0, W, H);
+      withCtx(b, () => st.drawBG(b, cam));
+      ART.vignette(b, st.grade || { vig: 0.5 }); // la viñeta solo oscurece el fondo: casi igual y a la cuarta parte
+      c.drawImage(ART.bgCv, 0, 0, W, H);
+    } else st.drawBG(c, cam);
     c.save();
     const sx = this.shake ? rand(-this.shake, this.shake) : 0, sy = this.shake ? rand(-this.shake, this.shake) : 0;
     const z = cam.z * (1 + (this.camKick || 0));
@@ -379,68 +389,30 @@ class Battle {
     }
   }
   drawHUD() {
-    const c = ctx, n = this.fighters.length;
+    const n = this.fighters.length;
     const cw = 268, gap = 14, total = n * cw + (n - 1) * gap;
     let x0 = (W - total) / 2;
     for (const f of this.fighters) {
       const x = x0, y = hudOnTop() ? 8 : H - 100;
       x0 += cw + gap;
-      c.globalAlpha = f.stocks <= 0 ? 0.4 : 1;
-      slab(x, y, cw, 86, Prefs.contrast
-        ? { skew: 0.25, top: '#05070c', bottom: '#05070c', edge: f.color, lw: 4 }
-        : { skew: 0.25, edge: withAlpha(f.color, 0.95), lw: 2.5 });
-      // retrato
-      c.save(); slabPath(x + 14, y + 7, 84, 72, 0.25); c.clip();
-      const pg = c.createLinearGradient(0, y, 0, y + 80); pg.addColorStop(0, withAlpha(f.color, 0.6)); pg.addColorStop(1, '#0b0e16');
-      c.fillStyle = pg; c.fillRect(x + 10, y + 5, 92, 76);
-      // con cámara y voz: su cara en vivo en lugar del retrato
       const cam = typeof AV !== 'undefined' && f.avPeer ? AV.videoFor(f.avPeer) : null;
-      if (cam) drawVideoCover(c, cam.v, x + 10, y + 5, 92, 76, cam.mirror);
-      else drawPortrait(c, f.id, x + 57, y + 44, 30, f.dead ? 'ko' : f.flinch > 0 ? 'hurt' : 'normal');
-      if (cam && (f.dead || f.flinch > 0)) { c.fillStyle = f.dead ? 'rgba(10,12,20,.55)' : 'rgba(230,57,70,.3)'; c.fillRect(x + 10, y + 5, 92, 76); }
-      c.restore();
-      slabPath(x + 14, y + 7, 84, 72, 0.25); c.lineWidth = cam ? 2.5 : 1.5; c.strokeStyle = cam ? withAlpha(f.color, 0.95) : 'rgba(255,255,255,.25)'; c.stroke();
-      if (cam) { c.fillStyle = '#ef4444'; c.beginPath(); c.arc(x + 26, y + 17, 4, 0, TAU); c.fill(); }
-      sfText(CHARS[f.id].name, x + 106, y + 18, fitSize(CHARS[f.id].name, cw - 106 - 78, 22), '#dfe5ee', { align: 'left' });
-      if (f.label && !f.cpu) text(f.label.slice(0, 12), x + cw - 24, y + 17, 12, f.color, { align: 'right', body: true, weight: 700 });
-      else sfText(f.cpu ? `CPU ${f.brain ? f.brain.L.lv : ''}` : PLAYER_TAGS[f.port], x + cw - 22, y + 18, 20, f.color, { align: 'right' });
-      const m = this.rules.mode;
-      const jx = f.flinch > 0 ? rand(-3, 3) : 0, jy = f.flinch > 0 ? rand(-3, 3) : 0;
-      const bx = x + 104, bw = cw - 138, byy = y + 72;
-      if (m === 'hp') {
-        // barra de vida estilo arcade
-        const hp = Math.ceil(f.hp || 0), k = clamp((f.hp || 0) / (f.maxHp || HP_MAX), 0, 1);
-        const hc = k > 0.5 ? '#34d399' : k > 0.25 ? '#ffd166' : '#e63946';
-        if (!f.dead || f.stocks > 0) sfText(`${hp}`, x + 214 + jx, y + 48 + jy, 44, hc, { align: 'right', strokeW: 6 });
-        slabPath(bx, byy - 4, bw, 11, 1); c.fillStyle = 'rgba(0,0,0,.7)'; c.fill();
-        if (k > 0) { slabPath(bx, byy - 4, bw * k, 11, 1); c.fillStyle = hc; c.fill(); }
-      } else {
-        // porcentaje con color de calor
-        const p = Math.floor(f.percent);
-        const pc = p < 40 ? '#f4f6fa' : p < 80 ? '#ffe08a' : p < 120 ? '#ffb020' : p < 160 ? '#ff6a2b' : p < 220 ? '#e63946' : '#a4161a';
-        if (!f.dead || f.stocks > 0) {
-          const pop = f.flinch > 0 ? 1 + f.flinch * 0.012 : 1;
-          c.save(); c.translate(x + 196 + jx, y + 50 + jy); c.scale(pop, pop);
-          sfText(`${p}`, 0, 0, 56, pc, { align: 'right', strokeW: 7 });
-          sfText('%', 4, 8, 26, pc, { align: 'left', strokeW: 4 });
-          c.restore();
-        }
-        // barra de peligro (0–200 %)
-        slabPath(bx, byy, bw, 7, 1); c.fillStyle = 'rgba(0,0,0,.6)'; c.fill();
-        const fill = clamp(f.percent / 200, 0, 1);
-        if (fill > 0) { slabPath(bx, byy, bw * fill, 7, 1); const bg = c.createLinearGradient(bx, 0, bx + bw, 0); bg.addColorStop(0, '#ffe08a'); bg.addColorStop(0.5, '#ff6a2b'); bg.addColorStop(1, '#a4161a'); c.fillStyle = bg; c.fill(); }
+      // la tarjeta se guarda pintada y solo se vuelve a pintar cuando cambia lo que muestra; mientras tiembla
+      // (recién golpeado) o con cámara en vivo se dibuja directo. Antes: placas, degradados y números con
+      // contorno de 4 tarjetas en cada cuadro
+      if (f.flinch > 0 || cam) { ctx.globalAlpha = f.stocks <= 0 ? 0.4 : 1; this.drawHudCard(ctx, f, x, y, cw, cam); ctx.globalAlpha = 1; continue; }
+      const P = 10, k = VIEW.k || 1, m = this.rules.mode;
+      const sig = [k, f.id, f.label, f.cpu, f.brain && f.brain.L.lv, f.port, m, Math.floor(f.percent), Math.ceil(f.hp || 0), f.stocks, f.score, f.dead, f.item && f.item.type, f.finalReady, Prefs.contrast].join('|');
+      let hc = HUD_CACHE.get(f);
+      if (!hc || hc.sig !== sig) {
+        if (!hc || hc.k !== k) HUD_CACHE.set(f, hc = { cv: mkCanvas((cw + P * 2) * k, (86 + P * 2) * k), k });
+        const c2 = hc.cv.getContext('2d');
+        c2.setTransform(1, 0, 0, 1, 0, 0); c2.clearRect(0, 0, hc.cv.width, hc.cv.height); c2.setTransform(k, 0, 0, k, 0, 0);
+        withCtx(c2, () => this.drawHudCard(c2, f, P, P, cw, null));
+        hc.sig = sig;
       }
-      // vidas / puntos
-      if (stockMode(m)) {
-        const sN = f.stocks;
-        if (sN <= 6) for (let i = 0; i < sN; i++) { const sx2 = x + 110 + i * 15, sy2 = y + 36; c.save(); c.translate(sx2, sy2); c.rotate(Math.PI / 4); c.fillStyle = f.color; c.fillRect(-4.5, -4.5, 9, 9); c.strokeStyle = INK; c.lineWidth = 1.5; c.strokeRect(-4.5, -4.5, 9, 9); c.restore(); }
-        else sfText(`×${sN}`, x + 108, y + 38, 20, f.color, { align: 'left' });
-      } else if (m === 'koth') sfText(`${Math.floor(f.score)}/${KOTH_TARGET}`, x + 108, y + 40, 22, GOLD, { align: 'left' });
-      else if (m === 'soccer') sfText(`⚽ ${Math.floor(f.score)}`, x + 108, y + 40, 20, PAPER, { align: 'left' });
-      else sfText(`${f.score >= 0 ? '+' : ''}${f.score}`, x + 108, y + 40, 24, f.score >= 0 ? '#34d399' : RED, { align: 'left' });
-      if (f.finalReady) sfText('¡Final!', x + cw - 26, y + 56, 20, GOLD, { align: 'right' });
-      else if (f.item) drawItemIcon(c, f.item.type, x + cw - 36, y + 52, 0.55);
-      c.globalAlpha = 1;
+      ctx.globalAlpha = f.stocks <= 0 ? 0.4 : 1;
+      ctx.drawImage(hc.cv, x - P, y - P, cw + P * 2, 86 + P * 2);
+      ctx.globalAlpha = 1;
     }
     if (timedMode(this.rules.mode)) {
       const s = Math.max(0, Math.ceil(this.timer / 60));
@@ -449,6 +421,62 @@ class Battle {
       slab(W / 2 - 80, ty, 160, 54, { skew: 0.3, edge: GOLD });
       sfText(txt, W / 2, ty + 28, 48, s <= 10 ? RED : GOLD);
     }
+  }
+  // una tarjeta del marcador en (x, y), dibujada en c (la pantalla o el lienzo guardado de la tarjeta)
+  drawHudCard(c, f, x, y, cw, cam) {
+    slab(x, y, cw, 86, Prefs.contrast
+      ? { skew: 0.25, top: '#05070c', bottom: '#05070c', edge: f.color, lw: 4 }
+      : { skew: 0.25, edge: withAlpha(f.color, 0.95), lw: 2.5 });
+    // retrato
+    c.save(); slabPath(x + 14, y + 7, 84, 72, 0.25); c.clip();
+    const pg = c.createLinearGradient(0, y, 0, y + 80); pg.addColorStop(0, withAlpha(f.color, 0.6)); pg.addColorStop(1, '#0b0e16');
+    c.fillStyle = pg; c.fillRect(x + 10, y + 5, 92, 76);
+    // con cámara y voz: su cara en vivo en lugar del retrato
+    if (cam) drawVideoCover(c, cam.v, x + 10, y + 5, 92, 76, cam.mirror);
+    else drawPortrait(c, f.id, x + 57, y + 44, 30, f.dead ? 'ko' : f.flinch > 0 ? 'hurt' : 'normal');
+    if (cam && (f.dead || f.flinch > 0)) { c.fillStyle = f.dead ? 'rgba(10,12,20,.55)' : 'rgba(230,57,70,.3)'; c.fillRect(x + 10, y + 5, 92, 76); }
+    c.restore();
+    slabPath(x + 14, y + 7, 84, 72, 0.25); c.lineWidth = cam ? 2.5 : 1.5; c.strokeStyle = cam ? withAlpha(f.color, 0.95) : 'rgba(255,255,255,.25)'; c.stroke();
+    if (cam) { c.fillStyle = '#ef4444'; c.beginPath(); c.arc(x + 26, y + 17, 4, 0, TAU); c.fill(); }
+    sfText(CHARS[f.id].name, x + 106, y + 18, fitSize(CHARS[f.id].name, cw - 106 - 78, 22), '#dfe5ee', { align: 'left' });
+    if (f.label && !f.cpu) text(f.label.slice(0, 12), x + cw - 24, y + 17, 12, f.color, { align: 'right', body: true, weight: 700 });
+    else sfText(f.cpu ? `CPU ${f.brain ? f.brain.L.lv : ''}` : PLAYER_TAGS[f.port], x + cw - 22, y + 18, 20, f.color, { align: 'right' });
+    const m = this.rules.mode;
+    const jx = f.flinch > 0 ? rand(-3, 3) : 0, jy = f.flinch > 0 ? rand(-3, 3) : 0;
+    const bx = x + 104, bw = cw - 138, byy = y + 72;
+    if (m === 'hp') {
+      // barra de vida estilo arcade
+      const hp = Math.ceil(f.hp || 0), k = clamp((f.hp || 0) / (f.maxHp || HP_MAX), 0, 1);
+      const hc = k > 0.5 ? '#34d399' : k > 0.25 ? '#ffd166' : '#e63946';
+      if (!f.dead || f.stocks > 0) sfText(`${hp}`, x + 214 + jx, y + 48 + jy, 44, hc, { align: 'right', strokeW: 6 });
+      slabPath(bx, byy - 4, bw, 11, 1); c.fillStyle = 'rgba(0,0,0,.7)'; c.fill();
+      if (k > 0) { slabPath(bx, byy - 4, bw * k, 11, 1); c.fillStyle = hc; c.fill(); }
+    } else {
+      // porcentaje con color de calor
+      const p = Math.floor(f.percent);
+      const pc = p < 40 ? '#f4f6fa' : p < 80 ? '#ffe08a' : p < 120 ? '#ffb020' : p < 160 ? '#ff6a2b' : p < 220 ? '#e63946' : '#a4161a';
+      if (!f.dead || f.stocks > 0) {
+        const pop = f.flinch > 0 ? 1 + f.flinch * 0.012 : 1;
+        c.save(); c.translate(x + 196 + jx, y + 50 + jy); c.scale(pop, pop);
+        sfText(`${p}`, 0, 0, 56, pc, { align: 'right', strokeW: 7 });
+        sfText('%', 4, 8, 26, pc, { align: 'left', strokeW: 4 });
+        c.restore();
+      }
+      // barra de peligro (0–200 %)
+      slabPath(bx, byy, bw, 7, 1); c.fillStyle = 'rgba(0,0,0,.6)'; c.fill();
+      const fill = clamp(f.percent / 200, 0, 1);
+      if (fill > 0) { slabPath(bx, byy, bw * fill, 7, 1); const bg = c.createLinearGradient(bx, 0, bx + bw, 0); bg.addColorStop(0, '#ffe08a'); bg.addColorStop(0.5, '#ff6a2b'); bg.addColorStop(1, '#a4161a'); c.fillStyle = bg; c.fill(); }
+    }
+    // vidas / puntos
+    if (stockMode(m)) {
+      const sN = f.stocks;
+      if (sN <= 6) for (let i = 0; i < sN; i++) { const sx2 = x + 110 + i * 15, sy2 = y + 36; c.save(); c.translate(sx2, sy2); c.rotate(Math.PI / 4); c.fillStyle = f.color; c.fillRect(-4.5, -4.5, 9, 9); c.strokeStyle = INK; c.lineWidth = 1.5; c.strokeRect(-4.5, -4.5, 9, 9); c.restore(); }
+      else sfText(`×${sN}`, x + 108, y + 38, 20, f.color, { align: 'left' });
+    } else if (m === 'koth') sfText(`${Math.floor(f.score)}/${KOTH_TARGET}`, x + 108, y + 40, 22, GOLD, { align: 'left' });
+    else if (m === 'soccer') sfText(`⚽ ${Math.floor(f.score)}`, x + 108, y + 40, 20, PAPER, { align: 'left' });
+    else sfText(`${f.score >= 0 ? '+' : ''}${f.score}`, x + 108, y + 40, 24, f.score >= 0 ? '#34d399' : RED, { align: 'left' });
+    if (f.finalReady) sfText('¡Final!', x + cw - 26, y + 56, 20, GOLD, { align: 'right' });
+    else if (f.item) drawItemIcon(c, f.item.type, x + cw - 36, y + 52, 0.55);
   }
   drawPause() {
     const c = ctx;
@@ -491,3 +519,7 @@ function copyStateValue(v, seen, key) {
   return out;
 }
 function copyBattleState(b) { return copyStateValue(b, new Map()); }
+
+// tarjetas del marcador ya pintadas, por peleador. Fuera del peleador a propósito: el rollback guarda y compara
+// el estado de cada peleador, y un lienzo local ahí dentro lo rompería (y no es parte de la pelea)
+const HUD_CACHE = new WeakMap();

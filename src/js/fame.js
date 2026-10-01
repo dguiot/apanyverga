@@ -147,7 +147,7 @@ APP.fameDraw = function () {
     wrapText(b, W / 2, 322, 720, 17, 26, '#e2e8f0');
   };
   if (!Fame.db) {
-    msg(Fame.tried ? (window.APYV_WEB ? 'No se pudo abrir el salón' : 'El salón vive en el link del juego') : 'Abriendo el salón…', window.APYV_WEB ? 'Revisa tu conexión y vuelve a entrar a esta pantalla.' : 'Abre A pan y verga desde su link en claude.ai para ver y guardar el ranking. En el archivo descargado no hay dónde guardarlo.');
+    msg(Fame.tried ? (window.APYV_WEB ? 'No se pudo abrir el salón' : 'El salón vive en el link del juego') : 'Abriendo el salón…', window.APYV_WEB ? 'Revisa tu conexión y vuelve a entrar a esta pantalla.' : 'Abre Esmash Bros desde su link en claude.ai para ver y guardar el ranking. En el archivo descargado no hay dónde guardarlo.');
   } else if (Fame.err) {
     msg('No se pudo abrir el salón', 'Revisa tu conexión y vuelve a entrar a esta pantalla.');
   } else if (!Fame.rows) {

@@ -20,6 +20,7 @@ const { spawn } = require('child_process');
       buttons: Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 })), axes: [0, 0, 0, 0] };
     navigator.getGamepads = () => [window.__pad, null, null, null];
   };
+  const pages = [];
   const mk = async (opts = {}) => {
     const ctx = await browser.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 2, userAgent: opts.ua === undefined ? UA : opts.ua });
     if (opts.pad) await ctx.addInitScript(PAD);
@@ -28,6 +29,7 @@ const { spawn } = require('child_process');
     if (opts.block) await p.route('**/' + opts.block, r => r.abort());
     await p.goto(URL);
     await p.waitForTimeout(opts.wait || 700);
+    pages.push(p);
     return p;
   };
   const btn = async (p, i, hold = 90, wait = 150) => { await p.evaluate(i => { __pad.buttons[i] = { pressed: true, touched: true, value: 1 }; }, i); await p.waitForTimeout(hold); await p.evaluate(i => { __pad.buttons[i] = { pressed: false, touched: false, value: 0 }; }, i); await p.waitForTimeout(wait); };
@@ -149,7 +151,30 @@ const { spawn } = require('child_process');
   ok('pelea en el mundo más grande: memoria de lienzos contenida', fight < 60, fight + ' MB');
   ok('sin errores en la pantalla de escenarios', S.errs.length === 0, S.errs.slice(0, 3).join(' | '));
 
-  // 12) si un archivo no carga: aviso con Recargar en vez de pantalla negra
+  // 12) si aun así no alcanza los 60 cuadros, baja la nitidez sola. Se mide el tiempo REAL entre cuadros:
+  //     antes se medía lo que tarda el código en dar las órdenes de dibujo y en la Xbox nunca bajaba
+  for (const q of pages.splice(0)) await q.close(); // las páginas anteriores siguen peleando y le quitan procesador
+  const L = await mk({ pad: true });
+  const slow = await L.evaluate(async () => {
+    APP.startBattle({ players: [{ port: 0, char: 'nacho', dev: 'pad0' }, { port: 1, char: 'pablo', cpu: 1 }], stage: 'temple', rules: { mode: 'stock', stocks: 3, items: 0 } });
+    const lite = ART.lite, res0 = QUALITY.res, w0 = canvas.width;
+    const d = APP.battleDraw; APP.battleDraw = function () { const t = performance.now(); while (performance.now() - t < 40) { /* un equipo lento */ } d.call(this); };
+    const t0 = performance.now();
+    while (performance.now() - t0 < 20000 && QUALITY.res >= res0) await new Promise(r => setTimeout(r, 250));
+    APP.battleDraw = d;
+    return { lite, res0, res: QUALITY.res, w0, w: canvas.width, s: Math.round((performance.now() - t0) / 1000) };
+  });
+  ok('Xbox: modo ligero desde el arranque', slow.lite);
+  ok('equipo lento: baja la nitidez sola en unos segundos', slow.res < slow.res0 && slow.w < slow.w0, JSON.stringify(slow));
+  // (el navegador de prueba no tiene tarjeta de video y de verdad va lento: aquí se dibuja nada para alcanzar los 60)
+  const fast = await L.evaluate(async () => {
+    const d = APP.battleDraw; APP.battleDraw = () => {};
+    await new Promise(r => setTimeout(r, 1600)); const r = QUALITY.res; await new Promise(r => setTimeout(r, 4500));
+    APP.battleDraw = d; return { antes: r, despues: QUALITY.res };
+  });
+  ok('equipo que ya alcanza: no sigue bajando', fast.despues === fast.antes, JSON.stringify(fast));
+
+  // 13) si un archivo no carga: aviso con Recargar en vez de pantalla negra
   // (la versión de un solo archivo no tiene archivos sueltos que puedan faltar)
   if (!/golpazo|web\//.test(process.env.PAGE || '')) {
     const F = await mk({ block: 'js/menus.js', wait: 8800 });

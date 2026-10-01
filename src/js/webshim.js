@@ -37,7 +37,7 @@
       const r = await SB.auth.signInAnonymously();
       if (r.error) throw r.error;
       return r.data.user;
-    })().catch(e => { console.warn('A pan y verga: sin sesión (¿están activados los inicios anónimos en Supabase?)', e && e.message); return null; });
+    })().catch(e => { console.warn('Esmash Bros: sin sesión (¿están activados los inicios anónimos en Supabase?)', e && e.message); return null; });
     return authP;
   }
   function cleanName(s) { return String(s || '').replace(/[<>\n\r\t]/g, '').trim().slice(0, 20); }
@@ -78,7 +78,7 @@
     if (savedName) return; savedName = true;
     const u = await auth(); if (!u) return;
     const r = await SB.from('apyv_players').upsert({ id: u.id, name: myName(), updated_at: new Date().toISOString() });
-    if (r && r.error) { savedName = false; console.warn('A pan y verga: no se guardó el nombre', r.error.message); }
+    if (r && r.error) { savedName = false; console.warn('Esmash Bros: no se guardó el nombre', r.error.message); }
   }
 
   // ---------------- base (salón de la fama) ----------------

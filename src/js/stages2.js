@@ -181,7 +181,7 @@ STAGE_DEFS.stadium = (opts = {}) => {
       roundRect(c, W / 2 - 150 + px, 70 + py, 300, 120, 10); c.fillStyle = '#05070d'; c.fill(); c.strokeStyle = '#48cae4'; c.lineWidth = 3; c.stroke();
       const B = BATTLE;
       if (B && B.ms && B.ms.goals) { text(`${B.ms.goals[0]}  -  ${B.ms.goals[1]}`, W / 2 + px, 130 + py, 64, '#ffc53d', { weight: 700 }); }
-      else text('A PAN Y VERGA', W / 2 + px, 130 + py, 44, '#ffc53d', { weight: 700 });
+      else text('ESMASH BROS', W / 2 + px, 130 + py, 44, '#ffc53d', { weight: 700 });
     },
     drawStage(c) {
       const s = this.solids[0];

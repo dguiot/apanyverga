@@ -17,10 +17,12 @@ function devLabel(d) {
 }
 // Paralelogramo inclinado (la forma base de toda la interfaz)
 function slabPath(x, y, w, h, sk = 0.22) {
+  const ctx = UI.c;
   const o = h * sk;
   ctx.beginPath(); ctx.moveTo(x + o, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w - o, y + h); ctx.lineTo(x, y + h); ctx.closePath();
 }
 function slab(x, y, w, h, o = {}) {
+  const ctx = UI.c;
   const sk = o.skew ?? 0.22;
   slabPath(x, y, w, h, sk);
   const g = ctx.createLinearGradient(0, y, 0, y + h);
@@ -29,6 +31,7 @@ function slab(x, y, w, h, o = {}) {
   if (o.edge !== null) { ctx.lineWidth = o.lw || 2; ctx.strokeStyle = o.edge || 'rgba(154,167,184,.35)'; ctx.stroke(); }
 }
 function sfText(str, x, y, size, col = PAPER, o = {}) {
+  const ctx = UI.c;
   ctx.save(); ctx.translate(x, y); if (o.italic !== false) ctx.transform(1, 0, -0.18, 1, 0, 0);
   text(str.toUpperCase ? (o.keepCase ? str : str.toUpperCase()) : str, 0, size * 0.08, size, col, { weight: o.weight || 700, align: o.align || 'center', stroke: o.stroke === undefined ? 'rgba(0,0,0,.85)' : o.stroke, strokeW: o.strokeW || Math.max(3, size / 9) });
   ctx.restore();
@@ -39,9 +42,13 @@ function sfButton(label, x, y, w, h, on) {
 }
 function drawMenuBG(seed = 0) {
   const t = APP.t;
-  const g = ctx.createLinearGradient(0, 0, W, H);
-  g.addColorStop(0, '#0b0e16'); g.addColorStop(0.55, '#141a28'); g.addColorStop(1, '#2a0d14');
-  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  // lo quieto (degradado de fondo, líneas de escaneo y viñeta) se pinta una vez y se copia; antes eran un
+  // degradado y una viñeta a pantalla completa más 180 rayas en cada cuadro
+  ctx.drawImage(ART.sprite('menubg-base', W, H, c => {
+    const g = c.createLinearGradient(0, 0, W, H);
+    g.addColorStop(0, '#0b0e16'); g.addColorStop(0.55, '#141a28'); g.addColorStop(1, '#2a0d14');
+    c.fillStyle = g; c.fillRect(0, 0, W, H);
+  }).img, 0, 0, W, H);
   // haces diagonales de energía
   ctx.save(); ctx.globalCompositeOperation = 'lighter';
   for (let i = 0; i < 9; i++) {
@@ -53,29 +60,27 @@ function drawMenuBG(seed = 0) {
   }
   ctx.restore();
   // líneas de escaneo + viñeta
-  ctx.fillStyle = 'rgba(255,255,255,.025)'; for (let y = 0; y < H; y += 4) ctx.fillRect(0, y, W, 1);
-  const v = ctx.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, H * 0.95);
-  v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,.6)');
-  ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
+  ctx.drawImage(ART.sprite('menubg-top', W, H, c => {
+    c.fillStyle = 'rgba(255,255,255,.025)'; for (let y = 0; y < H; y += 4) c.fillRect(0, y, W, 1);
+    const v = c.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, H * 0.95);
+    v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,.6)');
+    c.fillStyle = v; c.fillRect(0, 0, W, H);
+  }).img, 0, 0, W, H);
 }
-const GAME_NAME = 'A pan y verga', GAME_TAGLINE = '…y se nos acabó el pan';
+const GAME_NAME = 'Esmash Bros';
 function logo(x, y, s = 1) {
   ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
   ctx.save(); ctx.transform(1, 0, -0.2, 1, 0, 0);
-  ctx.font = `700 64px ${FONT_DISPLAY}`; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.lineJoin = 'round';
-  ctx.lineWidth = 10; ctx.strokeStyle = INK; ctx.strokeText('A PAN Y', -118, -46);
-  ctx.fillStyle = RED; ctx.fillText('A PAN Y', -118, -46);
-  ctx.font = `700 170px ${FONT_DISPLAY}`;
-  ctx.lineWidth = 22; ctx.strokeStyle = INK; ctx.strokeText('VERGA', 0, 88);
-  ctx.lineWidth = 8; ctx.strokeStyle = '#8c0b1c'; ctx.strokeText('VERGA', 0, 88);
-  const g = ctx.createLinearGradient(0, -30, 0, 90);
+  ctx.font = `700 74px ${FONT_DISPLAY}`; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.lineJoin = 'round';
+  ctx.lineWidth = 11; ctx.strokeStyle = INK; ctx.strokeText('ESMASH', -110, -74);
+  ctx.fillStyle = RED; ctx.fillText('ESMASH', -110, -74);
+  ctx.font = `700 220px ${FONT_DISPLAY}`;
+  ctx.lineWidth = 26; ctx.strokeStyle = INK; ctx.strokeText('BROS', 0, 88);
+  ctx.lineWidth = 8; ctx.strokeStyle = '#8c0b1c'; ctx.strokeText('BROS', 0, 88);
+  const g = ctx.createLinearGradient(0, -66, 0, 90);
   g.addColorStop(0, '#fff8e1'); g.addColorStop(0.45, GOLD); g.addColorStop(0.5, '#f59f00'); g.addColorStop(1, '#c2410c');
-  ctx.fillStyle = g; ctx.fillText('VERGA', 0, 88);
+  ctx.fillStyle = g; ctx.fillText('BROS', 0, 88);
   ctx.restore();
-  // subtítulo
-  ctx.font = `italic 600 34px ${FONT_BODY}`; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.lineJoin = 'round';
-  ctx.lineWidth = 7; ctx.strokeStyle = INK; ctx.strokeText(GAME_TAGLINE, 24, 134);
-  ctx.fillStyle = '#f3e3c3'; ctx.fillText(GAME_TAGLINE, 24, 134);
   ctx.restore();
 }
 // Orden fijo de la portada y de la selección: las caras de persona repartidas entre los demás
@@ -84,26 +89,34 @@ const ROSTER = ['torito', 'daniel', 'chilazo', 'nicole', 'dino', 'mariachi', 'na
 CHAR_ORDER.sort((a, b) => (ROSTER.includes(a) ? ROSTER.indexOf(a) : 99) - (ROSTER.includes(b) ? ROSTER.indexOf(b) : 99));
 const NCH = () => CHAR_ORDER.length; // la tarjeta NCH() es "Aleatorio"
 function lineupX(i) { const n = CHAR_ORDER.length, sp = Math.min(215, (W - 150) / (n - 1)); return W / 2 + (i - (n - 1) / 2) * sp; }
+// cada personaje de la fila se pinta una vez (con su sombra) y luego se copia; "respira" estirándose un poco
+// desde los pies. Antes eran 15 personajes en vectores en cada cuadro: ~25 ms, la portada iba a tirones
+const LINEUP_BOX = { x: -112, y: -172, w: 224, h: 204 }; // lo que ocupa cualquier personaje parado (medido)
 function lineup(y, scale) {
+  const B = LINEUP_BOX;
   CHAR_ORDER.forEach((id, i) => {
-    const x = lineupX(i);
+    const x = lineupX(i), k = scale * CHARS[id].size;
     const flip = i > (CHAR_ORDER.length - 1) / 2;
-    ctx.save(); ctx.translate(x, y); ctx.scale((flip ? -1 : 1) * scale * CHARS[id].size, scale * CHARS[id].size);
-    const ph = APP.t * 0.07 + i;
-    const p = mkPose(Object.assign({}, POSES.idle, { bodyY: Math.sin(ph) * 2, armF: [0.9 + Math.sin(ph) * 0.05, 1.75] }));
-    // sombra
-    ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.beginPath(); ctx.ellipse(0, 0, 30, 6, 0, 0, TAU); ctx.fill();
-    drawCharacter(ctx, id, p, { flip });
+    const sp = ART.sprite(`lineup:${id}:${flip ? 1 : 0}:${k.toFixed(3)}`, B.w * k, B.h * k, c => {
+      c.translate(-B.x * k, -B.y * k); c.scale((flip ? -1 : 1) * k, k);
+      c.fillStyle = 'rgba(0,0,0,.45)'; c.beginPath(); c.ellipse(0, 0, 30, 6, 0, 0, TAU); c.fill();
+      drawCharacter(c, id, mkPose(Object.assign({}, POSES.idle, { armF: [0.9, 1.75] })), { flip });
+    });
+    const br = reducedMotion ? 1 : 1 + Math.sin(APP.t * 0.07 + i) * 0.012;
+    ctx.save(); ctx.translate(x, y); ctx.scale(1, br);
+    ctx.drawImage(sp.img, B.x * k, B.y * k, B.w * k, B.h * k);
     ctx.restore();
   });
 }
 // tamaño de letra que cabe en maxW (títulos en mayúsculas)
 function fitSize(str, maxW, size) {
+  const ctx = UI.c;
   ctx.font = `700 ${size}px ${FONT_DISPLAY}`;
   const w = ctx.measureText(str.toUpperCase()).width;
   return w > maxW ? Math.max(14, Math.floor(size * maxW / w)) : size;
 }
 function wrapText(str, x, y, maxW, size, lh, col, align = 'center') {
+  const ctx = UI.c;
   ctx.font = `500 ${size}px ${FONT_BODY}`;
   const words = str.split(' '); let line = '', yy = y;
   const lines = [];
@@ -277,7 +290,7 @@ const APP = {
   },
   titleDraw() {
     drawMenuBG();
-    logo(W / 2, 150, 1);
+    logo(W / 2, 178, 1);
     // piso
     const fl = ctx.createLinearGradient(0, 560, 0, H);
     fl.addColorStop(0, 'rgba(230,57,70,.18)'); fl.addColorStop(1, 'rgba(0,0,0,0)');
@@ -347,7 +360,7 @@ const APP = {
   },
   mainDraw() {
     drawMenuBG(1);
-    logo(W / 2, 98, 0.5);
+    logo(W / 2, 104, 0.5); // (con más opciones en el menú, el logo va más chico)
     this.mainOptions().forEach((o, i) => {
       const y = this.mainY(i), sel = i === this.menuSel || hover(W / 2 - 230, y, 460, 50);
       sfButton(o, W / 2 - 230 + (sel ? 12 : 0), y, 460, 50, sel);
@@ -634,20 +647,25 @@ const APP = {
       const r = this.cardRect(i), id = CHAR_ORDER[i];
       const cursors = sl.map((s, si) => ({ s, si })).filter(({ s }) => s.type !== 'none' && !s.ready && s.cur === i && (s.type === 'human' || sl.some(h => h.type === 'human' && sl[h.edit] === s)));
       const focused = cursors.length > 0;
-      ctx.save();
-      slabPath(r.x, r.y, r.w, r.h, 0.12); ctx.clip();
-      const bg = ctx.createLinearGradient(0, r.y, 0, r.y + r.h);
-      bg.addColorStop(0, id ? withAlpha(LOOKS[id].top, 0.8) : '#2a2f3d'); bg.addColorStop(1, '#07090f');
-      ctx.fillStyle = bg; ctx.fillRect(r.x, r.y, r.w, r.h);
-      if (id) drawBust(ctx, id, r.x + 8, r.y, r.w - 16, r.h - (r.h < 120 ? 24 : 36), focused ? 'angry' : 'normal');
-      else sfText('?', r.x + r.w / 2, r.y + r.h * 0.42, r.h < 120 ? 64 : 120, GOLD);
-      const pl = ctx.createLinearGradient(0, r.y + r.h - 50, 0, r.y + r.h);
-      pl.addColorStop(0, 'rgba(7,9,15,0)'); pl.addColorStop(0.5, 'rgba(7,9,15,.92)');
-      ctx.fillStyle = pl; ctx.fillRect(r.x, r.y + r.h - 50, r.w, 50);
-      ctx.restore();
-      slabPath(r.x, r.y, r.w, r.h, 0.12); ctx.lineWidth = focused ? 4 : 2; ctx.strokeStyle = focused ? GOLD : 'rgba(154,167,184,.35)'; ctx.stroke();
+      // la tarjeta (fondo, retrato y nombre) se pinta una vez por estado y se copia: antes eran 16 retratos
+      // en vectores en cada cuadro
       const nm = id ? CHARS[id].name : 'Aleatorio';
-      sfText(nm, r.x + r.w / 2, r.y + r.h - (r.h < 120 ? 13 : 18), r.h < 120 ? (nm.length > 9 ? 17 : 21) : r.w < 140 ? 22 : 30, focused ? GOLD : PAPER);
+      const card = ART.sprite(`card:${id || '?'}:${focused ? 1 : 0}:${r.w}x${r.h}`, r.w, r.h, c => {
+        c.save();
+        slabPath(0, 0, r.w, r.h, 0.12); c.clip();
+        const bg = c.createLinearGradient(0, 0, 0, r.h);
+        bg.addColorStop(0, id ? withAlpha(LOOKS[id].top, 0.8) : '#2a2f3d'); bg.addColorStop(1, '#07090f');
+        c.fillStyle = bg; c.fillRect(0, 0, r.w, r.h);
+        if (id) drawBust(c, id, 8, 0, r.w - 16, r.h - (r.h < 120 ? 24 : 36), focused ? 'angry' : 'normal');
+        else sfText('?', r.w / 2, r.h * 0.42, r.h < 120 ? 64 : 120, GOLD);
+        const pl = c.createLinearGradient(0, r.h - 50, 0, r.h);
+        pl.addColorStop(0, 'rgba(7,9,15,0)'); pl.addColorStop(0.5, 'rgba(7,9,15,.92)');
+        c.fillStyle = pl; c.fillRect(0, r.h - 50, r.w, 50);
+        c.restore();
+        sfText(nm, r.w / 2, r.h - (r.h < 120 ? 13 : 18), r.h < 120 ? (nm.length > 9 ? 17 : 21) : r.w < 140 ? 22 : 30, focused ? GOLD : PAPER);
+      });
+      ctx.drawImage(card.img, r.x, r.y, r.w, r.h);
+      slabPath(r.x, r.y, r.w, r.h, 0.12); ctx.lineWidth = focused ? 4 : 2; ctx.strokeStyle = focused ? GOLD : 'rgba(154,167,184,.35)'; ctx.stroke();
       cursors.forEach(({ s, si }, k) => {
         const bw = r.w < 140 ? 40 : 46, bx = r.x + 10 + (k % 2) * (bw + 4), by = r.y + 8 + Math.floor(k / 2) * 28 + (reducedMotion ? 0 : Math.sin(this.t * 0.15 + si) * 3);
         slabPath(bx, by, bw, 24, 0.3); ctx.fillStyle = PLAYER_COLORS[si]; ctx.fill(); ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.stroke();
@@ -709,8 +727,14 @@ const APP = {
     ctx.fillStyle = g; ctx.fillRect(r.x, r.y, r.w, r.h);
     if (id) {
       ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.beginPath(); ctx.ellipse(r.x + 88, r.y + 262, 44, 8, 0, 0, TAU); ctx.fill();
-      ctx.save(); ctx.translate(r.x + 88, r.y + 262); const k = 1.72 * CHARS[id].size; ctx.scale(k, k);
-      drawCharacter(ctx, id, s.ready ? (i % 2 ? POSES.win2 : POSES.win1) : mkPose(Object.assign({}, POSES.idle, { bodyY: Math.sin(this.t * 0.07 + i) * 2 })), {});
+      // el personaje grande del lugar: pintado una vez por pose y copiado (antes, en vectores cada cuadro)
+      const k = 1.72 * CHARS[id].size, B = LINEUP_BOX, pose = s.ready ? (i % 2 ? 'win2' : 'win1') : 'idle';
+      const sp = ART.sprite(`slot:${id}:${pose}:${k.toFixed(3)}`, B.w * k, B.h * k, c => {
+        c.translate(-B.x * k, -B.y * k); c.scale(k, k); drawCharacter(c, id, POSES[pose], {});
+      });
+      const br = s.ready || reducedMotion ? 1 : 1 + Math.sin(this.t * 0.07 + i) * 0.012;
+      ctx.save(); ctx.translate(r.x + 88, r.y + 262); ctx.scale(1, br);
+      ctx.drawImage(sp.img, B.x * k, B.y * k, B.w * k, B.h * k);
       ctx.restore();
     } else sfText('?', r.x + 88, r.y + 160, 140, GOLD);
     ctx.restore();

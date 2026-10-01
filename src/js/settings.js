@@ -31,7 +31,8 @@ const Prefs = {
     if (redraw) {
       QUALITY.res = 1;
       ART.hi = !IS_XBOX && this.quality !== 'fast' && this.fx === 'full';
-      ART.slow = 0;
+      ART.lite = this.quality === 'fast'; // fondo a media resolución y sin "soft-light" (art.js)
+      ART.slow = 0; ART.win = []; ART.winMs = 0; ART.slowWins = 0;
       ART.store.clear();
       APP.previews = {};
       resize();

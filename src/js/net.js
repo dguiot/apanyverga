@@ -93,8 +93,8 @@ const Net = {
     let who = this.user && this.user.name ? this.user.name() : '';
     if (/^Jugador\b/.test(who)) who = ''; // nombre de relleno: mejor sin nombre
     const url = this.inviteURL();
-    return url ? `¡Vente a jugar A pan y verga${who ? ' con ' + who : ''}! Entra directo a mi sala:`
-      : `¡Vente a jugar A pan y verga! Abre el juego (el link que te compartí), entra a "Jugar online" y elige mi sala · código ${this.code}`;
+    return url ? `¡Vente a jugar Esmash Bros${who ? ' con ' + who : ''}! Entra directo a mi sala:`
+      : `¡Vente a jugar Esmash Bros! Abre el juego (el link que te compartí), entra a "Jugar online" y elige mi sala · código ${this.code}`;
   },
   inviteText() { const url = this.inviteURL(); return url ? this.inviteMsg() + ' ' + url : this.inviteMsg(); },
   // Se llama DENTRO del toque, clic o tecla: el navegador solo deja compartir o copiar durante el gesto.
@@ -105,7 +105,7 @@ const Net = {
     const mobile = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || TouchPad.active;
     if (mobile && navigator.share) {
       let p;
-      try { p = navigator.share(url ? { title: 'A pan y verga', text: msg, url } : { title: 'A pan y verga', text: msg }); } catch (e) { p = Promise.reject(e); }
+      try { p = navigator.share(url ? { title: GAME_NAME, text: msg, url } : { title: GAME_NAME, text: msg }); } catch (e) { p = Promise.reject(e); }
       Promise.resolve(p).then(() => {}, e => { if (!e || e.name !== 'AbortError') InviteBox.open(copyText(this.inviteText())); });
       return 'share';
     }
@@ -439,7 +439,7 @@ const InviteBox = {
       if (e.target === el) return this.close(); // clic afuera
       const b = e.target.closest('[data-a]'); if (!b) return;
       if (b.dataset.a === 'copy') copyText(Net.inviteText()).then(say);
-      if (b.dataset.a === 'share') { const m = Net.inviteMsg(); try { navigator.share(url ? { title: 'A pan y verga', text: m, url } : { title: 'A pan y verga', text: m }).catch(() => {}); } catch (err) { /* sin compartir */ } }
+      if (b.dataset.a === 'share') { const m = Net.inviteMsg(); try { navigator.share(url ? { title: GAME_NAME, text: m, url } : { title: GAME_NAME, text: m }).catch(() => {}); } catch (err) { /* sin compartir */ } }
       if (b.dataset.a === 'close') this.close();
     });
     // las teclas se quedan en la ventanita (el juego no reacciona detrás); Esc la cierra

@@ -21,7 +21,7 @@ html = html.replace('<link rel="stylesheet" href="fonts/inline.css">', '<style>\
 icon = "data:image/svg+xml," + "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23e63946'/%3E%3Ctext x='32' y='47' font-size='40' text-anchor='middle' font-family='Impact,Arial Black,sans-serif' fill='%23ffc53d'%3EV%3C/text%3E%3C/svg%3E"
 head = ('<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'
         '<meta name="theme-color" content="#060d18">\n'
-        '<meta name="description" content="A pan y verga… y se nos acabó el pan. Juego de peleas para hasta 4 jugadores, en la misma pantalla o en línea con voz y cámara.">\n'
+        '<meta name="description" content="Esmash Bros: juego de peleas para hasta 4 jugadores, en la misma pantalla o en línea con voz y cámara.">\n'
         f'<link rel="icon" href="{icon}">\n'
         # "Agregar a inicio": desde el ícono abre a pantalla completa y de lado (en iPhone es la única forma)
         '<link rel="manifest" href="manifest.webmanifest">\n'
@@ -29,7 +29,7 @@ head = ('<meta name="viewport" content="width=device-width, initial-scale=1, vie
         '<meta name="mobile-web-app-capable" content="yes">\n'
         '<meta name="apple-mobile-web-app-capable" content="yes">\n'
         '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">\n'
-        '<meta name="apple-mobile-web-app-title" content="A pan y verga">\n')
+        '<meta name="apple-mobile-web-app-title" content="Esmash Bros">\n')
 html = html.replace('<meta charset="utf-8">', '<meta charset="utf-8">\n' + head, 1)
 block = re.search(r'<!--SCRIPTS-->(.*?)<!--/SCRIPTS-->', html, re.S).group(1)
 page = html.replace(block, "\n<script>\n" + vendor + "\n</script>\n<script src=\"config.js\"></script>\n<script>\n'use strict';\n" + '\n'.join(js) + "\n</script>\n")
@@ -37,8 +37,8 @@ page = html.replace(block, "\n<script>\n" + vendor + "\n</script>\n<script src=\
 (out / 'icons').mkdir(exist_ok=True)
 for n in (180, 192, 512): (out / 'icons' / f'icon-{n}.png').write_bytes((root / 'icons' / f'icon-{n}.png').read_bytes())
 (out / 'manifest.webmanifest').write_text('''{
-  "name": "A pan y verga",
-  "short_name": "A pan y verga",
+  "name": "Esmash Bros",
+  "short_name": "Esmash Bros",
   "description": "…y se nos acabó el pan. Peleas para hasta 4, en la misma pantalla o en línea.",
   "start_url": "./",
   "scope": "./",
@@ -54,7 +54,7 @@ for n in (180, 192, 512): (out / 'icons' / f'icon-{n}.png').write_bytes((root / 
 ''')
 cfg = out / 'config.js'
 if not cfg.exists():
-    cfg.write_text("""// Configuración de la versión web de "A pan y verga".
+    cfg.write_text("""// Configuración de la versión web de "Esmash Bros".
 // url y key: Supabase → Project Settings → API. La "anon" / "publishable" key es pública por diseño
 // (viaja en el navegador de todos). NUNCA pongas aquí la service_role / secret key.
 // ice: servidores para conectar voz, cámara y la pelea directo entre navegadores. Con los STUN de

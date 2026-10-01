@@ -41,11 +41,14 @@ function rgbStr(c, a = 1) { return a >= 1 ? `rgb(${c[0] | 0},${c[1] | 0},${c[2] 
 const ART = {
   store: new Map(),
   hi: !IS_XBOX,            // bloom y luz de borde; baja sola si el equipo no aguanta (en Xbox empieza apagado)
+  lite: IS_XBOX,           // modo ligero: fondo a media resolución y sin la gradación "soft-light" (en Xbox desde el arranque)
   light: null,             // luz del escenario actual
   frameMs: 0, slow: 0,
   lowRes: 0,              // >0 mientras se pinta una miniatura (vista previa de escenario): capas chiquitas
   pxRes() { return this.lowRes || clamp(VIEW.scale * VIEW.dpr, 1, 2); },
-  bgRes() { return this.lowRes || clamp(VIEW.scale * VIEW.dpr * 0.8, 0.7, 1.4); },
+  // (modo ligero: el fondo se dibuja a media resolución, sus capas no necesitan más; y así bajar la nitidez
+  // a media pelea no obliga a volver a pintarlas)
+  bgRes() { return this.lowRes || (this.lite ? 0.5 : clamp(VIEW.scale * VIEW.dpr * 0.8, 0.7, 1.4)); },
   trim(bytes) {
     const budget = (IS_XBOX ? 48 : 120) * 1024 * 1024;
     let used = 0;
@@ -61,14 +64,26 @@ const ART = {
       this.store.delete(oldKey);
     }
   },
-  // guarda lo que cuesta dibujar (se genera una vez por clave)
+  // guarda lo que cuesta dibujar (se genera una vez por clave). Lo que se vuelve a pedir pasa al final de la
+  // lista: si hay que soltar memoria (trim) se va primero lo que no se ha usado en más tiempo, nunca una capa
+  // que el escenario está dibujando (si no, se volvería a pintar cada cuadro)
   memo(key, make) {
-    if (this.store.has(key)) return this.store.get(key);
+    if (this.store.has(key)) { const v = this.store.get(key); this.store.delete(key); this.store.set(key, v); return v; }
     const value = make(), image = value && (value.img || value);
     const bytes = image && image.width && image.height ? image.width * image.height * 4 : 0;
     if (bytes) this.trim(bytes);
     this.store.set(key, value);
     return value;
+  },
+  // pieza de interfaz que casi no cambia (fondo de menú, tarjeta, personaje quieto): se pinta una vez a la
+  // nitidez de la pantalla y luego solo se copia. draw(c) dibuja en coordenadas 0..w × 0..h
+  sprite(key, w, h, draw) {
+    const k = VIEW.k || 1;
+    return this.memo('spr:' + key + '@' + k.toFixed(2), () => {
+      const cv = mkCanvas(w * k, h * k), c = cv.getContext('2d');
+      c.scale(k, k); withCtx(c, () => draw(c));
+      return { img: cv, w, h };
+    });
   },
   // lienzo horneado en coordenadas del mundo: {img, x, y, w, h}
   bake(key, x, y, w, h, draw, res) {
@@ -257,14 +272,19 @@ const ART = {
       c.globalAlpha = G.bloom; c.drawImage(this.bloomSm, 0, 0, cv.width, cv.height);
       c.restore();
     }
-    // gradación: luz cálida/fría arriba y abajo
-    if (G.top || G.bottom) {
+    // gradación: luz cálida/fría arriba y abajo ("soft-light" a pantalla completa: de lo más caro en una
+    // tarjeta de video modesta, porque tiene que leer la pantalla para mezclar; en modo ligero no va)
+    if ((G.top || G.bottom) && !this.lite) {
       c.save(); c.globalCompositeOperation = 'soft-light';
       const g = c.createLinearGradient(0, 0, 0, H);
       g.addColorStop(0, G.top || 'rgba(0,0,0,0)'); g.addColorStop(1, G.bottom || 'rgba(0,0,0,0)');
       c.fillStyle = g; c.fillRect(0, 0, W, H);
       c.restore();
     }
+    if (this.lite && !G.forceVig) return; // modo ligero: la viñeta va en el fondo a media resolución (battle.js)
+    this.vignette(c, G);
+  },
+  vignette(c, G) {
     const v = this.memo('vignette:' + (G.vig || 0.5), () => {
       const cv2 = mkCanvas(W / 2, H / 2), x = cv2.getContext('2d');
       const g = x.createRadialGradient(W / 4, H / 4, H * 0.14, W / 4, H / 4, H * 0.5);
@@ -274,14 +294,23 @@ const ART = {
     });
     c.drawImage(v, 0, 0, W, H);
   },
-  // baja la calidad sola si dibujar un cuadro tarda demasiado
-  measure(ms) {
+  // baja la calidad sola si el juego no alcanza los 60 cuadros por segundo. Se mide el tiempo REAL entre
+  // cuadros (dt), no lo que tarda el código en dar las órdenes de dibujo: en la Xbox el código termina rápido
+  // y lo lento es pintar, así que antes nunca bajaba. Escalones: sin brillo → modo ligero → menos pixeles
+  // (con Calidad: Nítida en Ajustes no baja nunca)
+  win: [], winMs: 0, slowWins: 0,
+  measure(dt) {
     if (typeof Prefs !== 'undefined' && Prefs.quality === 'sharp') return;
-    this.frameMs = lerp(this.frameMs, ms, 0.05);
-    if (this.hi && this.frameMs > 22) { if (++this.slow > 120) { this.hi = false; this.slow = 0; } }
-    // ya sin brillo y todavía lento: menos pixeles (hasta 60%), una vez cada 3 s
-    else if (!this.hi && this.frameMs > 24 && QUALITY.res > 0.6) { if (++this.slow > 180) { QUALITY.res = Math.max(0.6, QUALITY.res - 0.2); resize(); this.slow = 0; this.frameMs = 16; } }
-    else this.slow = Math.max(0, this.slow - 1);
+    if (typeof document !== 'undefined' && document.hidden) return;
+    this.win.push(dt); this.winMs += dt;
+    if (this.winMs < 1500 || this.win.length < 20) return; // ventanas de 1.5 s (en un equipo lento son pocos cuadros)
+    const s = this.win.sort((a, b) => a - b), med = s[s.length >> 1]; this.win = []; this.winMs = 0;
+    if (med < 19) { this.slowWins = 0; return; } // la mitad de los cuadros llega a tiempo: bien
+    if (++this.slowWins < 2) return;             // 3 s seguidos lento
+    this.slowWins = 0;
+    if (this.hi) this.hi = false;
+    else if (!this.lite) this.lite = true;
+    else if (QUALITY.res > 0.6) { QUALITY.res = Math.max(0.6, +(QUALITY.res - 0.2).toFixed(2)); resize(); }
   },
 };
 function mixStr(a, b, t) { return rgbStr(mixRGB(parseColor(a), parseColor(b), t)); }
