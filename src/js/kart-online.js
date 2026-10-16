@@ -4,7 +4,8 @@
 const KART_NET_FIELDS=['s','x','v','yaw','velocityYaw','steer','lat','drift','driftDir','charge','turbo','shield','stun','invuln','height','vy','airTime','trick','coins','star','magnet','slow','slip','roulette','completedLaps','finish','nextCheckpoint','rescue','launch','rampCd','air','boostCd','slipCd','hitCd','bumpLat'];
 const KART_NET_ITEMS=Object.keys(KART_ITEMS);
 const KartOnline={
-  browsing:false,ep:0,seq:0,counters:[0,0,0],remote:new Map(),lastStateTick:-1,lastStateAt:0,sendTick:0,
+  browsing:false,ep:0,seq:0,counters:[0,0,0],remote:new Map(),lastStateTick:-1,lastStateAt:0,sendTick:0,entityIds:new WeakMap(),nextEntity:1,
+  entityId(entity){let id=this.entityIds.get(entity);if(!id){id=this.nextEntity++;this.entityIds.set(entity,id);}return id;},
   browse(){this.browsing=true;KartMenu.save();if(Net.user?.askName)Net.user.askName(false);APP.onSel=0;APP.go('online');},
   publish(extra){Object.assign(Net.lob,extra);const j=JSON.stringify(Net.lob);if(j!==Net.lastLobJSON){Net.lastLobJSON=j;Net.set({lob:Net.lob});}},
   lobby(){
@@ -38,7 +39,7 @@ const KartOnline={
     race.online=true;race.setup=s;race.spectator=!s.humans.some(p=>p.peer===Net.myPeer());
     race.racers.forEach((r,i)=>{r.human=i<s.humans.length;r.peer=s.humans[i]?.peer||null;r.label=r.peer?Net.nameOf(r.peer):CHARS[r.id].name;});
     race.player=race.racers.find(r=>r.peer===Net.myPeer())||race.racers[0];
-    this.ep=s.ep;this.seq=0;this.counters=[0,0,0];this.remote.clear();this.lastStateTick=-1;this.lastStateAt=performance.now();this.sendTick=0;
+    this.ep=s.ep;this.seq=0;this.counters=[0,0,0];this.remote.clear();this.lastStateTick=-1;this.lastStateAt=performance.now();this.sendTick=0;this.entityIds=new WeakMap();this.nextEntity=1;
     KartMenu.cupState=null;KartMenu.recorded=false;KartControls.prev={};KartControls.tapped.clear();KartControls.read();
     APP.go('kartRace');TouchPad.release();return true;
   },
@@ -80,13 +81,16 @@ const KartOnline={
   },
   snapshot(){
     const r=APP.kartRace,q=n=>typeof n==='number'?Math.round(n*100)/100:n;
+    const projectiles=r.projectiles.slice(-18),effects=r.effects.filter(e=>e.type!=='flame').slice(-4);
     const snap={k:1,e:this.ep,t:r.tick,g:[q(r.time),q(r.countdown),['grid','race','finish'].indexOf(r.phase),q(r.resultTime)],
       r:r.racers.map(p=>[...KART_NET_FIELDS.map(k=>q(p[k])),KART_NET_ITEMS.indexOf(p.item),p.disconnected?1:0]),
       b:r.course.boxes.map(b=>q(Math.max(0,b.ready-r.time))),c:r.course.coins.map(c=>q(Math.max(0,c.ready-r.time))),
-      p:r.projectiles.slice(-18).map(p=>[KART_NET_ITEMS.indexOf(p.type),p.owner,q(p.s),q(p.x),q(p.life),q(p.v),q(p.vx),q(p.age),p.target??-1,p.dir]),
-      l:r.racers.filter(p=>p.human).map(p=>p.lapTimes.map(q)),d:r.effects.filter(e=>e.type!=='flame').slice(-4).map(e=>[e.type,q(e.s),q(e.x),q(e.life),q(e.max),e.color])};
+      p:projectiles.map(p=>[KART_NET_ITEMS.indexOf(p.type),p.owner,q(p.s),q(p.x),q(p.life),q(p.v),q(p.vx),q(p.age),p.target??-1,p.dir]),
+      l:r.racers.filter(p=>p.human).map(p=>p.lapTimes.map(q)),d:effects.map(e=>[e.type,q(e.s),q(e.x),q(e.life),q(e.max),e.color]),
+      // Optional identity extension: old clients can still read the same packet.
+      ids:[projectiles.map(p=>this.entityId(p)),effects.map(e=>this.entityId(e))]};
     // Leave room for lobby/AV metadata under the original 4 KiB presence budget.
-    while(JSON.stringify(snap).length>3000&&(snap.p.length||snap.d.length)){if(snap.d.length)snap.d.shift();else snap.p.shift();}
+    while(JSON.stringify(snap).length>3000&&(snap.p.length||snap.d.length)){if(snap.d.length){snap.d.shift();snap.ids[1].shift();}else{snap.p.shift();snap.ids[0].shift();}}
     return snap;
   },
   pushState(){Net.set({st:this.snapshot()});},
@@ -94,21 +98,26 @@ const KartOnline={
     const race=APP.kartRace,fields=race?.setup?.v===1?KART_NET_FIELDS.slice(0,-1):KART_NET_FIELDS;
     if(!race||s.e!==this.ep||!Number.isSafeInteger(s.t)||s.t<=this.lastStateTick||!Array.isArray(s.g)||s.g.length!==4||!s.g.every(Number.isFinite)||!Array.isArray(s.r)||s.r.length!==8||s.r.some(a=>!Array.isArray(a)||a.length!==fields.length+2||a.some(v=>v!==null&&typeof v!=='boolean'&&!Number.isFinite(v))))return;
     if(!Array.isArray(s.p)||s.p.length>48||s.p.some(a=>!Array.isArray(a)||a.length!==10||!a.every(Number.isFinite)||!KART_NET_ITEMS[a[0]]||a[1]<0||a[1]>7))return;
+    if(s.ids&&(!Array.isArray(s.ids)||s.ids.length!==2||s.ids.some((a,i)=>!Array.isArray(a)||a.length!==(i?s.d?.length:s.p.length)||a.some(n=>!Number.isSafeInteger(n)||n<1)||new Set(a).size!==a.length)))return;
     const first=this.lastStateTick<0;this.lastStateTick=s.t;this.lastStateAt=performance.now();
     const oldPhase=race.phase,oldCount=Math.ceil(race.countdown);
     race.time=s.g[0];race.countdown=s.g[1];race.phase=['grid','race','finish'][s.g[2]]||'grid';race.resultTime=s.g[3];race.tick=s.t;
     if(!first&&oldPhase==='grid'){if(race.phase==='race')KartSound.effect('confirm');else if(Math.ceil(race.countdown)!==oldCount)KartSound.effect('menu');}
-    s.r.forEach((a,i)=>{const r=race.racers[i],old={s:r.s,x:r.x,yaw:r.yaw,velocityYaw:r.velocityYaw,v:r.v},wasFinish=r.finish,wasStun=r.stun,oldItem=r.item;
+    s.r.forEach((a,i)=>{const r=race.racers[i],visual=KartMotion.view(r,1),old={s:r.s,x:r.x,yaw:r.yaw,velocityYaw:r.velocityYaw,v:r.v},wasFinish=r.finish,wasStun=r.stun,oldItem=r.item,wasTrick=r.trick;
       fields.forEach((k,j)=>r[k]=a[j]);r.item=KART_NET_ITEMS[a[fields.length]]||null;r.disconnected=!!a[fields.length+1];
       r.serverS=r.s;r.serverX=r.x;
       if(!first&&r===race.player&&!race.spectator&&race.phase==='race'&&!r.rescue&&r.finish===null&&Math.abs(old.s-r.s)<25){r.s=lerp(old.s,r.s,.4);r.x=lerp(old.x,r.x,.35);r.yaw=lerp(old.yaw,r.yaw,.4);r.velocityYaw=lerp(old.velocityYaw,r.velocityYaw,.4);r.v=lerp(old.v,r.v,.45);}
       r.ps=r.s;r.px=r.x;
+      KartMotion.reconcile(r,visual,first||!!r.rescue||r.finish!==wasFinish||race.phase!=='race');
+      const motion=KartMotion.state(r);if(r.stun>wasStun+.3)motion.hitAge=0;
+      if(r.trick&&!wasTrick){motion.trickAge=0;motion.trickDuration=clamp((r.vy+Math.sqrt(r.vy*r.vy+48*r.height))/24-.04,.12,.6);}
       if(r.human&&s.l?.[i])r.lapTimes=s.l[i].filter(Number.isFinite);
       if(r===race.player&&!race.spectator){if(wasFinish===null&&r.finish!==null){race.say('¡META!');race.saveBest();KartSound.effect('confirm');}if(r.stun>wasStun+.3)race.feedback(r,'hit',.65);if(!oldItem&&r.item)KartSound.effect('confirm');}
     });
     race.course.boxes.forEach((b,i)=>b.ready=race.time+(+s.b?.[i]||0));race.course.coins.forEach((c,i)=>c.ready=race.time+(+s.c?.[i]||0));
-    race.projectiles=s.p.map(a=>({type:KART_NET_ITEMS[a[0]],owner:a[1],s:a[2],ps:a[2],x:a[3],life:a[4],v:a[5],vx:a[6],age:a[7],target:a[8]<0?undefined:a[8],dir:a[9]}));
-    race.effects=(s.d||[]).filter(a=>Array.isArray(a)&&['lightning','hit'].includes(a[0])&&a.slice(1,5).every(Number.isFinite)).map(a=>({type:a[0],s:a[1],x:a[2],life:a[3],max:a[4],color:a[5]}));
+    const oldProjectiles=new Map(race.projectiles.map(p=>[p.netId,p])),oldEffects=new Map(race.effects.map(e=>[e.netId,e]));
+    race.projectiles=s.p.map((a,i)=>{const id=s.ids?.[0][i],p=id&&oldProjectiles.get(id)||{};return Object.assign(p,{netId:id,type:KART_NET_ITEMS[a[0]],owner:a[1],s:a[2],ps:a[2],x:a[3],life:a[4],v:a[5],vx:a[6],age:a[7],target:a[8]<0?undefined:a[8],dir:a[9]});});
+    race.effects=(s.d||[]).map((a,i)=>({a,id:s.ids?.[1][i]})).filter(({a})=>Array.isArray(a)&&['lightning','hit'].includes(a[0])&&a.slice(1,5).every(Number.isFinite)).map(({a,id})=>Object.assign(id&&oldEffects.get(id)||{},{netId:id,type:a[0],s:a[1],x:a[2],life:a[3],max:a[4],color:a[5]}));
     this.sort(race);
   },
   sort(r){r.order=r.racers.slice().sort((a,b)=>a.finish!==null&&b.finish!==null?a.finish-b.finish:a.finish!==null?-1:b.finish!==null?1:b.s-a.s);},

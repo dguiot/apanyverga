@@ -304,8 +304,8 @@ const ART = {
     if (typeof document !== 'undefined' && document.hidden) return;
     this.win.push(dt); this.winMs += dt;
     if (this.winMs < 1500 || this.win.length < 20) return; // ventanas de 1.5 s (en un equipo lento son pocos cuadros)
-    const s = this.win.sort((a, b) => a - b), med = s[s.length >> 1]; this.win = []; this.winMs = 0;
-    if (med < 19) { this.slowWins = 0; return; } // la mitad de los cuadros llega a tiempo: bien
+    const s = this.win.sort((a, b) => a - b), med = s[s.length >> 1], p90 = s[Math.floor(s.length * .9)]; this.win = []; this.winMs = 0;
+    if (med < 19 && p90 < 30) { this.slowWins = 0; return; } // también detectar tirones repetidos aunque la mediana sea buena
     if (++this.slowWins < 2) return;             // 3 s seguidos lento
     this.slowWins = 0;
     if (this.hi) this.hi = false;

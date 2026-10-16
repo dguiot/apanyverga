@@ -47,10 +47,10 @@ const kartItemBuild=Kart3D.build;Kart3D.build=function(race){
 };
 const kartItemAnimate=Kart3D.animate;Kart3D.animate=function(race,alpha){
   kartItemAnimate.call(this,race,alpha);const C=race.course,tick=this.itemFxTick!==race.tick;this.itemFxTick=race.tick;
-  for(const r of race.racers){const ring=this.magnetRings[r.index],w=C.world(r.s,r.x,.2);ring.visible=r.magnet>0;ring.position.set(w.x,w.y,w.z);ring.scale.setScalar(1+Math.sin(race.time*5)*.1);
+  for(const r of race.racers){const visual=KartMotion.view(r,alpha),ring=this.magnetRings[r.index],w=C.world(visual.s,visual.x,.2);ring.visible=r.magnet>0;ring.position.set(w.x,w.y,w.z);ring.scale.setScalar(1+Math.sin(race.time*5)*.1);
     const type=r.item;let held=this.heldItems.get(r.index);if(held&&held.type!==type){this.scene.remove(held.mesh);held.mesh.traverse(o=>{if(o.geometry)o.geometry.dispose();});this.heldItems.delete(r.index);held=null;}
     if(type&&!held){const mesh=new KartGL.Group(),n=type==='triple'?3:1;for(let i=0;i<n;i++)mesh.add(this.itemModel(type==='triple'?'chile':type));this.scene.add(mesh);held={type,mesh};this.heldItems.set(r.index,held);}
-    if(held){held.mesh.children.forEach((m,i)=>{const a=race.time*1.6+i*TAU/held.mesh.children.length,s=r.s-3+Math.sin(a)*1.3,x=r.x+Math.cos(a)*.11,w=C.world(s,x,1.25);m.position.set(w.x,w.y,w.z);m.scale.setScalar(.38);m.rotation.y=Math.atan2(C.sample(s).tx,C.sample(s).tz)+a;});}
+    if(held){held.mesh.children.forEach((m,i)=>{const a=race.time*1.6+i*TAU/held.mesh.children.length,s=visual.s-3+Math.sin(a)*1.3,x=visual.x+Math.cos(a)*.11,w=C.world(s,x,1.25+Math.max(0,visual.height));m.position.set(w.x,w.y,w.z);m.scale.setScalar(.38);m.rotation.y=Math.atan2(C.sample(s).tx,C.sample(s).tz)+a;});}
   }
   for(const q of race.projectiles){const mesh=this.itemMeshes.get(q);if(!mesh)continue;
     if(q.type==='pinata')mesh.position.y+=Math.sin(clamp(q.age/1.45,0,1)*Math.PI)*4.4;

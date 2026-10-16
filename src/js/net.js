@@ -190,7 +190,7 @@ const Net = {
     setup.players.forEach((p, i) => { if (p.team === undefined || p.team === null) p.team = i % 2; });
     const enc = { pl: setup.players.map(p => [p.port, CHAR_ORDER.indexOf(p.char), p.cpu || 0, p.remote || (p.cpu ? null : ''), p.team || 0]), stg: STAGE_INFO.findIndex(s => s.id === setup.stage), ru: this.encRules(setup.rules), py: setup.party ? PARTY.findIndex(p => p.id === setup.party) : -1 };
     const peers = [...new Set(setup.players.filter(p => !p.cpu && p.remote).map(p => p.remote))];
-    const rb = this.rollbackChoice() !== '0' && window.APYV_WEB && peers.length && this.room && typeof this.room.fastReady === 'function' && this.room.fastReady(peers) && peers.every(p => this.presOf(p)?.rbc === 1);
+    const rb = this.rollbackChoice() !== '0' && window.APYV_WEB && peers.length && this.room && typeof this.room.fastReady === 'function' && this.room.fastReady(peers) && peers.every(p => this.presOf(p)?.rbc === RB_COMPAT);
     setup.rollback = !!rb; enc.rb = rb ? 1 : 0;
     if (rb) { setup.seed = (Math.random() * 4294967296) >>> 0; enc.sd = setup.seed; }
     else delete setup.seed;
@@ -344,7 +344,7 @@ const Net = {
   // ---------- cada fotograma ----------
   tick() {
     if (!this.ok) return;
-    const cap = window.APYV_WEB && this.room && typeof this.room.fastReady === 'function' && this.rollbackChoice() !== '0' ? 1 : 0;
+    const cap = window.APYV_WEB && this.room && typeof this.room.fastReady === 'function' && this.rollbackChoice() !== '0' ? RB_COMPAT : 0;
     if (this.rbCap !== cap) { this.rbCap = cap; this.set({ rbc: cap }); }
     if (this.role === 'host') {
       if (['modesel', 'charsel', 'stagesel'].includes(APP.screen)) { this.syncSlots(); this.publishLobby({ ph: 'lobby' }); }

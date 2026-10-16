@@ -5,6 +5,7 @@
 //  Solo cambia cómo se ven; la geometría y los eventos no se tocan.
 // ============================================================
 const SC = {
+  moteCache: new WeakMap(),
   // ---- texturas ----
   rockTex(key, base, dark, light, strata = 0.06) {
     const B = parseColor(base), D = parseColor(dark), L = parseColor(light);
@@ -101,7 +102,7 @@ const SC = {
     c.restore();
   },
   // partículas ambientales en pantalla (polvo de luz, ceniza, lluvia...)
-  motes(st, n, make) { if (!st._motes) st._motes = Array.from({ length: n }, (_, i) => make(i, true)); return st._motes; },
+  motes(st, n, make) { let ps = this.moteCache.get(st); if (!ps) { ps = Array.from({ length: n }, (_, i) => make(i, true)); this.moteCache.set(st, ps); } return ps; },
 };
 
 // ================================================================
@@ -289,9 +290,9 @@ SCENERY.temple = {
   drawFG(c) {
     // pétalos que el viento arrastra
     const ps = SC.motes(this, 26, (i) => ({ x: rand(-900, 900), y: rand(-700, 200), vx: rand(0.3, 1.2), vy: rand(0.4, 1), r: rand(2.5, 4.5), a: rand(0, TAU), sp: rand(0.02, 0.06) }));
-    const wind = this.wind > 0 ? this.windDir * 6 : 0;
+    const wind = this.wind > 0 ? this.windDir * 6 : 0, step = GameFeel.dt * 60;
     for (const p of ps) {
-      p.x += p.vx + wind; p.y += p.vy; p.a += p.sp;
+      p.x += (p.vx + wind) * step; p.y += p.vy * step; p.a += p.sp * step;
       if (p.y > 300 || p.x > 1100 || p.x < -1100) { p.y = rand(-800, -500); p.x = rand(-1000, 900); }
       c.save(); c.translate(p.x, p.y); c.rotate(p.a); c.scale(1, 0.55 + Math.sin(p.a * 2) * 0.35);
       c.fillStyle = 'rgba(255,214,222,.9)'; c.beginPath(); c.ellipse(0, 0, p.r, p.r * 0.6, 0, 0, TAU); c.fill();
@@ -368,17 +369,18 @@ SCENERY.volcano = {
     ART.drawLayer(c, spires, cam, 0.16, 80, { yk: 1.4 });
     // brasas que suben y ceniza que cae
     const em = SC.motes(this, 60, i => ({ x: rand(0, W), y: rand(0, H), v: rand(0.4, 1.6), s: rand(1, 2.6), ash: i % 3 === 0 }));
+    const step = GameFeel.dt * 60;
     c.save(); c.globalCompositeOperation = 'lighter';
     for (const e of em) {
       if (e.ash) continue;
-      e.y -= e.v * (erupt ? 2.2 : 1); e.x += Math.sin((t + e.y) * 0.02) * 0.4;
+      e.y -= e.v * (erupt ? 2.2 : 1) * step; e.x += Math.sin((t + e.y) * 0.02) * 0.4 * step;
       if (e.y < -10) { e.y = H + 10; e.x = rand(0, W); }
       c.fillStyle = `rgba(255,${150 + (e.s * 30 | 0)},60,${0.5 + Math.sin(t * 0.2 + e.x) * 0.3})`;
       c.fillRect(e.x, e.y, e.s, e.s);
     }
     c.restore();
     c.fillStyle = 'rgba(160,140,140,.35)';
-    for (const e of em) { if (!e.ash) continue; e.y += e.v * 0.5; e.x -= 0.3; if (e.y > H) { e.y = -5; e.x = rand(0, W + 200); } c.fillRect(e.x, e.y, 1.6, 1.6); }
+    for (const e of em) { if (!e.ash) continue; e.y += e.v * 0.5 * step; e.x -= 0.3 * step; if (e.y > H) { e.y = -5; e.x = rand(0, W + 200); } c.fillRect(e.x, e.y, 1.6, 1.6); }
   },
   drawStage(c) {
     const s = this.solids[0], t = this.t;

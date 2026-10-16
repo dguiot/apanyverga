@@ -1,6 +1,9 @@
 'use strict';
 // Cada pantalla simula con entradas cuantizadas; el anfitrión decide eventos y resultados.
 const RB_WINDOW = 8, RB_NEUTRAL = [0, 0, 0, 0, 0];
+// Gameplay compatibility, independent of transport. Older open tabs fall back
+// to host-authoritative play instead of predicting different jump/buffer rules.
+const RB_COMPAT = 2;
 const rbSame = (a, b) => a && b && a.every((x, i) => x === b[i]);
 class RollbackSession {
   constructor(battle, opts) {
@@ -12,7 +15,7 @@ class RollbackSession {
       return (Devices.ctrls[f.dev] || Devices.ctrls[Net.localDev] || {}).cur || blankState();
     });
     this.send = opts.send || ((k, v, to, reliable) => reliable ? Net.room.stateSend(k, v, to) : Net.room.fastSend(k, v, to));
-    this.real = new Map(); this.used = new Map(); this.lastHeard = new Map(); this.captured = new Map();
+    this.real = new Map(); this.used = new Map(); this.lastHeard = new Map(); this.captured = new Map(); this.pendingRead = new Map(); this.delayLowerAt = null;
     this.snapshots = new Map(); this.hashes = new Map(); this.events = new Map(); this.cpuAt = new Map();
     this.rollbackFrom = null; this.running = false; this.stopped = false; this.off = [];
     this.metrics = { rollbacks: 0, resimFrames: 0, resimMs: 0, saveMs: 0, stalls: 0 };
@@ -41,8 +44,18 @@ class RollbackSession {
       if (this.cpuAt.has(p)) continue;
       const f = this.frame + this.delay, entries = this.real.get(p);
       const last = this.captured.get(p);
+      const current = this.read(p), pending = this.pendingRead.get(p), state = { ...current };
+      if (pending) {
+        for (const key of BUTTONS) state[key] = !!(current[key] || pending[key]);
+        if (!current.cx && !current.cy) { state.cx = pending.cx; state.cy = pending.cy; }
+      }
+      // Reducing input delay (or waiting for a missing packet) may revisit an
+      // already published future frame. Keep that frame immutable and retain
+      // short button presses for the next new frame.
+      if (last !== undefined && f <= last) { this.pendingRead.set(p, state); this.send('ri', this.inputMessage(p, last)); continue; }
       if (last !== undefined) for (let n = last + 1; n < f; n++) entries.set(n, entries.get(last) || RB_NEUTRAL);
-      if (!entries.has(f)) entries.set(f, ReplayCtrl.pack(this.read(p)));
+      if (!entries.has(f)) entries.set(f, ReplayCtrl.pack(state));
+      this.pendingRead.delete(p);
       this.captured.set(p, f); this.send('ri', this.inputMessage(p, f));
     }
   }
@@ -176,6 +189,12 @@ class RollbackSession {
       this.receive('rcpu', event, this.hostPeer); this.send('rcpu', event, undefined, true);
     }
   }
+  tuneDelay() {
+    const rtt = Math.max(0, ...this.rtts.values()), desired = rtt > 300 || this.resimAvg > 12 ? 4 : rtt > 200 || this.resimAvg > 6 ? 3 : 2;
+    if (desired >= this.delay) { this.delay = desired; this.delayLowerAt = null; }
+    else if (this.delayLowerAt === null) this.delayLowerAt = this.now();
+    else if (this.now() - this.delayLowerAt >= 3000) { this.delay--; this.delayLowerAt = this.now(); }
+  }
   tick() {
     if (this.stopped) return;
     this.ticks++;
@@ -186,8 +205,7 @@ class RollbackSession {
       for (const peer of peers) { const id = ++this.pingSeq; this.pings.set(id, { peer, at: this.now() }); this.send('rp', { ep: this.ep, id }, peer); }
       for (const [id, p] of this.pings) if (this.now() - p.at > 5000) this.pings.delete(id);
     }
-    const rtt = Math.max(0, ...this.rtts.values());
-    this.delay = Math.max(this.delay, rtt > 300 || this.resimAvg > 12 ? 4 : rtt > 200 || this.resimAvg > 6 ? 3 : 2);
+    this.tuneDelay();
     this.capture(); this.disconnects();
     if (!this.reconcile() || this.frame - this.confirmed > RB_WINDOW) {
       this.metrics.stalls++;

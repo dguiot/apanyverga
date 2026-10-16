@@ -80,7 +80,11 @@ class Fighter {
     if (this.bigTime > 0) { this.bigTime--; if (this.bigTime === 0) Audio8.sfx('shrink'); }
     this.scale = approach(this.scale, this.bigTime > 0 ? 1.45 : (this.baseScale || 1), 0.03);
     if (this.state !== 'shield') this.shieldHP = Math.min(100, this.shieldHP + 0.16);
-    if (this.hitlag > 0) { this.hitlag--; return; }
+    if (this.hitlag > 0) {
+      // A fresh command during contact freeze survives until control returns.
+      for (const b of ['jump', 'attack', 'special', 'grab', 'shield', 'smash']) if (this.ctrl.buffer[b] > 0 && this.ctrl.buffer[b] <= (BUFFER[b] || 5)) this.ctrl.buffer[b]--;
+      this.hitlag--; return;
+    }
     this.sf++; this.stateT++;
     if (this.flipT > 0) this.flipT--;
     if (this.stretch > 0) this.stretch = Math.max(0, this.stretch - 0.12);
@@ -149,7 +153,7 @@ class Fighter {
         if (c.buffered('special', 3) && c.y < -0.5) { c.consume('special'); this.special(); return; }
         // golpe durante el impulso: salto corto y el golpe sale al despegar
         if (!this.jsQueue && !this.jumpFromTap) { if (c.buffered('attack', 3)) { c.consume('attack'); this.jsQueue = 'attack'; } else if (c.buffered('special', 3)) { c.consume('special'); this.jsQueue = 'special'; } }
-        if (this.sf >= 4) {
+        if (this.sf >= 3) {
           const q = this.jsQueue; this.jsQueue = null;
           const full = !q && (c.held('jump') || (this.jumpFromTap && c.y < -0.5));
           const crouchK = abil(this).crouchJump && (this.crouchT || 0) >= 24 ? abil(this).crouchJump : 1; this.crouchT = 0;
@@ -748,7 +752,7 @@ class Fighter {
       }
     }
     // aterrizaje
-    const wasGrounded = this.grounded;
+    const wasGrounded = this.grounded, landingSpeed = this.vy + this.ly;
     if (!this.grounded && ny >= this.y - 0.01) {
       let best = null;
       for (const so of st.surfaces()) {
@@ -778,11 +782,15 @@ class Fighter {
       } else ny = so.y;
     }
     this.x = nx; this.y = ny;
-    if (!wasGrounded && this.grounded) Audio8.sfx('land');
+    if (!wasGrounded && this.grounded) Audio8.sfx('land', clamp(Math.abs(landingSpeed) / 16, .2, 1));
   }
   land(so) {
     this.coyoteT = 0;
     const prevVy = this.vy + this.ly;
+    if (!BATTLE.resim) {
+      const force = clamp(Math.abs(prevVy) / 22, 0, 1);
+      Rumble.play(Rumble.devOf(this), .04 + force * .18, .08 + force * .1, 40 + force * 45);
+    }
     this.grounded = true; this.surface = so; this.vy = 0; this.fastFall = false;
     this.jumps = this.ch.jumps - 1; this.airUsed = {};
     if (this.state === 'hitstun') {
@@ -910,28 +918,28 @@ class Fighter {
   // ---------- dibujo ----------
   draw(c) {
     if (this.dead || this.hidden) return;
-    const s = this.size();
+    const s = this.size(), visual = FightView.fighter(this);
     if (this.state === 'respawn') {
       c.fillStyle = withAlpha(this.color, 0.5);
-      c.beginPath(); c.ellipse(this.x, this.y + 4, 48, 10, 0, 0, TAU); c.fill();
+      c.beginPath(); c.ellipse(visual.x, visual.y + 4, 48, 10, 0, 0, TAU); c.fill();
       c.strokeStyle = '#fff'; c.lineWidth = 3; c.stroke();
     }
     // sombra en el suelo
     if (!this.grounded && BATTLE) {
-      const fy = BATTLE.stage.floorY(this.x);
-      if (this.x > BATTLE.stage.left && this.x < BATTLE.stage.right && fy > this.y) {
-        c.fillStyle = 'rgba(0,0,0,.18)'; c.beginPath(); c.ellipse(this.x, fy, 22 * s * clamp(1 - (fy - this.y) / 600, 0.3, 1), 5, 0, 0, TAU); c.fill();
+      const fy = BATTLE.stage.floorY(visual.x);
+      if (visual.x > BATTLE.stage.left && visual.x < BATTLE.stage.right && fy > visual.y) {
+        c.fillStyle = 'rgba(0,0,0,.18)'; c.beginPath(); c.ellipse(visual.x, fy, 22 * s * clamp(1 - (fy - visual.y) / 600, 0.3, 1), 5, 0, 0, TAU); c.fill();
       }
     }
     // aura del golpe final
     if (this.finalReady) {
-      const g = c.createRadialGradient(this.x, this.y - 50 * s, 10, this.x, this.y - 50 * s, 90 * s);
+      const g = c.createRadialGradient(visual.x, visual.y - 50 * s, 10, visual.x, visual.y - 50 * s, 90 * s);
       g.addColorStop(0, 'rgba(255,190,11,0.0)'); g.addColorStop(0.6, `rgba(255,190,11,${0.3 + Math.sin(performance.now() / 80) * 0.15})`); g.addColorStop(1, 'rgba(230,57,70,0)');
-      c.fillStyle = g; c.beginPath(); c.arc(this.x, this.y - 50 * s, 90 * s, 0, TAU); c.fill();
+      c.fillStyle = g; c.beginPath(); c.arc(visual.x, visual.y - 50 * s, 90 * s, 0, TAU); c.fill();
     }
-    const shakeX = this.hitlag > 0 && this.flinch > 0 ? rand(-3, 3) : 0;
+    const shakeX = !reducedMotion && this.hitlag > 0 && this.flinch > 0 ? FightView.noise((BATTLE.t + GameFeel.alpha) * 2, this.port + 501) * 2.5 : 0;
     c.save();
-    c.translate(this.x + shakeX, this.y);
+    c.translate(visual.x + shakeX, visual.y);
     if ((this.invuln > 0 && this.state !== 'attack' && this.state !== 'respawn' && Math.floor(this.invuln / 3) % 2) || this.state === 'dodge' || this.state === 'airdodge') c.globalAlpha = 0.55;
     if (BATTLE && BATTLE.mods && BATTLE.mods.ghosts && !['attack', 'hitstun', 'grabbed', 'holding'].includes(this.state) && !this.flinch) c.globalAlpha = 0.12;
     c.scale(this.face * s, s);
@@ -944,7 +952,7 @@ class Fighter {
     const item = this.item;
     // el mariachi saca la guitarra de la espalda para los golpes que la usan
     const gOut = this.id === 'mariachi' && !item && this.state === 'attack' && this.move && this.move.def && (this.move.def.guitar || animFor(this, this.move).limb === 'guitar');
-    ART.drawLit(c, this.port, [-160, -270, 160, 60], cc => drawCharacter(cc, this.id, this.pose, {
+    ART.drawLit(c, this.port, [-160, -270, 160, 60], cc => drawCharacter(cc, this.id, visual.pose, {
       outline, flip: this.face < 0, headScale: BATTLE && BATTLE.mods && BATTLE.mods.bigHeads ? 1.9 : 1, guitarOut: gOut,
       onHand: item ? (cc, hx, hy, ang) => {
         cc.save(); cc.translate(hx, hy);
@@ -961,7 +969,7 @@ class Fighter {
     // escudo
     if (this.state === 'shield') {
       // burbuja de energía: centro transparente, borde brillante, reflejo; destella en la ventana de parry
-      const r = (26 + this.shieldHP * 0.38) * s, cx = this.x, cy = this.y - 60 * s, pw = this.sf <= PHYS.parry;
+      const r = (26 + this.shieldHP * 0.38) * s, cx = visual.x, cy = visual.y - 60 * s, pw = this.sf <= PHYS.parry;
       const g = c.createRadialGradient(cx, cy, r * 0.2, cx, cy, r);
       g.addColorStop(0, withAlpha(this.color, 0.04)); g.addColorStop(0.7, withAlpha(this.color, 0.16)); g.addColorStop(1, withAlpha(this.color, 0.5));
       c.fillStyle = g; c.beginPath(); c.arc(cx, cy, r, 0, TAU); c.fill();
@@ -971,11 +979,11 @@ class Fighter {
       if (pw) ART.drawGlow(c, cx, cy, r * 1.6, '#ffffff', 0.35);
       if (this.shieldHP < 35) { c.strokeStyle = 'rgba(255,90,90,.7)'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(cx - r * 0.3, cy - r * 0.5); c.lineTo(cx, cy - r * 0.1); c.lineTo(cx - r * 0.1, cy + r * 0.3); c.moveTo(cx, cy - r * 0.1); c.lineTo(cx + r * 0.4, cy + r * 0.05); c.stroke(); }
     }
-    if (this.state === 'dizzy') for (let i = 0; i < 3; i++) { const a = performance.now() / 200 + i * 2.1; drawStar(c, this.x + Math.cos(a) * 26, this.y - 128 * s + Math.sin(a) * 6, 7, 3, '#ffd166'); }
+    if (this.state === 'dizzy') for (let i = 0; i < 3; i++) { const a = performance.now() / 200 + i * 2.1; drawStar(c, visual.x + Math.cos(a) * 26, visual.y - 128 * s + Math.sin(a) * 6, 7, 3, '#ffd166'); }
     // reflector / contraataque
     if (this.state === 'attack' && (this.inReflect() || this.inCounter())) {
       c.strokeStyle = this.inCounter() ? 'rgba(241,245,249,.8)' : 'rgba(72,202,228,.85)'; c.lineWidth = 4;
-      c.beginPath(); for (let i = 0; i < 6; i++) { const a = i / 6 * TAU + performance.now() / 300; c.lineTo(this.x + Math.cos(a) * 56 * s, this.y - 56 * s + Math.sin(a) * 56 * s); } c.closePath(); c.stroke();
+      c.beginPath(); for (let i = 0; i < 6; i++) { const a = i / 6 * TAU + performance.now() / 300; c.lineTo(visual.x + Math.cos(a) * 56 * s, visual.y - 56 * s + Math.sin(a) * 56 * s); } c.closePath(); c.stroke();
     }
     // haz de Daniel
     if (this.move && this.move.v.beam) {
@@ -985,9 +993,9 @@ class Fighter {
       c.fillStyle = g; c.fillRect(r.x, r.y + Math.sin(performance.now() / 30) * 4, r.w, r.h);
     }
     // indicador de jugador
-    const tagY = this.y - (this.state === 'ledge' ? 128 : 150) * s;
+    const tagY = visual.y - (this.state === 'ledge' ? 128 : 150) * s;
     c.fillStyle = this.color;
-    c.beginPath(); c.moveTo(this.x - 8, tagY); c.lineTo(this.x + 8, tagY); c.lineTo(this.x, tagY + 10); c.closePath(); c.fill();
-    text(this.cpu ? 'CPU' : (this.label || PLAYER_TAGS[this.port]), this.x, tagY - 12, 15, this.color, { stroke: '#10131a', strokeW: 4 });
+    c.beginPath(); c.moveTo(visual.x - 8, tagY); c.lineTo(visual.x + 8, tagY); c.lineTo(visual.x, tagY + 10); c.closePath(); c.fill();
+    text(this.cpu ? 'CPU' : (this.label || PLAYER_TAGS[this.port]), visual.x, tagY - 12, 15, this.color, { stroke: '#10131a', strokeW: 4 });
   }
 }
