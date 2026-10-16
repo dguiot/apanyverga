@@ -38,6 +38,7 @@ function step() {
   if (InviteBox.isOpen()) { for (const d of Devices.list) { const n = Devices.nav(d); if (n.back || n.start) InviteBox.close(); } }
   else try { APP.update(); } catch (e) { console.error(e); }
   Audio8.tick();
+  KartMusic.tick();
   endFrameKeys();
   Pointer.clicked = false;
 }

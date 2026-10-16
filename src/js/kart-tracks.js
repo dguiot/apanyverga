@@ -60,6 +60,9 @@ class KartCourse {
     this.boxes=info.boxes.flatMap((at,row)=>[-.66,0,.66].map((x,col)=>({s:at*len,x,key:row*3+col,ready:0})));
     this.boosts=info.boosts.map((at,i)=>({s:at*len,x:i%2?-.38:.38}));
     this.hazards=info.hazards.map((q,i)=>({...q,s:q.at*len,phase:i*2.3}));
+    this.ramps=[.145,.46,.795].map((at,i)=>({s:at*len,x:i%2?-.38:.38}));
+    this.coins=[];
+    for(let row=0;row<18;row++)for(let j=0;j<4;j++)this.coins.push({s:len*(.035+row*.052)+j*6,x:(row%3-1)*.52,ready:0});
   }
   sample(s) {
     const v=KartMath.wrap(s,this.length)/this.step,i=Math.floor(v),t=v-i;

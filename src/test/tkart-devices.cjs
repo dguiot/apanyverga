@@ -24,7 +24,11 @@ const {chromium}=require('playwright');const {pathToFileURL}=require('node:url')
     const sx=await p.evaluate(()=>APP.kartRace.player.x);await p.evaluate(()=>__pad.axes[0]=-.8);await p.waitForTimeout(350);await p.evaluate(()=>__pad.axes[0]=0);
     ok('analog steering responds',await p.evaluate(x=>APP.kartRace.player.x<x-.04,sx));
     await p.evaluate(()=>APP.kartRace.player.item='shield');await btn(p,4);ok('LB uses held item once',await p.evaluate(()=>APP.kartRace.player.item===null&&APP.kartRace.player.shield>5));
-    await btn(p,9);ok('Menu button pauses',await p.evaluate(()=>APP.kartRace.paused));await btn(p,9);ok('Menu button resumes',await p.evaluate(()=>!APP.kartRace.paused));
+    await p.keyboard.down('KeyM');await p.waitForTimeout(100);await p.keyboard.up('KeyM');await p.waitForTimeout(100);ok('M silences music while preserving effects',await p.evaluate(()=>!Audio8.musicOn&&!Audio8.muted));
+    await p.keyboard.down('KeyM');await p.waitForTimeout(100);await p.keyboard.up('KeyM');await p.waitForTimeout(100);ok('M restores the new soundtrack',await p.evaluate(()=>Audio8.musicOn&&KartMusic.mood!==null));
+    await btn(p,9);ok('Menu button pauses',await p.evaluate(()=>APP.kartRace.paused));
+    const music=await p.evaluate(()=>Audio8.musicOn);await btn(p,2);ok('X in pause controls music',await p.evaluate(m=>Audio8.musicOn!==m,music));await btn(p,2);
+    await btn(p,9);ok('Menu button resumes',await p.evaluate(()=>!APP.kartRace.paused));
     await p.evaluate(()=>window.dispatchEvent(new Event('blur')));ok('loss of focus pauses and releases engine sound',await p.evaluate(()=>APP.kartRace.paused&&!KartSound.node));
     // Cup identity, cumulative score, independent personal records and final standings.
     const cup=await p.evaluate(()=>{
@@ -50,6 +54,7 @@ const {chromium}=require('playwright');const {pathToFileURL}=require('node:url')
     ok('two simultaneous fingers accelerate and steer',await touch.evaluate(x=>APP.kartRace.player.v>15&&APP.kartRace.player.x>x+.05,beforeX));
     if(process.env.KART_SHOTS)await touch.screenshot({path:path.join(process.env.KART_SHOTS,'touch.png')});
     await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await touch.waitForTimeout(100);ok('lifting fingers releases all touch controls',await touch.evaluate(()=>TouchPad.held.size===0&&TouchPad.stick===null));
+    const musicTouch=await touch.evaluate(()=>{APP.kartRace.paused=true;return Audio8.musicOn;});await touch.touchscreen.tap(512,536);await touch.waitForTimeout(140);ok('touch pause has a working music button',await touch.evaluate(m=>Audio8.musicOn!==m,musicTouch));
     await touch.evaluate(()=>{APP.kartRace.stop();APP.go('controls');});ok('fighting touch labels restored',await touch.evaluate(()=>TouchPad.L.btns[0].label==='A'&&TouchPad.L.btns[2].label==='Saltar'));
     const xbox=await mk({viewport:{width:1920,height:1080},deviceScaleFactor:2,userAgent:'Mozilla/5.0 (Windows NT 10.0; Win64; x64; Xbox; Xbox Series S) AppleWebKit/537.36 Chrome/128.0.0.0 Safari/537.36 Edg/128.0.0.0'});
     await xbox.evaluate(()=>{KartMenu.enter();KartMenu.track=2;KartMenu.start();});ok('Xbox keeps render surface at 720p or below',await xbox.evaluate(()=>canvas.width<=1280&&canvas.height<=720&&IS_XBOX&&ART.lite));

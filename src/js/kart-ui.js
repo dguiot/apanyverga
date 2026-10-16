@@ -5,7 +5,7 @@ const KartMenu={
   course(i){if(!this.courses.has(i))this.courses.set(i,new KartCourse(KART_TRACKS[i]));return this.courses.get(i);},
   save(){try{localStorage.setItem('esmash-kart-garage-v1',JSON.stringify({char:this.char,track:this.track,cc:this.cc,assist:this.assist,cup:this.cup}));}catch(e){}},
   load(){try{const j=JSON.parse(localStorage.getItem('esmash-kart-garage-v1')||'null');if(j){this.char=clamp(j.char|0,0,CHAR_ORDER.length-1);this.track=clamp(j.track|0,0,2);this.cc=clamp(j.cc|0,0,2);this.assist=!!j.assist;this.cup=!!j.cup;}}catch(e){}},
-  enter(){this.cupState=null;this.row=0;this.selection=this.char;this.load();APP.go('kartGarage');Audio8.playSong('menu');TouchPad.release();},
+  enter(){this.cupState=null;this.row=0;this.selection=this.char;this.load();APP.go('kartGarage');TouchPad.release();},
   card(i){return {x:40+(i%5)*148,y:117+Math.floor(i/5)*111,w:138,h:101};},
   trackRect(i){return {x:40+i*405,y:120,w:390,h:407};},
   button(label,b,on=false){sfButton(label,b.x,b.y,b.w,b.h,on||hover(b.x,b.y,b.w,b.h));},
@@ -20,7 +20,7 @@ const KartMenu={
     if(APP.kartRace)APP.kartRace.stop();
     APP.kartRace=new KartRace(KART_TRACKS[this.track],CHAR_ORDER[this.char],this.cc,this.assist,Date.now(),this.cupState&&this.cupState.ids);
     if(this.cupState&&!this.cupState.ids){this.cupState.ids=APP.kartRace.racers.map(r=>r.id);for(const id of this.cupState.ids)this.cupState.scores[id]=0;}
-    this.selection=0;this.recorded=false;TouchPad.release();APP.go('kartRace');Audio8.playSong(this.track===0?'son':this.track===1?'huapango':'menu');
+    this.selection=0;this.recorded=false;TouchPad.release();APP.go('kartRace');
     // Prime the finite sprite set outside the moving race.
     for(const r of APP.kartRace.racers)KartRender.kartSprite(r.id);
     KartControls.tapped.clear();KartControls.read(); // menu confirmation must not immediately pause the race
@@ -31,7 +31,7 @@ const KartMenu={
       order.forEach((r,i)=>{this.cupState.scores[r.id]+=points[i];});this.cupState.results.push(order.map(r=>r.id));this.cupState.round++;
     }
   },
-  exit(){if(APP.kartRace)APP.kartRace.stop();APP.kartRace=null;APP.menuSel=9;APP.go('main');Audio8.playSong('menu');},
+  exit(){if(APP.kartRace)APP.kartRace.stop();APP.kartRace=null;APP.menuSel=9;APP.go('main');},
 };
 const mainChooseBeforeKart=APP.mainChoose;
 APP.mainChoose=function(i){if(i===9){Audio8.sfx('confirm');return KartMenu.enter();}return mainChooseBeforeKart.call(this,i);};
@@ -61,7 +61,7 @@ APP.mainDraw=function(){
     else{const sp=ART.sprite('kart-hub-fight',170,170,c=>{c.translate(87,162);c.scale(.95,.95);drawCharacter(c,'torito',mkPose(POSES.idle));});ctx.drawImage(sp.img,b.x+385,b.y+35,170,170);}
   }
   const opts=this.mainOptions();for(let i=1;i<9;i++){const b=this.mainRect(i);sfButton(opts[i],b.x,b.y,b.w,b.h,this.menuSel===i||hover(b.x,b.y,b.w,b.h));}
-  const desc=this.menuSel===9?'Tres vueltas, siete rivales y seis objetos. Teclado, control o pantalla táctil.':this.menuSel===0?'Entra a la selección de los modos de pelea.':'A / J / Enter: elegir   ·   Cruceta / flechas: moverte   ·   B / K / Esc: volver';
+  const desc=this.menuSel===9?'Carreras 3D, doce objetos, derrapes y acrobacias. Teclado, control o pantalla táctil.':this.menuSel===0?'Entra a la selección de los modos de pelea.':'A / J / Enter: elegir   ·   Cruceta / flechas: moverte   ·   B / K / Esc: volver';
   text(desc,640,634,16,'#d1dce5',{body:true,weight:500});
   text('ESMASH BROS',640,692,22,'#7593a7',{weight:700});
 };
@@ -104,7 +104,7 @@ APP.kartGarageDraw=function(){
   M.button('ELEGIR CIRCUITO →',{x:822,y:556,w:410,h:59},true);
   text('← → / cruceta: piloto   ·   A / Enter: continuar',43,488,15,'#c9dae3',{body:true,align:'left'});
   text('X / Espacio: cilindrada   ·   LT / RT / L: asistencia',43,518,14,'#9ebacb',{body:true,align:'left'});
-  wrapText(M.assist?'Asistencia activa: ayuda cerca de los bordes. Récords separados.':'Conducción manual: controla la salida de las curvas y usa el freno en las horquillas.',43,561,690,16,25,'#d5e4e9','left');
+  wrapText(M.assist?'Asistencia activa: ayuda en las curvas. Récords separados.':'Derrapa y corrige con contravolante. En una rampa, pulsa derrape en el aire para ganar un turbo al aterrizar.',43,561,690,16,25,'#d5e4e9','left');
   M.button('← VOLVER',{x:40,y:645,w:180,h:44});text('TRES VUELTAS. OCHO PILOTOS. UNA META.',815,672,18,'#7f9eb1');
 };
 APP.kartTracksUpdate=function(){
@@ -127,7 +127,7 @@ APP.kartTracksDraw=function(){
     sfText(info.name,b.x+23,b.y+250,fitSize(info.name,b.w-50,37),on?GOLD:PAPER,{align:'left'});
     text((C.length/1000).toFixed(1)+' km / vuelta   ·   '+Math.round(C.length/(115*KART_CLASSES[M.cc].speed)*1.18)+'–'+Math.round(C.length/(85*KART_CLASSES[M.cc].speed)*1.2)+' s / vuelta',b.x+24,b.y+286,13,'#a9d8e1',{body:true,align:'left',weight:600});
     wrapText(info.desc,b.x+24,b.y+320,b.w-50,15,23,'#dde5e6','left');
-    let best=null;try{best=JSON.parse(localStorage.getItem('esmash-kart-v1:'+info.id+':'+M.cc+':'+(M.assist?'assist':'manual'))||'null');}catch(e){}
+    let best=null;try{best=JSON.parse(localStorage.getItem('esmash-kart-v2:'+info.id+':'+M.cc+':'+(M.assist?'assist':'manual'))||'null');}catch(e){}
     text(best?'Récord: '+KartRender.time(best.time):'Récord: por conquistar',b.x+24,b.y+384,13,best?GOLD:'#819aaf',{body:true,align:'left',weight:600});
   }
   M.button(M.cup?'COPA: LOS TRES CIRCUITOS':'CARRERA INDIVIDUAL',{x:40,y:555,w:375,h:56});M.button('¡A LA PARRILLA! →',{x:846,y:555,w:394,h:56},true);
@@ -136,12 +136,14 @@ APP.kartTracksDraw=function(){
 };
 APP.kartRaceUpdate=function(){
   const race=this.kartRace;if(!race)return KartMenu.exit();const input=KartControls.read();
+  if(input.musicPressed){Audio8.setSound(Audio8.musicOn?'fx':'all');Toasts.push(Audio8.musicOn?'Música activada':'Solo motor y efectos');}
   if(input.pausePressed){race.paused=!race.paused;race.pauseSel=0;TouchPad.release();KartSound.stop();Audio8.sfx('menu');return;}
   if(race.paused){
-    for(const d of Devices.list){const n=Devices.nav(d);if(n.up||n.down)race.pauseSel=(race.pauseSel+(n.down?1:2))%3;
+    for(const d of Devices.list){const n=Devices.nav(d);if(n.jump)Audio8.setSound(Audio8.musicOn?'fx':'all');if(n.up||n.down)race.pauseSel=(race.pauseSel+(n.down?1:2))%3;
       if(n.confirm){if(race.pauseSel===0){race.paused=false;return;}if(race.pauseSel===1)return KartMenu.start();return KartMenu.exit();}
     }
     for(let i=0;i<3;i++)if(KartMenu.hit({x:440,y:318+i*72,w:400,h:58})){if(i===0){race.paused=false;return;}if(i===1)return KartMenu.start();return KartMenu.exit();}
+    if(KartMenu.hit({x:470,y:654,w:340,h:38}))Audio8.setSound(Audio8.musicOn?'fx':'all');
     return;
   }
   race.update(input);KartSound.tick(race);
@@ -152,7 +154,8 @@ APP.kartRaceDraw=function(){
   if(race.paused){ctx.fillStyle='rgba(4,13,24,.85)';ctx.fillRect(0,0,W,H);sfText('PAUSA',640,217,82,GOLD);
     for(let i=0;i<3;i++)KartMenu.button(['SEGUIR CORRIENDO','REINICIAR CARRERA','SALIR AL MENÚ'][i],{x:440,y:318+i*72,w:400,h:58},i===race.pauseSel);
     text('RT / A: acelerar  ·  LT: frenar  ·  X / RB: derrape  ·  LB: ítem  ·  B: lanzar atrás',640,586,16,'#d4e7e9',{body:true});
-    text('R / Y: rescate  ·  ☰ / Esc: continuar',640,620,15,'#a2bacb',{body:true});
+    text('R / Y: rescate  ·  ☰ / Esc: continuar  ·  X / M: música '+(Audio8.musicOn?'sí':'no'),640,620,15,'#a2bacb',{body:true});
+    KartMenu.button('MÚSICA: '+(Audio8.musicOn?'SÍ':'NO'),{x:470,y:654,w:340,h:38});
   }
 };
 APP.kartResultsUpdate=function(){
@@ -192,6 +195,9 @@ const goBeforeKart=APP.go;
 APP.go=function(s){
   const was=this.screen;if(was==='kartRace'&&s!=='kartRace')KartSound.stop();goBeforeKart.call(this,s);
   if(s==='kartGarage'||s==='kartTracks'||s==='kartResults')Audio8.playSong(s==='kartResults'?'results':'menu');
+  if(s!=='kartRace')Kart3D.hide();
+  if(['battle','demo','netview','vs'].includes(s))KartMusic.stop();
+  else {Audio8.stopSong();KartMusic.play(s==='kartRace'?APP.kartRace.course.info.id:s==='kartResults'?'results':'menu');}
   TouchPad.kartLabels();
 };
 // Browser gestures should not scroll while racing; key repeat does not create item presses.
