@@ -56,7 +56,7 @@ APP.mainDraw=function(){
     slab(b.x,b.y,b.w,b.h,{skew:.07,edge:on?GOLD:'rgba(131,168,190,.4)',lw:on?4:2,top:i===0?'#572035':'#123a50',bottom:'#0b1829'});
     sfText(i===0?'PELEAS':'ESMASH KART',b.x+34,b.y+47,52,on?GOLD:PAPER,{align:'left'});
     text(i===0?'Golpes, especiales y Smash.':'Derrapa, lanza ítems y conquista la pista.',b.x+36,b.y+94,17,'#d0e3e9',{body:true,align:'left',weight:500});
-    text(i===0?'1–4 JUGADORES  ·  LOCAL Y ONLINE':'1 JUGADOR + 7 CPU  ·  3 CIRCUITOS',b.x+36,b.y+174,13,i===0?'#ffada6':'#7bf0e6',{body:true,align:'left',weight:700});
+    text(i===0?'1–4 JUGADORES  ·  LOCAL Y ONLINE':'1–4 ONLINE  ·  PANTALLA DIVIDIDA  ·  3 CIRCUITOS',b.x+36,b.y+174,13,i===0?'#ffada6':'#7bf0e6',{body:true,align:'left',weight:700});
     if(i===9){const sp=KartRender.kartSprite(CHAR_ORDER[KartMenu.char]);ctx.drawImage(sp.img,b.x+395,b.y+80,150,147);}
     else{const sp=ART.sprite('kart-hub-fight',170,170,c=>{c.translate(87,162);c.scale(.95,.95);drawCharacter(c,'torito',mkPose(POSES.idle));});ctx.drawImage(sp.img,b.x+385,b.y+35,170,170);}
   }
@@ -75,6 +75,7 @@ APP.focusNative=function(d){
 APP.kartGarageUpdate=function(){
   const M=KartMenu;
   for(const d of Devices.list){const n=Devices.nav(d);if(n.back)return M.exit();
+    if(n.grab)return KartOnline.browse();
     if(n.left){M.char=(M.char+CHAR_ORDER.length-1)%CHAR_ORDER.length;Audio8.sfx('menu');}
     if(n.right){M.char=(M.char+1)%CHAR_ORDER.length;Audio8.sfx('menu');}
     if(n.up)M.char=(M.char+CHAR_ORDER.length-5)%CHAR_ORDER.length;
@@ -87,6 +88,7 @@ APP.kartGarageUpdate=function(){
   if(M.hit({x:822,y:489,w:190,h:48}))M.cc=(M.cc+1)%3;
   if(M.hit({x:1022,y:489,w:210,h:48}))M.assist=!M.assist;
   if(M.hit({x:822,y:556,w:410,h:59})){M.save();return this.go('kartTracks');}
+  if(M.hit({x:822,y:624,w:410,h:44}))return KartOnline.browse();
   if(M.hit({x:40,y:645,w:180,h:44}))return M.exit();
 };
 APP.kartGarageDraw=function(){
@@ -102,6 +104,7 @@ APP.kartGarageDraw=function(){
   for(let i=0;i<3;i++){text(labs[i],840,414+i*20,13,'#bbd0d9',{body:true,align:'left',weight:600});for(let j=0;j<5;j++){ctx.fillStyle=j<st.bars[i]?'#77e6df':'#30475c';roundRect(ctx,975+j*41,408+i*20,34,9,3);ctx.fill();}}
   M.button(KART_CLASSES[M.cc].name,{x:822,y:489,w:190,h:48});M.button('Asistencia: '+(M.assist?'sí':'no'),{x:1022,y:489,w:210,h:48});
   M.button('ELEGIR CIRCUITO →',{x:822,y:556,w:410,h:59},true);
+  M.button('ONLINE · U / LB',{x:822,y:624,w:410,h:44});
   text('← → / cruceta: piloto   ·   A / Enter: continuar',43,488,15,'#c9dae3',{body:true,align:'left'});
   text('X / Espacio: cilindrada   ·   LT / RT / L: asistencia',43,518,14,'#9ebacb',{body:true,align:'left'});
   wrapText(M.assist?'Asistencia activa: ayuda en las curvas. Récords separados.':'Derrapa y corrige con contravolante. En una rampa, pulsa derrape en el aire para ganar un turbo al aterrizar.',43,561,690,16,25,'#d5e4e9','left');
@@ -135,6 +138,7 @@ APP.kartTracksDraw=function(){
   M.button('← PILOTOS',{x:40,y:645,w:180,h:44});text('A / Enter: correr   ·   B / Esc: volver',1238,671,15,'#a2b7c7',{body:true,align:'right'});
 };
 APP.kartRaceUpdate=function(){
+  if(this.kartRace?.online)return KartOnline.raceUpdate();
   const race=this.kartRace;if(!race)return KartMenu.exit();const input=KartControls.read();
   if(input.musicPressed){Audio8.setSound(Audio8.musicOn?'fx':'all');Toasts.push(Audio8.musicOn?'Música activada':'Solo motor y efectos');}
   if(input.pausePressed){race.paused=!race.paused;race.pauseSel=0;TouchPad.release();KartSound.stop();Audio8.sfx('menu');return;}
@@ -152,13 +156,15 @@ APP.kartRaceUpdate=function(){
 APP.kartRaceDraw=function(){
   const race=this.kartRace;if(!race)return;KartRender.draw(race,clamp(acc/STEP,0,1));
   if(race.paused){ctx.fillStyle='rgba(4,13,24,.85)';ctx.fillRect(0,0,W,H);sfText('PAUSA',640,217,82,GOLD);
-    for(let i=0;i<3;i++)KartMenu.button(['SEGUIR CORRIENDO','REINICIAR CARRERA','SALIR AL MENÚ'][i],{x:440,y:318+i*72,w:400,h:58},i===race.pauseSel);
+    for(let i=0;i<3;i++)KartMenu.button((race.online?['SEGUIR CORRIENDO',Net.role==='host'?'VOLVER A LA SALA':'MICRÓFONO: '+(AV.mic?'SÍ':'NO'),'SALIR DE LA SALA']:['SEGUIR CORRIENDO','REINICIAR CARRERA','SALIR AL MENÚ'])[i],{x:440,y:318+i*72,w:400,h:58},i===race.pauseSel);
+    if(race.online)text('La carrera sigue mientras tienes abierto este menú.',640,274,18,TEAL,{body:true});
     text('RT / A: acelerar  ·  LT: frenar  ·  X / RB: derrape  ·  LB: ítem  ·  B: lanzar atrás',640,586,16,'#d4e7e9',{body:true});
     text('R / Y: rescate  ·  ☰ / Esc: continuar  ·  X / M: música '+(Audio8.musicOn?'sí':'no'),640,620,15,'#a2bacb',{body:true});
     KartMenu.button('MÚSICA: '+(Audio8.musicOn?'SÍ':'NO'),{x:470,y:654,w:340,h:38});
   }
 };
 APP.kartResultsUpdate=function(){
+  if(this.kartRace?.online)return KartOnline.resultsUpdate();
   const M=KartMenu;
   const next=()=>{if(M.cupState&&M.cupState.round<3){M.track=M.cupState.round;return M.start();}return M.start();};
   for(const d of Devices.list){const n=Devices.nav(d);if(n.back){this.kartRace.stop();M.cupState=null;M.cup=false;return this.go('kartTracks');}
@@ -171,17 +177,17 @@ APP.kartResultsDraw=function(){
   M.header(final?'RESULTADO DE LA COPA':'BANDERA A CUADROS',race.course.info.name+'  ·  '+race.cc.name+(cup?'  ·  Copa '+cup.round+' / 3':''));
   const order=final?cup.ids.map(id=>({id})).sort((a,b)=>cup.scores[b.id]-cup.scores[a.id]||cup.results[2].indexOf(a.id)-cup.results[2].indexOf(b.id)):race.order;
   for(let i=0;i<order.length;i++){
-    const r=order[i],y=127+i*65,on=r.id===p.id;KartRender.panel(40,y,640,57);if(on){ctx.strokeStyle=GOLD;ctx.lineWidth=2;roundRect(ctx,40,y,640,57,15);ctx.stroke();}
+    const r=order[i],y=127+i*65,on=race.online?r.peer===Net.myPeer():r.id===p.id;KartRender.panel(40,y,640,57);if(on){ctx.strokeStyle=GOLD;ctx.lineWidth=2;roundRect(ctx,40,y,640,57,15);ctx.stroke();}
     text(String(i+1).padStart(2,'0'),70,y+29,29,on?GOLD:'#89a4b9',{weight:700});ctx.save();ctx.beginPath();ctx.rect(104,y+4,54,48);ctx.clip();drawPortrait(ctx,r.id,130,y+27,18);ctx.restore();
-    text(CHARS[r.id].name+(on?'  ·  TÚ':''),175,y+28,20,on?GOLD:'#f0f5ee',{body:true,align:'left',weight:700});
+    text((race.online&&r.peer?r.label+' · ':'')+CHARS[r.id].name+(on?' · TÚ':''),175,y+28,race.online?17:20,on?GOLD:'#f0f5ee',{body:true,align:'left',weight:700});
     text(final?cup.scores[r.id]+' pts':r.finish!==null?KartRender.time(r.finish):'En pista',653,y+29,17,'#a9d1d8',{body:true,align:'right',weight:600});
   }
   const sp=KartRender.kartSprite(p.id);ctx.drawImage(sp.img,843,111,255,249);sfText(final?`${order.findIndex(r=>r.id===p.id)+1}.º EN LA COPA`:`${race.order.indexOf(p)+1}.º LUGAR`,972,387,58,GOLD);
   text(KartRender.time(p.finish),972,442,45,PAPER,{weight:700});
   for(let i=0;i<p.lapTimes.length;i++)text('Vuelta '+(i+1)+'   '+KartRender.time(p.lapTimes[i]),972,481+i*26,17,'#c8dde3',{body:true,weight:500});
   if(race.newRecord)text('¡NUEVO RÉCORD PERSONAL!',972,566,16,'#71e7cc',{body:true,weight:700});
-  M.button(final?'ELEGIR CIRCUITO':cup?'SIGUIENTE CARRERA →':'VOLVER A CORRER',{x:730,y:582,w:485,h:62},true);
-  M.button('ELEGIR CIRCUITO / B / ESC',{x:730,y:659,w:485,h:40});
+  M.button(race.online?(Net.role==='host'?'VOLVER A LA SALA':'ESPERANDO AL ANFITRIÓN'):final?'ELEGIR CIRCUITO':cup?'SIGUIENTE CARRERA →':'VOLVER A CORRER',{x:730,y:582,w:485,h:62},true);
+  M.button(race.online?'SALIR DE LA SALA / B / ESC':'ELEGIR CIRCUITO / B / ESC',{x:730,y:659,w:485,h:40});
 };
 
 // Race labels and actions share the existing reliable multitouch handling.

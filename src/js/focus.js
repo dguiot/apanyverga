@@ -51,7 +51,7 @@ const UIFocus = {
     if (this.screen !== APP.screen) { this.screen = APP.screen; this.off(); }
     this.list = this.next; this.next = [];
     // los que no pasan por clickIn(): volumen, cámara y voz, invitar
-    if (!['battle', 'demo', 'vs', 'netview'].includes(APP.screen)) this.list.push({ x: W - 58, y: 14, w: 46, h: 40, k: 'mute' });
+    if (!['battle', 'demo', 'vs', 'netview', 'kartRace'].includes(APP.screen)) this.list.push({ x: W - 58, y: 14, w: 46, h: 40, k: 'mute' });
     if (typeof avButtonShown === 'function' && avButtonShown()) {
       if (AV.on) for (const q of AV.segs(AV_BTN)) this.list.push({ x: q.x, y: q.y, w: q.w, h: q.h, k: 'av-' + q.a });
       else this.list.push({ x: AV_BTN.x, y: AV_BTN.y, w: AV_BTN.w, h: AV_BTN.h, k: 'av' });

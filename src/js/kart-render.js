@@ -49,6 +49,36 @@ const KartRender={
   },
   time(t){if(t===null||t===undefined)return '—';const m=Math.floor(t/60),s=Math.floor(t%60),ms=Math.floor(t%1*1000);return `${m}:${String(s).padStart(2,'0')}.${String(ms).padStart(3,'0')}`;},
   panel(x,y,w,h){ctx.fillStyle='rgba(6,18,31,.82)';roundRect(ctx,x,y,w,h,15);ctx.fill();ctx.strokeStyle='rgba(179,228,239,.16)';ctx.lineWidth=1;ctx.stroke();},
+  viewports(n){
+    if(n<=1)return [{x:0,y:0,w:W,h:H}];
+    if(n===2)return [{x:0,y:0,w:W/2,h:H},{x:W/2,y:0,w:W/2,h:H}];
+    if(n===3)return [{x:0,y:0,w:W/2,h:H},{x:W/2,y:0,w:W/2,h:H/2},{x:W/2,y:H/2,w:W/2,h:H/2}];
+    return Array.from({length:4},(_,i)=>({x:i%2*W/2,y:Math.floor(i/2)*H/2,w:W/2,h:H/2}));
+  },
+  splitHud(race,r,b){
+    ctx.save();ctx.beginPath();ctx.rect(b.x,b.y,b.w,b.h);ctx.clip();ctx.translate(b.x,b.y);
+    const color=PLAYER_COLORS[r.index%4],mine=r===race.player&&!race.spectator,short=b.h<500;
+    ctx.strokeStyle=mine?GOLD:'rgba(196,224,236,.7)';ctx.lineWidth=mine?4:2;ctx.strokeRect(1,1,b.w-2,b.h-2);
+    this.panel(12,12,258,56);text(String(race.order.indexOf(r)+1)+'.º',40,39,36,GOLD,{weight:700});
+    text('VUELTA '+Math.min(3,r.completedLaps+1)+'/3',91,28,15,PAPER,{align:'left',body:true,weight:700});
+    text(this.time(r.finish===null?race.time:r.finish),91,51,17,'#b7dce4',{align:'left',body:true,weight:600});
+    this.panel(12,b.h-48,b.w-24,36);ctx.fillStyle=color;ctx.fillRect(21,b.h-38,5,15);
+    const label=(mine?CHARS[r.id].name:r.label||CHARS[r.id].name)+(mine?' · TÚ':'')+(r.disconnected?' · CPU temporal':'');
+    text(label,34,b.h-29,16,mine?GOLD:PAPER,{body:true,align:'left',weight:700});
+    text(Math.round(r.v*1.8)+' km/h  ·  ● '+r.coins,b.w-25,b.h-29,16,'#e8f3ee',{body:true,align:'right',weight:600});
+    this.panel(12,80,170,54);if(r.item)ctx.drawImage(this.itemIcon(r.item).img,18,84,46,46);
+    else text(r.roulette>0?'?':'—',42,107,30,'#a9d4dc',{weight:700});
+    text(r.item?KART_ITEMS[r.item].name:r.roulette>0?'Sorteando…':'Sin ítem',72,106,13,r.item?KART_ITEMS[r.item].color:'#bfd5dd',{body:true,align:'left',weight:700});
+    const cam=AV.videoFor(r.peer);if(cam){ctx.save();roundRect(ctx,b.w-94,short?76:72,80,60,9);ctx.clip();drawVideoCover(ctx,cam.v,b.w-94,short?76:72,80,60,cam.mirror);ctx.restore();}
+    if(!short)this.map(race.course,b.w-166,152,150,112,race.racers);
+    if(r.drift){const col=r.charge>2?'#d989ff':r.charge>1.3?GOLD:TEAL;ctx.fillStyle='#24354c';ctx.fillRect(b.w/2-95,b.h-69,190,8);ctx.fillStyle=col;ctx.fillRect(b.w/2-95,b.h-69,190*r.charge/2.7,8);}
+    if(race.phase==='grid'){sfText(Math.ceil(race.countdown)>3?'PREPÁRATE':Math.ceil(race.countdown),b.w/2,b.h*.5,short?74:106,GOLD);}
+    if(r.finish!==null){sfText('¡META!',b.w/2,b.h*.52,short?53:77,GOLD);text('Esperando a los demás pilotos',b.w/2,b.h*.52+49,16,PAPER,{body:true,stroke:'#102335',strokeW:3});}
+    if(r.rescue)sfText('RESCATE',b.w/2,b.h*.6,39,GOLD);
+    const curve=race.course.sample(r.s+r.v*.8+40).curve;if(Math.abs(curve)>.0035&&race.phase==='race'){text((curve>0?'↱':'↰')+' '+(Math.abs(curve)>.007?'HORQUILLA':'CURVA'),b.w/2,94,17,'#ffdd99',{body:true,weight:700,stroke:'#102335',strokeW:3});}
+    if(mine&&Net.role==='guest'&&performance.now()-KartOnline.lastStateAt>1500){text('Reconectando con la carrera…',b.w/2,b.h-88,18,GOLD,{body:true,stroke:'#102335',strokeW:3});}
+    ctx.restore();
+  },
   hud(race){
     const r=race.player,pos=race.order.indexOf(r)+1,info=race.course.info;
     this.panel(22,20,224,99);text(String(pos),57,69,70,'#ffc53d',{weight:700});text('/ 8',99,83,23,'#a8becd',{body:true,weight:700});
