@@ -29,8 +29,8 @@ const KartRender={
       c.fillStyle='#d88dff';c.beginPath();for(let i=0;i<14;i++){const a=i*TAU/14-Math.PI/2,r=i%2?16:33;i?c.lineTo(Math.cos(a)*r,Math.sin(a)*r):c.moveTo(Math.cos(a)*r,Math.sin(a)*r);}c.closePath();c.fill();c.stroke();c.fillStyle='#72e8dd';c.beginPath();c.arc(0,0,15,0,TAU);c.fill();c.fillStyle='#ffe08d';c.fillRect(-10,-4,20,6);c.strokeStyle='#f69fa2';c.lineWidth=3;c.beginPath();c.moveTo(-4,17);c.lineTo(-9,34);c.moveTo(4,17);c.lineTo(12,32);c.stroke();
     }
   });},
-  kartSprite(id){
-    const rendered=Kart3D.thumbnail(id);if(rendered)return rendered;
+  kartSprite(id,vehicle=0){
+    const rendered=Kart3D.thumbnail(id,vehicle);if(rendered)return rendered;
     return ART.sprite('kart-rear:'+id,180,180,c=>{
       c.fillStyle='#182b3d';c.fillRect(0,0,180,180);c.fillStyle=LOOKS[id]?.top||'#e86961';
       roundRect(c,36,100,108,45,12);c.fill();c.fillStyle='#253044';c.fillRect(16,115,25,39);c.fillRect(139,115,25,39);

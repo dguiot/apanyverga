@@ -16,6 +16,33 @@ La cámara sigue al piloto desde atrás; las fotos se usan en la selección, no 
 Las carreras online reutilizan las salas, enlaces de invitación, cámara, voz y conexión WebRTC de las peleas.
 Los puestos restantes hasta ocho se completan con CPU.
 
+Cada piloto puede elegir **seis vehículos**, incluidos **dos modelos de moto**, desde el botón
+**Vehículo** del garaje o la sala online (**V / Y**). La elección se guarda en este navegador y viaja
+con la configuración de la carrera para que todos vean el mismo vehículo y simulen sus mismas características.
+
+| Vehículo | Ventaja | Compensación |
+| --- | --- | --- |
+| Cometa | Conducción equilibrada | Sin especialidad marcada |
+| Flecha GP | Punta y duración del turbo | Menor aceleración y recuperación en tierra |
+| Rally 4×4 | Agarre, frenada y terreno difícil | Menor punta y turbo más breve |
+| Titán GT | Peso en los contactos y turbos largos | Aceleración y cambios de apoyo más lentos |
+| Centella R · moto deportiva | Respuesta y carga rápida del derrape | Turbo breve, menor agarre y peso |
+| Gacela Trail · moto de campo | Aceleración, agarre y recuperación | Menor punta y duración del turbo |
+
+Las motos tienen dos ruedas, manillar y postura propia; se inclinan al girar. Las cuatro carrocerías
+también tienen geometrías distintas. Todos los personajes pueden usar cualquiera. El equilibrio se
+comprueba con 54 vueltas controladas: seis vehículos × tres pistas × tres cilindradas, mismo piloto e IA,
+sin objetos. El margen agregado de tiempos entre el más rápido y el más lento es de aproximadamente 2,3 %.
+
+Los escenarios incluyen cielo con nubes y atmósfera, tres capas de montañas, asfalto y terreno con
+texturas y relieve, fachadas con balcones y contraventanas, árboles ramificados, roca estratificada,
+estructuras bajo los puentes y reflejos suaves en las zonas nocturnas. Los materiales se generan
+localmente y no requieren descargas adicionales.
+
+Los doce ítems tienen modelos 3D propios y se ven orbitando el vehículo mientras los llevas. Las cajas
+se leen desde seis caras, los cohetes dejan estela y avisan al objetivo, la piñata describe un arco y
+el búmeran gira durante el vuelo. Una tortilla puede interceptar un cohete enemigo.
+
 En **Esmash Kart → ONLINE** (U / LB en el garaje), crea una sala o entra con el enlace que te compartan.
 Cada invitado elige su personaje y pulsa **Estoy listo**; el anfitrión elige pista y cilindrada e inicia.
 Cada navegador muestra una vista trasera por participante: dos mitades para dos pilotos, una mitad y
@@ -32,7 +59,7 @@ terminan todos los pilotos conectados. El anfitrión puede volver a la sala sin 
 - **Cañón de Fuego** — 10.1 km; horquillas, desniveles, rocas móviles y puentes sobre el cañón.
 - **Cumbre Neón** — 11.0 km; eses, asfalto mojado, curvas cerradas y luces nocturnas.
 - Tres vueltas por carrera; carrera individual o copa de las tres pistas con puntuación acumulada.
-- 100, 150 y 200 cc; asistencia de dirección opcional. Velocidad, aceleración y agarre dependen del personaje.
+- 100, 150 y 200 cc; asistencia de dirección opcional. Velocidad, aceleración y agarre combinan el personaje y el vehículo; también cambian frenada, carga y duración del derrape, recuperación fuera de pista y respuesta al contacto.
 - Dirección y velocidad de los neumáticos independientes: el kart conserva su rumbo si no giras. Derrape con contravolante y tres niveles de mini turbo.
 - Rampas, saltos y acrobacias: pulsa derrape en el aire para ganar turbo al aterrizar. Rebufo al seguir de cerca una misma línea y monedas que aumentan la velocidad; un impacto hace perder tres.
 - Doce ítems: chile teledirigido, tortilla que rebota, salsa, pan turbo, burbuja, piñata, búmeran de ida y vuelta, triple chile, tormenta de alcance limitado, imán, estrella y resorte.
@@ -118,3 +145,7 @@ como espectador, paquetes atrasados, desconexiones, resultados y regreso a la sa
 
 El motor 3D (Three.js 0.180.0) se incluye dentro de la versión web; no necesita un CDN ni instalar paquetes
 para jugar. Licencia y entrada del bundle: `src/vendor/THREE-LICENSE.txt` y `src/vendor/three-kart.entry.js`.
+
+`node src/test/tkart-vehicles.cjs` verifica la selección y persistencia, geometría de los seis vehículos,
+dos ruedas en las motos, 54 vueltas para comparar tiempos, respuesta por peso, intercepción de
+cohetes, los doce modelos de ítems, materiales y cielos de las tres pistas, y el límite de caché de miniaturas.

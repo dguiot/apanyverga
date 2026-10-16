@@ -16,6 +16,8 @@ const {chromium}=require('playwright');const {pathToFileURL}=require('node:url')
   const btn=async(p,i)=>{let f=await p.evaluate(i=>{__pad.buttons[i]={pressed:true,value:1,touched:true};return Devices.frame;},i);await p.waitForFunction(f=>Devices.frame>f+4,f);f=await p.evaluate(i=>{__pad.buttons[i]={pressed:false,value:0,touched:false};return Devices.frame;},i);await p.waitForFunction(f=>Devices.frame>f+3,f);};
   try{
     const p=await mk();await btn(p,0);await btn(p,15);await btn(p,0);ok('gamepad navigates hub to garage',await p.evaluate(()=>APP.screen==='kartGarage'));
+    await btn(p,3);ok('Y opens vehicle selection with a controller',await p.evaluate(()=>APP.screen==='kartVehicles'));
+    await btn(p,13);await btn(p,15);await btn(p,0);ok('controller confirms a sportbike and returns to garage',await p.evaluate(()=>APP.screen==='kartGarage'&&KartMenu.vehicle===4));await p.evaluate(()=>KartMenu.vehicle=0);
     const cc=await p.evaluate(()=>KartMenu.cc);await btn(p,2);ok('X changes engine class',await p.evaluate(cc=>KartMenu.cc===(cc+1)%3,cc));
     await btn(p,6);ok('LT toggles steering assistance',await p.evaluate(()=>KartMenu.assist));
     await btn(p,0);await btn(p,0);ok('A enters race without immediately pausing',await p.evaluate(()=>APP.screen==='kartRace'&&!APP.kartRace.paused));
@@ -44,6 +46,8 @@ const {chromium}=require('playwright');const {pathToFileURL}=require('node:url')
     ok('personal best stored with assistance category',cup.saved.time===280&&cup.separate);
     await p.evaluate(()=>{APP.kartRace.player.finish=320;APP.kartRace.saveBest();});ok('slower finish does not replace record',await p.evaluate(()=>JSON.parse(localStorage.getItem(APP.kartRace.bestKey())).time===280));
     const touch=await mk({viewport:{width:1024,height:576},hasTouch:true,isMobile:true});
+    const tapLogical=async(x,y)=>{const p=await touch.evaluate(({x,y})=>{const b=canvas.getBoundingClientRect();return {x:b.left+x*b.width/W,y:b.top+y*b.height/H};},{x,y});await touch.touchscreen.tap(p.x,p.y);await touch.waitForTimeout(140);};
+    await touch.evaluate(()=>KartMenu.enter());await tapLogical(404,490);await touch.waitForFunction(()=>APP.screen==='kartVehicles');await tapLogical(1045,460);await tapLogical(1060,670);ok('touch selects the trail motorcycle through visible buttons',await touch.evaluate(()=>APP.screen==='kartGarage'&&KartMenu.vehicle===5));
     await touch.evaluate(()=>{KartMenu.enter();KartMenu.char=3;KartMenu.track=0;KartMenu.start();APP.kartRace.phase='race';});
     await touch.touchscreen.tap(490,250);await touch.waitForTimeout(100);
     const labels=await touch.evaluate(()=>{TouchPad.measure();return TouchPad.L.btns.map(b=>b.label);});ok('race uses purpose-built touch labels',labels.join(',')==='GAS,FRENO,DERRAPE,ÍTEM,ATRÁS',labels);

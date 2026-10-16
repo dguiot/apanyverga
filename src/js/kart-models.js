@@ -6,9 +6,9 @@ const KartModels = {
   geo(type) {
     if(!this.geometry.has(type)) {
       const T=KartGL;
-      const g=type==='box'?new T.BoxGeometry(1,1,1):type==='sphere'?new T.SphereGeometry(1,18,12):
+      const g=type==='box'?new T.BoxGeometry(1,1,1):type==='plane'?new T.PlaneGeometry(1,1):type==='sphere'?new T.SphereGeometry(1,18,12):
         type==='cylinder'?new T.CylinderGeometry(1,1,1,18):type==='cone'?new T.ConeGeometry(1,1,14):
-        type==='torus'?new T.TorusGeometry(1,.12,8,28):type==='hill'?new T.DodecahedronGeometry(1,1):type==='rock'?new T.DodecahedronGeometry(1,0):new T.OctahedronGeometry(1,0);
+        type==='torus'?new T.TorusGeometry(1,.12,8,28):type==='leaf'?new T.SphereGeometry(1,8,6):type==='branch'?new T.CylinderGeometry(.75,1,1,7):type==='hill'?new T.DodecahedronGeometry(1,1):type==='rock'?new T.DodecahedronGeometry(1,0):new T.OctahedronGeometry(1,0);
       this.geometry.set(type,g);
     }
     return this.geometry.get(type);
@@ -41,10 +41,60 @@ const KartModels = {
     const rot=new T.Euler().setFromQuaternion(q);
     batch.add('cylinder',color,va.add(vb).multiplyScalar(.5).toArray(),[radius,dir.length(),radius],[rot.x,rot.y,rot.z],metal);
   },
-  kart(id) {
-    const T=KartGL,L=LOOKS[id]||{},root=new T.Group(),body=new T.Group(),b=this.batch();root.add(body);
+  chassis(b,V,col){
+    const dark='#151f2b',metal='#9caebd',white='#e9edf0';
+    if(V.kind==='sportbike'||V.kind==='trailbike'){
+      const trail=V.kind==='trailbike';
+      this.link(b,[0,.66,-.8],[0,1.22,.5],.12,dark,.65);this.link(b,[0,.66,.65],[0,1.22,-.3],.12,metal,.7);
+      b.add('sphere',col,[0,1.11,.35],[trail?.34:.49,.34,.8],[-.2,0,0],.5,.25);
+      b.add('box',dark,[0,1.19,-.48],[.52,.18,1.05],[-.05,0,0],.1,.5);
+      b.add('sphere',col,[0,1.12,-.94],[.36,.13,.54],[-.15,0,0],.4,.25);
+      b.add('box','#fb5f4c',[0,1.12,-1.31],[.32,.1,.04],null,0,.3,'#b32218');
+      b.add('sphere',metal,[0,.73,-.03],[.36,.32,.47],null,.8,.3);
+      for(let i=0;i<5;i++)b.add('box',dark,[0,.61+i*.06,.1],[.75,.025,.62],null,.6);
+      for(const side of [-1,1]){
+        this.link(b,[side*.23,.65,-1.05],[side*.2,.82,.05],.075,metal,.8);
+        this.link(b,[side*.23,.6,1.2],[side*.21,1.42,.9],.065,trail?'#edc56f':metal,.8);
+        this.link(b,[side*.12,1.4,.9],[side*.59,1.46,.88],.055,metal,.8);
+        b.add('cylinder',dark,[side*.63,1.46,.88],[.07,.25,.07],[0,0,Math.PI/2]);
+        b.add('box',dark,[side*.39,.65,-.05],[.3,.08,.2],null,.4);
+      }
+      b.add('cylinder',metal,[.38,.78,-.78],[.13,.72,.13],[Math.PI/2,0,-.2],.8,.2);
+      b.add('cylinder',dark,[.45,.85,-1.16],[.095,.12,.095],[Math.PI/2,0,0]);
+      if(trail){b.add('box',white,[0,1.5,1.02],[.49,.45,.15],[-.16,0,0]);b.add('box',col,[0,1.13,1.19],[.42,.1,.72],[-.12,0,0]);}
+      else {b.add('sphere',col,[0,.85,.75],[.5,.48,.48],[-.2,0,0],.35,.25);b.add('sphere','#283f50',[0,1.47,.88],[.31,.35,.14],[.24,0,0],.65,.16);b.add('box','#dce9ee',[0,1.25,1.05],[.32,.09,.07],null,0,.2,'#a2c1cc');}
+      return;
+    }
+    const rally=V.kind==='buggy',formula=V.kind==='formula',coupe=V.kind==='coupe';
+    b.add('box',dark,[0,.47,0],[1.85,.28,2.75],null,.5);
+    b.add('sphere',col,[0,.78,.05],[coupe?1.07:.88,rally?.42:.3,formula?1.35:1.57],null,.5,.28);
+    if(formula){
+      b.add('box',col,[0,1.57,-1.33],[2.65,.13,.47],[-.05,0,0],.5,.25);for(const x of [-1,1])this.link(b,[x*.5,.65,-1.2],[x*.5,1.57,-1.33],.055,metal,.8);
+      b.add('cone',col,[0,.72,1.28],[.51,1.45,.4],[-Math.PI/2,0,0],.5,.24);
+      b.add('box',col,[0,.48,1.73],[2.3,.1,.34],null,.55,.27);
+      for(const x of [-1,1]){this.link(b,[x*.28,.55,.6],[x*1.02,.5,1.02],.055,metal,.8);this.link(b,[x*.28,.55,-.6],[x*1.02,.5,-1.02],.055,metal,.8);b.add('box',col,[x*.74,.72,-.16],[.45,.35,1.17],null,.4,.26);}
+    }else if(rally){
+      for(const x of [-1,1]){this.link(b,[x*.68,.85,.63],[x*.65,2.2,-.17],.075,dark,.7);this.link(b,[x*.65,2.2,-.17],[x*.75,.88,-1.15],.075,dark,.7);this.link(b,[x*.72,.82,-1.15],[x*.67,1.35,-1.5],.07,metal,.75);}
+      this.link(b,[-.65,2.2,-.17],[.65,2.2,-.17],.075,dark,.7);
+      b.add('box',dark,[0,2.21,-.12],[1.5,.12,.5]);
+      for(const x of [-.5,0,.5])b.add('sphere','#ffe6b0',[x,2.22,.15],[.17,.13,.08],null,.25,.2,'#625634');
+      b.add('box',metal,[0,.42,1.6],[1.9,.2,.22],null,.8);
+    }else if(coupe){
+      b.add('box',col,[0,.86,-1.22],[2.17,.52,.65],null,.5,.25);for(const x of [-.7,-.3,.3,.7])b.add('sphere','#ef554d',[x,.98,-1.57],[.12,.12,.035],null,0,.2,'#9d231d');
+      b.add('box',col,[0,1.02,1.0],[1.85,.27,1.07],[.08,0,0],.6,.23);
+      for(const x of [-1,1]){b.add('sphere',col,[x*.88,.86,-.7],[.31,.32,.65],null,.5,.25);b.add('box','#edf0de',[x*.7,.99,1.58],[.33,.13,.06],null,.2,.2,'#889a91');}
+      b.add('box','#c9a672',[0,.62,-1.61],[1.5,.15,.08],null,.6);
+    }
+    b.add('box',dark,[0,1.02,-.42],[.9,.72,.22],[-.2,0,0]);
+    b.add('box',col,[0,formula?1.35:1.23,-1.3],[formula?2.22:2.04,.13,.43],[-.05,0,0],.5,.25);
+    b.add('box',white,[0,formula?.96:1.17,.93],[.16,.025,1.03],[.08,0,0],.2);
+    for(const x of [-1,1]){b.add('box','#fe534d',[x*.68,.96,-1.5],[.27,.1,.04],null,0,.2,'#a2221c');b.add('cylinder',metal,[x*.45,.55,-1.55],[.12,.32,.12],[Math.PI/2,0,0],.85,.25);}
+  },
+  kart(id,vehicle=0) {
+    const T=KartGL,L=LOOKS[id]||{},V=kartVehicle(vehicle),bike=V.kind.endsWith('bike'),root=new T.Group(),body=new T.Group();let b=this.batch();root.add(body);
     const accent=L.accent||'#eb4f61',top=L.top||L.body||L.skin||'#bd6950',skin=L.skin||'#d49c7a',hair=L.hair||'#352b31';
     const metal='#9dabb9',dark='#17212d',carbon='#263243';
+    if(V.id==='cometa'){
     b.add('box',dark,[0,.43,0],[1.9,.25,2.75],null,.35);
     b.add('sphere',accent,[0,.65,.18],[.97,.38,1.62],null,.25,.32);
     b.add('box',accent,[0,.79,1.03],[1.65,.32,.85],[.12,0,0],.25,.3);
@@ -65,6 +115,8 @@ const KartModels = {
     b.add('box','#faf0d2',[0,1.39,-1.2],[.24,.02,.42],[-.07,0,0],.3);
     b.add('box',metal,[0,.42,1.63],[2,.14,.12],null,.8,.3);
     b.add('box',metal,[0,.4,-1.6],[1.85,.12,.12],null,.8,.3);
+    }else this.chassis(b,V,accent);
+    b.finish(body);b=this.batch();const rider=new T.Group();body.add(rider);if(bike){rider.position.set(0,V.kind==='trailbike'?.16:.08,.05);rider.rotation.x=V.kind==='trailbike'?.06:.18;}
     // Driver sits facing +Z. The back of the head is a real curved surface.
     b.add('sphere',top,[0,1.29,-.05],[.45,.58,.31]);
     for(const side of [-1,1]) {
@@ -74,8 +126,8 @@ const KartModels = {
       this.link(b,[side*.24,1.05,.15],[side*.37,.7,.72],.15,L.pants||dark);
       b.add('sphere',L.shoe||dark,[side*.37,.65,.99],[.18,.15,.32]);
     }
-    b.add('torus',dark,[0,1.27,.76],[.41,.31,.41],[Math.PI/3,0,0],.25);
-    const head=new T.Group();head.position.set(0,1.98,-.07);body.add(head);
+    if(!bike)b.add('torus',dark,[0,1.27,.76],[.41,.31,.41],[Math.PI/3,0,0],.25);
+    const head=new T.Group();head.position.set(0,1.98,-.07);rider.add(head);
     const h=this.batch(),human=!L.species;
     if(human){
       h.add('sphere',skin,[0,0,0],[.31,.37,.3]);
@@ -123,18 +175,19 @@ const KartModels = {
         h.add('cone','#f5c547',[0,.3,.11],[.14,.3,.07],[.3,0,0]);
       }
     }
-    h.finish(head);b.finish(body);
+    h.finish(head);b.finish(rider);
     const wheels=[];
-    for(const side of [-1,1])for(const front of [-1,1]){
-      const pivot=new T.Group();pivot.position.set(side*1.03,.48,front*.99);body.add(pivot);
+    for(const side of bike?[0]:[-1,1])for(const front of [-1,1]){
+      const pivot=new T.Group(),radius=bike?.56:V.kind==='buggy'?.54:.44; pivot.position.set(side*(V.kind==='formula'?1.12:1.03),radius+.04,front*(bike?1.15:.99));body.add(pivot);
       const spin=new T.Group();pivot.add(spin);const w=this.batch();
-      w.add('cylinder','#111922',[0,0,0],[.44,.33,.44],[0,0,Math.PI/2],.05,.85);
-      w.add('cylinder',metal,[side*.18,0,0],[.25,.025,.25],[0,0,Math.PI/2],.85,.24);
-      w.add('cylinder',accent,[side*.2,0,0],[.13,.025,.13],[0,0,Math.PI/2],.45,.26);
-      for(let i=0;i<6;i++)w.add('box','#75899b',[side*.2,Math.cos(i*TAU/6)*.18,Math.sin(i*TAU/6)*.18],[.025,.055,.15],[i*TAU/6,0,0],.7);
+      w.add('cylinder','#111922',[0,0,0],[radius,bike?.2:.33,radius],[0,0,Math.PI/2],.05,.9);
+      for(const outside of bike?[-1,1]:[side]){const x=outside*(bike?.115:.18);w.add('cylinder',metal,[x,0,0],[radius*.58,.025,radius*.58],[0,0,Math.PI/2],.85,.24);
+        w.add('cylinder',accent,[x+outside*.02,0,0],[.13,.025,.13],[0,0,Math.PI/2],.45,.26);
+        for(let i=0;i<(bike?10:6);i++){const a=i*TAU/(bike?10:6);w.add('box','#75899b',[x+outside*.018,Math.cos(a)*radius*.37,Math.sin(a)*radius*.37],[.025,.03,radius*.45],[a,0,0],.7);}}
+      if(V.kind==='buggy'||V.kind==='trailbike')for(let i=0;i<16;i++){const a=i*TAU/16;w.add('box','#232b31',[0,Math.cos(a)*radius,Math.sin(a)*radius],[bike?.22:.37,.07,.12],[a,0,0],.05,.95);}
       w.finish(spin);wheels.push({pivot,spin,front:front>0});
     }
-    const shield=new T.Mesh(new T.SphereGeometry(1,20,14),new T.MeshBasicMaterial({color:'#82f6ff',transparent:true,opacity:.16,depthWrite:false,wireframe:true}));shield.scale.set(1.6,1.9,2.1);shield.position.y=1.35;shield.visible=false;root.add(shield);
-    root.userData={body,head,wheels,shield,id};return root;
+    const shield=new T.Mesh(new T.SphereGeometry(1,24,16),new T.MeshStandardMaterial({color:'#82f6ff',transparent:true,opacity:.18,metalness:.45,roughness:.16,emissive:'#123b46',depthWrite:false}));shield.scale.set(1.6,1.9,2.1);shield.position.y=1.35;shield.visible=false;root.add(shield);
+    root.userData={body,head,wheels,shield,id,vehicle:kartVehicleIndex(vehicle),bike};return root;
   },
 };

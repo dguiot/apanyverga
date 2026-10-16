@@ -1,9 +1,9 @@
 'use strict';
 // Mode hub, garage, track selection, pause, results and a three-race cup.
 const KartMenu={
-  char:0,track:0,cc:1,assist:false,cup:false,row:0,selection:0,courses:new Map(),cupState:null,
+  char:0,vehicle:0,track:0,cc:1,assist:false,cup:false,row:0,selection:0,courses:new Map(),cupState:null,
   course(i){if(!this.courses.has(i))this.courses.set(i,new KartCourse(KART_TRACKS[i]));return this.courses.get(i);},
-  save(){try{localStorage.setItem('esmash-kart-garage-v1',JSON.stringify({char:this.char,track:this.track,cc:this.cc,assist:this.assist,cup:this.cup}));}catch(e){}},
+  save(){try{localStorage.setItem('esmash-kart-garage-v1',JSON.stringify({char:this.char,vehicle:this.vehicle,track:this.track,cc:this.cc,assist:this.assist,cup:this.cup}));}catch(e){}},
   load(){try{const j=JSON.parse(localStorage.getItem('esmash-kart-garage-v1')||'null');if(j){this.char=clamp(j.char|0,0,CHAR_ORDER.length-1);this.track=clamp(j.track|0,0,2);this.cc=clamp(j.cc|0,0,2);this.assist=!!j.assist;this.cup=!!j.cup;}}catch(e){}},
   enter(){this.cupState=null;this.row=0;this.selection=this.char;this.load();APP.go('kartGarage');TouchPad.release();},
   card(i){return {x:40+(i%5)*148,y:117+Math.floor(i/5)*111,w:138,h:101};},
@@ -18,11 +18,11 @@ const KartMenu={
   },
   start(){
     if(APP.kartRace)APP.kartRace.stop();
-    APP.kartRace=new KartRace(KART_TRACKS[this.track],CHAR_ORDER[this.char],this.cc,this.assist,Date.now(),this.cupState&&this.cupState.ids);
+    APP.kartRace=new KartRace(KART_TRACKS[this.track],CHAR_ORDER[this.char],this.cc,this.assist,Date.now(),this.cupState&&this.cupState.ids,Array.from({length:8},(_,i)=>i===0?this.vehicle:(i-1)%6));
     if(this.cupState&&!this.cupState.ids){this.cupState.ids=APP.kartRace.racers.map(r=>r.id);for(const id of this.cupState.ids)this.cupState.scores[id]=0;}
     this.selection=0;this.recorded=false;TouchPad.release();APP.go('kartRace');
     // Prime the finite sprite set outside the moving race.
-    for(const r of APP.kartRace.racers)KartRender.kartSprite(r.id);
+    for(const r of APP.kartRace.racers)KartRender.kartSprite(r.id,r.vehicle);
     KartControls.tapped.clear();KartControls.read(); // menu confirmation must not immediately pause the race
   },
   record(){
@@ -57,7 +57,7 @@ APP.mainDraw=function(){
     sfText(i===0?'PELEAS':'ESMASH KART',b.x+34,b.y+47,52,on?GOLD:PAPER,{align:'left'});
     text(i===0?'Golpes, especiales y Smash.':'Derrapa, lanza ítems y conquista la pista.',b.x+36,b.y+94,17,'#d0e3e9',{body:true,align:'left',weight:500});
     text(i===0?'1–4 JUGADORES  ·  LOCAL Y ONLINE':'1–4 ONLINE  ·  PANTALLA DIVIDIDA  ·  3 CIRCUITOS',b.x+36,b.y+174,13,i===0?'#ffada6':'#7bf0e6',{body:true,align:'left',weight:700});
-    if(i===9){const sp=KartRender.kartSprite(CHAR_ORDER[KartMenu.char]);ctx.drawImage(sp.img,b.x+395,b.y+80,150,147);}
+    if(i===9){const sp=KartRender.kartSprite(CHAR_ORDER[KartMenu.char],KartMenu.vehicle);ctx.drawImage(sp.img,b.x+395,b.y+80,150,147);}
     else{const sp=ART.sprite('kart-hub-fight',170,170,c=>{c.translate(87,162);c.scale(.95,.95);drawCharacter(c,'torito',mkPose(POSES.idle));});ctx.drawImage(sp.img,b.x+385,b.y+35,170,170);}
   }
   const opts=this.mainOptions();for(let i=1;i<9;i++){const b=this.mainRect(i);sfButton(opts[i],b.x,b.y,b.w,b.h,this.menuSel===i||hover(b.x,b.y,b.w,b.h));}
@@ -74,6 +74,7 @@ APP.focusNative=function(d){
 
 APP.kartGarageUpdate=function(){
   const M=KartMenu;
+  if(KartVehicles.openPressed())return KartVehicles.open('kartGarage');
   for(const d of Devices.list){const n=Devices.nav(d);if(n.back)return M.exit();
     if(n.grab)return KartOnline.browse();
     if(n.left){M.char=(M.char+CHAR_ORDER.length-1)%CHAR_ORDER.length;Audio8.sfx('menu');}
@@ -89,24 +90,25 @@ APP.kartGarageUpdate=function(){
   if(M.hit({x:1022,y:489,w:210,h:48}))M.assist=!M.assist;
   if(M.hit({x:822,y:556,w:410,h:59})){M.save();return this.go('kartTracks');}
   if(M.hit({x:822,y:624,w:410,h:44}))return KartOnline.browse();
+  if(M.hit({x:40,y:465,w:728,h:50}))return KartVehicles.open('kartGarage');
   if(M.hit({x:40,y:645,w:180,h:44}))return M.exit();
 };
 APP.kartGarageDraw=function(){
-  const M=KartMenu,id=CHAR_ORDER[M.char],c=CHARS[id],st=kartStats(id);
+  const M=KartMenu,id=CHAR_ORDER[M.char],c=CHARS[id],st=kartStats(id,M.vehicle);
   M.header('ESMASH KART','01 / ELIGE A TU PILOTO   ·   Todos los personajes del juego original');
   for(let i=0;i<CHAR_ORDER.length;i++){
     const b=M.card(i),on=i===M.char;slab(b.x,b.y,b.w,b.h,{skew:.07,edge:on?GOLD:'rgba(115,163,186,.35)',lw:on?3:1,top:on?'#55502d':'#173247',bottom:'#10202e'});
     ctx.save();ctx.beginPath();ctx.rect(b.x+6,b.y+5,b.w-12,66);ctx.clip();drawPortrait(ctx,CHAR_ORDER[i],b.x+b.w/2,b.y+35,25);ctx.restore();
     text(CHARS[CHAR_ORDER[i]].name,b.x+b.w/2,b.y+83,fitSize(CHARS[CHAR_ORDER[i]].name,b.w-12,22),on?GOLD:PAPER,{weight:700});
   }
-  KartRender.panel(810,117,430,356);const sp=KartRender.kartSprite(id);ctx.drawImage(sp.img,902,123,240,235);
+  KartRender.panel(810,117,430,356);const sp=KartRender.kartSprite(id,M.vehicle);ctx.drawImage(sp.img,902,123,240,235);
   sfText(c.name,1025,375,45,GOLD);const labs=['Velocidad','Aceleración','Agarre'];
   for(let i=0;i<3;i++){text(labs[i],840,414+i*20,13,'#bbd0d9',{body:true,align:'left',weight:600});for(let j=0;j<5;j++){ctx.fillStyle=j<st.bars[i]?'#77e6df':'#30475c';roundRect(ctx,975+j*41,408+i*20,34,9,3);ctx.fill();}}
   M.button(KART_CLASSES[M.cc].name,{x:822,y:489,w:190,h:48});M.button('Asistencia: '+(M.assist?'sí':'no'),{x:1022,y:489,w:210,h:48});
   M.button('ELEGIR CIRCUITO →',{x:822,y:556,w:410,h:59},true);
   M.button('ONLINE · U / LB',{x:822,y:624,w:410,h:44});
-  text('← → / cruceta: piloto   ·   A / Enter: continuar',43,488,15,'#c9dae3',{body:true,align:'left'});
-  text('X / Espacio: cilindrada   ·   LT / RT / L: asistencia',43,518,14,'#9ebacb',{body:true,align:'left'});
+  M.button('VEHÍCULO: '+kartVehicle(M.vehicle).name+' · V / Y',{x:40,y:465,w:728,h:50});
+  text('← → piloto · A / Enter: continuar · X: cilindrada · LT / RT: asistencia',43,536,14,'#9ebacb',{body:true,align:'left'});
   wrapText(M.assist?'Asistencia activa: ayuda en las curvas. Récords separados.':'Derrapa y corrige con contravolante. En una rampa, pulsa derrape en el aire para ganar un turbo al aterrizar.',43,561,690,16,25,'#d5e4e9','left');
   M.button('← VOLVER',{x:40,y:645,w:180,h:44});text('TRES VUELTAS. OCHO PILOTOS. UNA META.',815,672,18,'#7f9eb1');
 };
@@ -182,7 +184,7 @@ APP.kartResultsDraw=function(){
     text((race.online&&r.peer?r.label+' · ':'')+CHARS[r.id].name+(on?' · TÚ':''),175,y+28,race.online?17:20,on?GOLD:'#f0f5ee',{body:true,align:'left',weight:700});
     text(final?cup.scores[r.id]+' pts':r.finish!==null?KartRender.time(r.finish):'En pista',653,y+29,17,'#a9d1d8',{body:true,align:'right',weight:600});
   }
-  const sp=KartRender.kartSprite(p.id);ctx.drawImage(sp.img,843,111,255,249);sfText(final?`${order.findIndex(r=>r.id===p.id)+1}.º EN LA COPA`:`${race.order.indexOf(p)+1}.º LUGAR`,972,387,58,GOLD);
+  const sp=KartRender.kartSprite(p.id,p.vehicle);ctx.drawImage(sp.img,843,111,255,249);sfText(final?`${order.findIndex(r=>r.id===p.id)+1}.º EN LA COPA`:`${race.order.indexOf(p)+1}.º LUGAR`,972,387,58,GOLD);
   text(KartRender.time(p.finish),972,442,45,PAPER,{weight:700});
   for(let i=0;i<p.lapTimes.length;i++)text('Vuelta '+(i+1)+'   '+KartRender.time(p.lapTimes[i]),972,481+i*26,17,'#c8dde3',{body:true,weight:500});
   if(race.newRecord)text('¡NUEVO RÉCORD PERSONAL!',972,566,16,'#71e7cc',{body:true,weight:700});
