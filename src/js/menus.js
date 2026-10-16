@@ -197,7 +197,7 @@ const APP = {
       text('Reconectando con la sala… ' + Math.max(0, Math.ceil((300 - Net.lostHostT) / 60)) + ' s', W / 2, 86, 20, GOLD, { body: true, weight: 700 });
     }
     const sx = W - 58, sy = 14;
-    if (!['battle', 'demo', 'vs', 'netview'].includes(this.screen)) {
+    if (!['battle', 'demo', 'vs', 'netview', 'kartRace'].includes(this.screen)) {
       slab(sx, sy, 46, 40, { skew: 0.2 });
       text(Audio8.muted ? '🔇' : '🔊', sx + 23, sy + 21, 18, PAPER, { body: true });
       // el navegador todavía no deja sonar (con control de juego pasa siempre: sus botones no cuentan como gesto)
