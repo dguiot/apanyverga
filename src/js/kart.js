@@ -1,5 +1,5 @@
 'use strict';
-// Racing is a separate local simulation; fighting/rollback state never enters here.
+// Racing simulation. Online sessions reuse Net's room and transport.
 const KART_CLASSES = [
   {name:'100 cc',label:'Ágil',speed:.86,ai:.88,turn:.86},
   {name:'150 cc',label:'Competitivo',speed:1,ai:.95,turn:1},
@@ -61,25 +61,28 @@ class KartRace {
   }
   random(){return this.rng.next();}
   say(msg,color='#ffc53d') {this.messages.push({msg,color,life:2.6});if(this.messages.length>3)this.messages.shift();}
-  feedback(r,sfx,force=.3){if(r.human){KartSound.effect(sfx);Rumble.play('local',force,.5,110);}}
+  feedback(r,sfx,force=.3){if(r.human&&(!this.online||r===this.player)){KartSound.effect(sfx);Rumble.play('local',force,.5,110);}}
   startBoost(r,seconds,label) {r.turbo=Math.max(r.turbo,seconds);if(r.human&&label)this.say(label,'#69e9ee');}
   update(input,dt=1/60) {
     if(this.paused)return;
+    const control=r=>input.players?input.players[r.index]||{}:input;
     this.tick++;for(const r of this.racers){r.ps=r.s;r.px=r.x;}
     for(const m of this.messages)m.life-=dt;this.messages=this.messages.filter(m=>m.life>0);
     for(const e of this.effects)e.life-=dt;this.effects=this.effects.filter(e=>e.life>0);
     if(this.phase==='grid'){
       const old=Math.ceil(this.countdown);this.countdown-=dt;
       // A small, learnable start boost; holding gas throughout overheats it.
-      if(input.gas)this.player.launch+=dt;else this.player.launch=Math.max(0,this.player.launch-dt*2);
+      for(const r of this.racers.filter(r=>r.human)){if(control(r).gas)r.launch+=dt;else r.launch=Math.max(0,r.launch-dt*2);}
       if(Math.ceil(this.countdown)!==old&&this.countdown>0)KartSound.effect('menu');
       if(this.countdown<=0){this.phase='race';KartSound.effect('confirm');this.say('¡A CORRER!');
-        if(this.player.launch>.18&&this.player.launch<1.25)this.startBoost(this.player,1.6,'¡SALIDA TURBO!');
-        else if(this.player.launch>=2.8){this.player.stun=.7;this.say('Motor caliente · acelera al final del 2');}
+        for(const r of this.racers.filter(r=>r.human)){if(r.launch>.18&&r.launch<1.25)this.startBoost(r,1.6,'¡SALIDA TURBO!');
+        else if(r.launch>=2.8){r.stun=.7;if(r===this.player)this.say('Motor caliente · acelera al final del 2');}}
       }return;
     }
     this.time+=dt;
-    for(const r of this.racers){const ai=!r.human||r.finish!==null;this.drive(r,ai?this.ai(r):input,dt);}
+    for(const r of this.racers){const ai=!r.human||r.disconnected||r.finish!==null;this.drive(r,ai?this.ai(r):control(r),dt);}
+    const humans=this.racers.filter(r=>r.human);
+    if(this.online&&this.phase==='race'&&humans.every(r=>r.finish!==null||r.disconnected)){this.phase='finish';this.resultTime=0;}
     this.updateProjectiles(dt);
     // Car contacts are symmetric and bounded, and have a cooldown to avoid repeated hits.
     for(let i=0;i<this.racers.length;i++)for(let j=i+1;j<this.racers.length;j++){
@@ -111,7 +114,7 @@ class KartRace {
     for(const k of ['turbo','shield','stun','invuln','air','hitCd','boostCd'])r[k]=Math.max(0,r[k]-dt);
     if(r.rescue>0){r.rescue-=dt;r.v=0;r.x=lerp(r.x,0,dt*7);r.lat=0;r.yaw=0;r.velocityYaw=0;r.turnRate=0;r.drift=0;r.charge=0;r.height=0;r.vy=0;return;}
     if(input.rescuePressed){this.rescue(r);return;}
-    if(r.roulette>0){r.roulette-=dt;if(r.roulette<=0){r.item=this.rollItem(r);this.feedback(r,'confirm',.15);}}
+    if(r.roulette>0){r.roulette-=dt;if(r.roulette<=0&&!this.predicting){r.item=this.rollItem(r);this.feedback(r,'confirm',.15);}}
     r.steer=approach(r.steer,input.steer||0,dt*(input.steer?11:15));
     for(const k of ['star','magnet','slow','slipCd','rampCd'])r[k]=Math.max(0,r[k]-dt);
     const wasFlying=r.height>0||r.vy>0;
@@ -151,13 +154,14 @@ class KartRace {
     if(Math.abs(r.x)>1.48){if(p.zone==='bridge'){this.rescue(r);return;}r.x=clamp(r.x,-1.48,1.48);r.lat*=-.25;r.v*=.94;}
     if(this.assist&&r.human)r.x=clamp(r.x,-1.3,1.3);
     const oldS=r.s;r.s+=r.v*Math.cos(r.velocityYaw)*dt;
+    if(this.predicting)return; // clients predict driving only; the host owns pickups, hits and laps
     const gate=C.length/16;
     while(oldS<=r.nextCheckpoint*gate&&r.s>=r.nextCheckpoint*gate&&r.nextCheckpoint<=this.laps*16){
       if(r.nextCheckpoint>0&&r.nextCheckpoint%16===0){
         r.completedLaps++;r.lapTimes.push(this.time-r.lastLapAt);r.lastLapAt=this.time;
         if(r.human&&r.completedLaps<this.laps){this.say(r.completedLaps===2?'¡ÚLTIMA VUELTA!':'VUELTA 2 / 3');this.feedback(r,'go',.3);}
         if(r.completedLaps===this.laps&&r.finish===null){r.finish=this.time;this.finishOrder.push(r);
-          if(r.human){this.phase='finish';this.say('¡META!');Audio8.stopSong();KartMusic.play('results');this.saveBest();Rumble.play('local',.6,.8,300);}
+          if(r.human){if(!this.online)this.phase='finish';this.say('¡META!');if(r===this.player){if(!this.online){Audio8.stopSong();KartMusic.play('results');}this.saveBest();Rumble.play('local',.6,.8,300);}}
         }
       }r.nextCheckpoint++;
     }

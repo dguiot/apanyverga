@@ -187,7 +187,7 @@ const Kart3D={
     const T=KartGL;this.disposeScene();this.race=race;this.scene=new T.Scene();this.scene.environment=this.environment;this.scene.environmentIntensity=.4;this.batches.clear();
     this.scene.fog=new T.FogExp2(race.course.info.theme==='neon'?'#182841':race.course.info.theme==='canyon'?'#c39880':'#c1c7ae',.00067);
     this.sky(this.scene,race.course.info);this.sun=this.lighting(this.scene,race.course.info.theme);this.terrainSurface(race.course);this.track(race.course);this.scenery(race.course);this.flush();
-    this.camera=new T.PerspectiveCamera(60,W/H,.15,6500);this.cameraPos=null;this.cameraLook=null;
+    this.camera=new T.PerspectiveCamera(60,W/H,.15,6500);this.cameraPos=null;this.cameraLook=null;this.views=new Map();
     this.drivers=race.racers.map(r=>{const mesh=KartModels.kart(r.id);this.scene.add(mesh);return mesh;});
     this.boxes=race.course.boxes.map(b=>{
       const root=new T.Group(),shell=new T.Mesh(new T.BoxGeometry(1.8,1.8,1.8),new T.MeshStandardMaterial({color:'#91ffff',emissive:'#2596a3',emissiveIntensity:.7,metalness:.25,roughness:.18,transparent:true,opacity:.82}));root.add(shell);
@@ -274,22 +274,38 @@ const Kart3D={
     if(tick){const pos=this.particles.geometry.attributes.position,col=this.particles.geometry.attributes.color;
       this.particleData.forEach((q,i)=>{q.life-=1/60;q.x+=q.vx/60;q.y+=q.vy/60;q.z+=q.vz/60;q.vy-=4/60;pos.setXYZ(i,q.life>0?q.x:0,q.life>0?q.y:-200,q.z);col.setXYZ(i,...q.color.map(c=>c*Math.max(0,q.life/.4)));});pos.needsUpdate=col.needsUpdate=true;this.particleTick=race.tick;
     }
-    const behind=C.world(s-(8.6+p.v*.008),x*.85,4.7+(p.height||0)*.25),look=C.world(s+17+p.v*.04,x*.55,1.7+(p.height||0)*.35);
-    const target=new T.Vector3(behind.x,behind.y,behind.z),aim=new T.Vector3(look.x,look.y,look.z);
-    if(!this.cameraPos||Math.abs(s-(this.cameraS||0))>100){this.cameraPos=target;this.cameraLook=aim;}else{this.cameraPos.lerp(target,reducedMotion?.8:.36);this.cameraLook.lerp(aim,.4);}
-    this.cameraS=s;this.camera.position.copy(this.cameraPos);this.camera.lookAt(this.cameraLook);
-    this.skyMesh.position.copy(this.cameraPos);
-    const fov=58+Math.min(5,p.v/30)+(p.turbo&&!reducedMotion?4:0);if(Math.abs(this.camera.fov-fov)>.05){this.camera.fov=lerp(this.camera.fov,fov,.15);this.camera.updateProjectionMatrix();}
+    this.followCamera(race,p,alpha,this);
     const w=C.world(s,x);this.sun.position.set(w.x-65,w.y+110,w.z-50);this.sun.target.position.set(w.x,w.y,w.z);this.sun.target.updateMatrixWorld();
     this.renderer.shadowMap.enabled=!IS_XBOX&&!ART.lite&&Prefs.fx==='full';this.renderer.toneMappingExposure=C.info.theme==='neon'?1.18:1.12;
+  },
+  followCamera(race,p,alpha,view){
+    const T=KartGL,C=race.course,s=lerp(p.ps,p.s,alpha),x=lerp(p.px,p.x,alpha);
+    const behind=C.world(s-(8.6+p.v*.008),x*.85,4.7+(p.height||0)*.25),look=C.world(s+17+p.v*.04,x*.55,1.7+(p.height||0)*.35);
+    const target=new T.Vector3(behind.x,behind.y,behind.z),aim=new T.Vector3(look.x,look.y,look.z);
+    if(!view.cameraPos||Math.abs(s-(view.cameraS||0))>100){view.cameraPos=target;view.cameraLook=aim;}else{view.cameraPos.lerp(target,reducedMotion?.8:.36);view.cameraLook.lerp(aim,.4);}
+    view.cameraS=s;view.camera.position.copy(view.cameraPos);view.camera.lookAt(view.cameraLook);
+    this.skyMesh.position.copy(view.cameraPos);
+    const fov=58+Math.min(5,p.v/30)+(p.turbo&&!reducedMotion?4:0);if(Math.abs(view.camera.fov-fov)>.05){view.camera.fov=lerp(view.camera.fov,fov,.15);view.camera.updateProjectionMatrix();}
   },
   draw(race,alpha){
     if(!this.init()){
       ctx.fillStyle='#0c1829';ctx.fillRect(0,0,W,H);sfText('EL MODO 3D NECESITA WEBGL',640,270,52,GOLD);
       wrapText('Abre el juego en Chrome, Edge o Safari con aceleración gráfica. Esc: volver al menú.',640,350,850,21,32,PAPER);if(keyEdge('kb1','Escape'))KartMenu.exit();return;
     }
-    if(this.race!==race)this.build(race);this.syncSize();this.animate(race,alpha);this.renderer.render(this.scene,this.camera);
-    KartRender.hud(race);
+    if(this.race!==race)this.build(race);this.syncSize();this.animate(race,alpha);
+    const players=race.online?race.racers.filter(r=>r.human).sort((a,b)=>(b===race.player?1:0)-(a===race.player?1:0)):[race.player],rects=KartRender.viewports(players.length),renderer=this.renderer;
+    this.lastViewports=rects;
+    if(players.length===1&&!race.online){renderer.setScissorTest(false);renderer.setViewport(0,0,renderer.domElement.width,renderer.domElement.height);renderer.render(this.scene,this.camera);KartRender.hud(race);return;}
+    const k=renderer.domElement.width/W;renderer.setScissorTest(true);
+    // One world and one GL context; only cameras and viewports multiply.
+    renderer.shadowMap.enabled=false;
+    players.forEach((p,i)=>{const b=rects[i];let v=this.views.get(p.index);if(!v){v={camera:this.camera.clone()};this.views.set(p.index,v);}
+      this.followCamera(race,p,alpha,v);v.camera.aspect=b.w/b.h;v.camera.updateProjectionMatrix();
+      const left=Math.round(b.x*k),bottom=Math.round((H-b.y-b.h)*k),right=Math.round((b.x+b.w)*k),top=Math.round((H-b.y)*k);
+      renderer.setViewport(left,bottom,right-left,top-bottom);renderer.setScissor(left,bottom,right-left,top-bottom);renderer.render(this.scene,v.camera);
+      KartRender.splitHud(race,p,b);
+    });
+    renderer.setScissorTest(false);renderer.setViewport(0,0,renderer.domElement.width,renderer.domElement.height);
   },
   thumbnail(id){
     if(this.thumbs.has(id))return this.thumbs.get(id);if(!this.init())return null;

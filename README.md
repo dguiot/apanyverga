@@ -9,10 +9,24 @@ Al entrar, elige **Peleas** o **Esmash Kart**. Las peleas conservan sus modos y 
 
 ## Esmash Kart
 
-Carreras locales para **un jugador contra siete CPU**, con los **15 personajes originales**,
+Carreras locales para **un jugador contra siete CPU**, y **salas online para hasta cuatro pilotos**,
+con los **15 personajes originales**,
 pilotos y karts modelados en **3D**, con sus colores, sombreros, cuernos, branquias y siluetas propias.
 La cámara sigue al piloto desde atrás; las fotos se usan en la selección, no durante la conducción.
-El online y el multijugador local corresponden por ahora a las peleas.
+Las carreras online reutilizan las salas, enlaces de invitación, cámara, voz y conexión WebRTC de las peleas.
+Los puestos restantes hasta ocho se completan con CPU.
+
+En **Esmash Kart → ONLINE** (U / LB en el garaje), crea una sala o entra con el enlace que te compartan.
+Cada invitado elige su personaje y pulsa **Estoy listo**; el anfitrión elige pista y cilindrada e inicia.
+Cada navegador muestra una vista trasera por participante: dos mitades para dos pilotos, una mitad y
+dos cuartos para tres, cuatro cuadrantes para cuatro. Tu vista tiene borde dorado y la etiqueta **TÚ**.
+El botón **Cámara y voz** funciona en la sala, durante la carrera y en resultados; los videos aparecen
+en el cuadro de cada piloto. En carrera, M controla la música; el micrófono se controla desde su botón.
+El anfitrión resuelve ítems, impactos y vueltas; los invitados predicen su conducción y reciben el
+estado por el transporte existente, con el mismo respaldo por canal cuando no conecta WebRTC.
+Abrir el menú no detiene una carrera online. Un piloto desconectado pasa temporalmente a CPU;
+las llegadas durante una carrera son espectadores hasta la siguiente. Los resultados aparecen cuando
+terminan todos los pilotos conectados. El anfitrión puede volver a la sala sin cortar la voz ni la cámara.
 
 - **Mercado del Sol** — 8.9 km por vuelta; curvas enlazadas, adoquines, puestos y un puente estrecho.
 - **Cañón de Fuego** — 10.1 km; horquillas, desniveles, rocas móviles y puentes sobre el cañón.
@@ -25,7 +39,7 @@ El online y el multijugador local corresponden por ahora a las peleas.
 - Placas de aceleración y salida turbo al acelerar al final del 2.
 - Banda sonora original con batería, bajo, acordes suaves y melodía; motor y neumáticos separados. **M** alterna música y solo efectos; en pausa también sirve X del mando.
 - Minimapa, aviso de curvas, posición, tiempos por vuelta y récord por pista, cilindrada y asistencia, guardado en este navegador.
-- Mundo WebGL2 con iluminación, sombras, materiales, relieve y objetos con profundidad. Simulación a 60 Hz e interpolación; calidad adaptativa y modo Xbox sin sombras dinámicas. Pausa automática al cambiar de ventana.
+- Mundo WebGL2 con iluminación, sombras, materiales, relieve y objetos con profundidad. Simulación a 60 Hz e interpolación; calidad adaptativa y modo Xbox sin sombras dinámicas. Pausa automática al cambiar de ventana en carreras locales; el online continúa.
 
 | Acción | Teclado | Control estándar |
 | --- | --- | --- |
@@ -97,6 +111,10 @@ determinismo y 9 carreras completas —tres pistas × tres cilindradas—, adem�
 La segunda cubre control estándar, pantalla táctil, copa, récords, pérdida de foco y calidad Xbox.
 `node src/test/tkart-3d.cjs` cubre WebGL real, los 15 modelos sin fotos en carrera, cámara trasera,
 contravolante, acrobacias, rebufo, monedas, los seis objetos nuevos y una renderización de audio sin saturación.
+`node src/test/tkart-online.cjs` abre cuatro navegadores con el adaptador de Supabase existente
+(solo el servicio de señalización se simula) y conexiones WebRTC reales. Comprueba invitaciones,
+voz y cámara, conducción independiente, ítems remotos, vistas de dos/tres/cuatro jugadores, entrada
+como espectador, paquetes atrasados, desconexiones, resultados y regreso a la sala.
 
 El motor 3D (Three.js 0.180.0) se incluye dentro de la versión web; no necesita un CDN ni instalar paquetes
 para jugar. Licencia y entrada del bundle: `src/vendor/THREE-LICENSE.txt` y `src/vendor/three-kart.entry.js`.

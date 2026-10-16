@@ -13,7 +13,7 @@ APP.battleDraw = function () { if (this.battle) { this.battle.draw(); if (this.b
 // quien usa lo suyo.
 // botón de cámara y voz (solo en las pantallas de una sala online)
 const AV_BTN = { x: W - 272, y: 14, w: 204, h: 40 };
-function avButtonShown() { return Net.ok && (Net.role === 'host' || Net.role === 'guest') && ['modesel', 'charsel', 'stagesel', 'netroom', 'results', 'tournament'].includes(APP.screen); }
+function avButtonShown() { return Net.ok && (Net.role === 'host' || Net.role === 'guest') && ['modesel', 'charsel', 'stagesel', 'netroom', 'results', 'tournament', 'kartLobby', 'kartResults', 'kartRace'].includes(APP.screen); }
 function kbShareNow() {
   let devs, full = false;
   if (Net.role === 'guest') { devs = [Net.localDev]; full = true; }
@@ -32,7 +32,7 @@ function step() {
   try { UIFocus.begin(); } catch (e) { console.error(e); }
   if (Pointer.clicked && !['battle', 'kartRace'].includes(APP.screen) && hover(W - 58, 14, 44, 44)) { Audio8.setMuted(!Audio8.muted); Pointer.clicked = false; }
   if (Pointer.clicked && avButtonShown()) { const b = AV_BTN; if (hover(b.x, b.y, b.w, b.h)) { AV.click(b); Pointer.clicked = false; } }
-  if (AV.on && keyEdge('kb1', 'KeyM')) { AV.setMic(!AV.mic); Toasts.push(AV.mic ? '🎤 Micrófono abierto' : '🔇 Micrófono silenciado'); }
+  if (AV.on && keyEdge('kb1', 'KeyM') && APP.screen!=='kartRace') { AV.setMic(!AV.mic); Toasts.push(AV.mic ? '🎤 Micrófono abierto' : '🔇 Micrófono silenciado'); }
   try { AV.tick(); } catch (e) { console.error(e); }
   // con la ventanita de invitar abierta el juego espera; B o Esc la cierran
   if (InviteBox.isOpen()) { for (const d of Devices.list) { const n = Devices.nav(d); if (n.back || n.start) InviteBox.close(); } }
