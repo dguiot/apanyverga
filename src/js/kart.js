@@ -19,10 +19,10 @@ const KART_ITEMS = {
   star:{name:'Estrella',icon:'ES',color:'#ffdd79',desc:'Invulnerabilidad y velocidad durante 6 segundos.'},
   spring:{name:'Resorte',icon:'RE',color:'#a9eea1',desc:'Salta obstáculos. Pulsa derrape en el aire para una acrobacia.'},
 };
-const kartStats=id=>{
-  const c=CHARS[id],heavy=clamp((c.weight-74)/60,0,1);
-  return {speed:108+heavy*7,accel:39-heavy*9,grip:1.09-heavy*.18,weight:.75+heavy*.6,
-    bars:[Math.round(3+heavy*2),Math.round(5-heavy*2),Math.round(5-heavy*2)]};
+const kartStats=(id,vehicle=0)=>{
+  const c=CHARS[id],heavy=clamp((c.weight-74)/60,0,1),V=kartVehicle(vehicle);
+  return {speed:(108+heavy*7)*V.speed,accel:(39-heavy*9)*V.accel,grip:(1.09-heavy*.18)*V.grip,weight:(.75+heavy*.6)*V.weight,
+    bars:[clamp(Math.round(3+heavy*2+(V.speed-1)*45),1,5),clamp(Math.round(5-heavy*2+(V.accel-1)*12),1,5),clamp(Math.round(5-heavy*2+(V.grip-1)*18),1,5)]};
 };
 const KartControls = {
   prev:{},tapped:new Set(),
@@ -47,16 +47,16 @@ const KartControls = {
 };
 
 class KartRace {
-  constructor(info,character,cc=1,assist=false,seed=Date.now(),roster=null) {
+  constructor(info,character,cc=1,assist=false,seed=Date.now(),roster=null,vehicles=null) {
     this.course=new KartCourse(info);this.cc=KART_CLASSES[cc];this.ccIndex=cc;this.assist=assist;
     this.rng=new SimRNG(seed);this.time=0;this.tick=0;this.countdown=3.5;this.phase='grid';this.paused=false;this.pauseSel=0;
     this.projectiles=[];this.effects=[];this.messages=[];this.laps=3;this.finishOrder=[];this.resultTime=0;this.camera=null;this.audio=null;
     const ids=roster||[character,...CHAR_ORDER.filter(id=>id!==character).sort(()=>this.rng.next()-.5).slice(0,7)];
     this.racers=ids.map((id,i)=>({id,index:i,human:i===0,s:-18-Math.floor((7-i)/2)*9,x:i%2?-.4:.4,px:i%2?-.4:.4,ps:-18-Math.floor((7-i)/2)*9,
       v:0,steer:0,lat:0,drift:0,driftDir:0,charge:0,turbo:0,shield:0,stun:0,invuln:0,air:0,rescue:0,
-      item:null,roulette:0,stats:kartStats(id),nextCheckpoint:0,completedLaps:0,lastLapAt:0,lapTimes:[],finish:null,
+      item:null,roulette:0,vehicle:kartVehicleIndex(vehicles?.[i]||0),stats:kartStats(id,vehicles?.[i]||0),nextCheckpoint:0,completedLaps:0,lastLapAt:0,lapTimes:[],finish:null,
       aiLane:(this.rng.next()-.5)*.85,skill:.94+this.rng.next()*.07,aiUse:1+this.rng.next()*3,hitCd:0,boostCd:0,launch:0}));
-    this.racers.forEach(r=>Object.assign(r,{yaw:0,velocityYaw:0,turnRate:0,height:0,vy:0,airTime:0,trick:false,coins:0,slip:0,slipCd:0,star:0,magnet:0,slow:0,rampCd:0}));
+    this.racers.forEach(r=>Object.assign(r,{yaw:0,velocityYaw:0,turnRate:0,height:0,vy:0,airTime:0,trick:false,coins:0,slip:0,slipCd:0,star:0,magnet:0,slow:0,rampCd:0,bumpLat:0}));
     this.player=this.racers[0];this.order=this.racers.slice().sort((a,b)=>b.s-a.s||b.index-a.index);KartControls.prev={};
   }
   random(){return this.rng.next();}
@@ -88,7 +88,7 @@ class KartRace {
     for(let i=0;i<this.racers.length;i++)for(let j=i+1;j<this.racers.length;j++){
       const a=this.racers[i],b=this.racers[j],ds=KartMath.delta(a.s,b.s,this.course.length),dx=a.x-b.x;
       if(Math.abs(ds)<4.1&&Math.abs(dx)<.19&&!a.rescue&&!b.rescue&&!a.hitCd&&!b.hitCd){
-        const dir=dx>=0?1:-1;a.lat+=dir*.75/b.stats.weight;b.lat-=dir*.75/a.stats.weight;
+        const dir=dx>=0?1:-1;a.bumpLat=clamp(a.bumpLat+dir*.8*b.stats.weight/a.stats.weight,-1.8,1.8);b.bumpLat=clamp(b.bumpLat-dir*.8*a.stats.weight/b.stats.weight,-1.8,1.8);
         if(ds<0)a.v*=.9;else b.v*=.9;a.hitCd=b.hitCd=.45;this.feedback(a,'land',.15);this.feedback(b,'land',.15);
       }
     }
@@ -110,9 +110,9 @@ class KartRace {
     return {steer,gas:r.v<target,brake:r.v>target+8,drift:curve>.0028&&curve<.007&&r.v>55&&Math.abs(r.x)<.72,itemPressed:!!use,rear:false};
   }
   drive(r,input,dt) {
-    const C=this.course,p=C.sample(r.s),max=r.stats.speed*this.cc.speed,ratio=r.v/max;
+    const C=this.course,p=C.sample(r.s),max=r.stats.speed*this.cc.speed,ratio=r.v/max,V=kartVehicle(r.vehicle);
     for(const k of ['turbo','shield','stun','invuln','air','hitCd','boostCd'])r[k]=Math.max(0,r[k]-dt);
-    if(r.rescue>0){r.rescue-=dt;r.v=0;r.x=lerp(r.x,0,dt*7);r.lat=0;r.yaw=0;r.velocityYaw=0;r.turnRate=0;r.drift=0;r.charge=0;r.height=0;r.vy=0;return;}
+    if(r.rescue>0){r.rescue-=dt;r.v=0;r.x=lerp(r.x,0,dt*7);r.lat=0;r.bumpLat=0;r.yaw=0;r.velocityYaw=0;r.turnRate=0;r.drift=0;r.charge=0;r.height=0;r.vy=0;return;}
     if(input.rescuePressed){this.rescue(r);return;}
     if(r.roulette>0){r.roulette-=dt;if(r.roulette<=0&&!this.predicting){r.item=this.rollItem(r);this.feedback(r,'confirm',.15);}}
     r.steer=approach(r.steer,input.steer||0,dt*(input.steer?11:15));
@@ -125,15 +125,15 @@ class KartRace {
     const drifting=!!input.drift&&r.v>max*.36&&Math.abs(r.x)<1.14&&!r.stun&&(!wasFlying||r.drift);
     if(drifting&&!r.drift&&Math.abs(r.steer)>.18){r.drift=1;r.driftDir=sign(r.steer);r.air=.25;r.vy=3.4;r.height=.03;}
     if(r.drift){
-      if(!drifting){if(r.charge>.7)this.startBoost(r,r.charge>2?2.2:r.charge>1.3?1.45:.8,r.human?'¡MINI TURBO!':null);r.drift=0;r.charge=0;}
+      if(!drifting){if(r.charge>.7)this.startBoost(r,(r.charge>2?2.2:r.charge>1.3?1.45:.8)*V.boost,r.human?'¡MINI TURBO!':null);r.drift=0;r.charge=0;}
       else {
         // Countersteering adjusts the racing line without instantly cancelling a drift.
         const into=r.steer*r.driftDir;
-        r.charge=Math.min(2.7,r.charge+dt*(.72+Math.max(0,into)*.42));
+        r.charge=Math.min(2.7,r.charge+dt*(.72+Math.max(0,into)*.42)*V.charge);
       }
     }
     if(r.stun){r.v=approach(r.v,max*.25,dt*max*1.8);r.drift=0;r.charge=0;}
-    else if(input.brake){r.v=approach(r.v,0,dt*max*1.12);}
+    else if(input.brake){r.v=approach(r.v,0,dt*max*1.12*V.brake);}
     else if(input.gas||r.turbo||r.star){r.v=approach(r.v,max*(r.turbo?1.32:r.star?1.2:1)*(1+r.coins*.005)*(r.slow?.58:1),dt*r.stats.accel*(r.turbo||r.star?2.3:1));}
     else r.v=approach(r.v,0,dt*18);
     // Integrate heading and tyre velocity separately. With no steering the kart
@@ -141,15 +141,15 @@ class KartRace {
     const grip=p.zone==='wet'?.73:1;
     const maxTurn=(1.62-.42*Math.min(1.4,ratio))*r.stats.grip;
     const steer=r.steer+(this.assist&&r.human?clamp(p.curve*r.v/maxTurn-r.x*.25,-.55,.55):0);
-    r.turnRate=approach(r.turnRate,clamp(steer,-1,1)*maxTurn*(r.drift?1.18:1)*Math.min(1,ratio*3),dt*7);
+    r.turnRate=approach(r.turnRate,clamp(steer,-1,1)*maxTurn*(r.drift?1.18:1)*Math.min(1,ratio*3),dt*7*V.response);
     const rotation=p.curve*r.v*Math.cos(r.velocityYaw)*dt;
     r.yaw=clamp(r.yaw+r.turnRate*dt-rotation,-1.23,1.23);r.velocityYaw-=rotation;
     const tyreTarget=r.yaw-(r.drift?r.driftDir*.2:0);
     r.velocityYaw=approach(r.velocityYaw,tyreTarget,dt*(r.drift?1.4:5.5)*grip*(r.height>.3?.35:1));
-    r.lat=Math.sin(r.velocityYaw)*r.v/p.width;
+    r.lat=Math.sin(r.velocityYaw)*r.v/p.width+r.bumpLat;r.bumpLat=approach(r.bumpLat,0,dt*2.8);
     if(r.stun){r.lat*=.7;r.yaw*=.99;}
     r.x+=r.lat*dt;
-    if(Math.abs(r.x)>1&&!r.star&&r.height<.3){r.v=approach(r.v,max*.42,dt*max*.95);r.charge=0;}
+    if(Math.abs(r.x)>1&&!r.star&&r.height<.3){r.v=approach(r.v,max*V.offroad,dt*max*.95);r.charge=0;}
     if((p.zone==='gravel'||p.zone==='cobbles')&&!r.turbo)r.v=approach(r.v,max*.88,dt*15);
     if(Math.abs(r.x)>1.48){if(p.zone==='bridge'){this.rescue(r);return;}r.x=clamp(r.x,-1.48,1.48);r.lat*=-.25;r.v*=.94;}
     if(this.assist&&r.human)r.x=clamp(r.x,-1.3,1.3);
@@ -232,11 +232,17 @@ class KartRace {
       }
       if(explode){q.life=0;this.effects.push({s:q.s,x:q.x,life:.6,max:.6,type:'hit',color:'#e0a1ff'});}
     }
+    // A well-aimed disc can intercept an incoming rocket.
+    for(let i=0;i<this.projectiles.length;i++)for(let j=i+1;j<this.projectiles.length;j++){
+      const a=this.projectiles[i],b=this.projectiles[j];if(a.life<=0||b.life<=0||a.owner===b.owner||!['chile','tortilla'].includes(a.type)||!['chile','tortilla'].includes(b.type))continue;
+      const d0=KartMath.delta(a.ps,b.ps,C.length),d1=KartMath.delta(a.s,b.s,C.length),cross=d0*d1<=0&&Math.abs(d1-d0)<45;
+      if((Math.abs(d1)<3||cross)&&Math.abs(a.x-b.x)<.22){a.life=b.life=0;this.effects.push({type:'hit',s:a.s,x:a.x,life:.4,max:.4,color:'#ffe3a7'});}
+    }
     this.projectiles=this.projectiles.filter(q=>q.life>0).slice(-48);
   }
   bestKey(){return 'esmash-kart-v2:'+this.course.info.id+':'+this.ccIndex+':'+(this.assist?'assist':'manual');}
   saveBest(){try{const best=JSON.parse(localStorage.getItem(this.bestKey())||'null'),p=this.player;
-    if(!best||p.finish<best.time){localStorage.setItem(this.bestKey(),JSON.stringify({time:p.finish,char:p.id,lap:Math.min(...p.lapTimes)}));this.newRecord=true;}
+    if(!best||p.finish<best.time){localStorage.setItem(this.bestKey(),JSON.stringify({time:p.finish,char:p.id,vehicle:kartVehicle(p.vehicle).id,lap:Math.min(...p.lapTimes)}));this.newRecord=true;}
   }catch(e){/* private browsing */}}
   stop(){KartSound.stop();Rumble.stopAll();TouchPad.release();}
 }

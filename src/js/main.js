@@ -13,7 +13,7 @@ APP.battleDraw = function () { if (this.battle) { this.battle.draw(); if (this.b
 // quien usa lo suyo.
 // botón de cámara y voz (solo en las pantallas de una sala online)
 const AV_BTN = { x: W - 272, y: 14, w: 204, h: 40 };
-function avButtonShown() { return Net.ok && (Net.role === 'host' || Net.role === 'guest') && ['modesel', 'charsel', 'stagesel', 'netroom', 'results', 'tournament', 'kartLobby', 'kartResults', 'kartRace'].includes(APP.screen); }
+function avButtonShown() { return Net.ok && (Net.role === 'host' || Net.role === 'guest') && ['modesel', 'charsel', 'stagesel', 'netroom', 'results', 'tournament', 'kartLobby', 'kartVehicles', 'kartResults', 'kartRace'].includes(APP.screen); }
 function kbShareNow() {
   let devs, full = false;
   if (Net.role === 'guest') { devs = [Net.localDev]; full = true; }
