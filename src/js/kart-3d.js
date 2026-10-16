@@ -240,15 +240,14 @@ const Kart3D={
     b.finish(root,false);return root;
   },
   animate(race,alpha){
-    const T=KartGL,C=race.course,p=race.player,s=lerp(p.ps,p.s,alpha),x=lerp(p.px,p.x,alpha),tick=race.tick!==this.particleTick;
+    KartMotion.animate(race);
+    const T=KartGL,C=race.course,p=race.player,pv=KartMotion.view(p,alpha),s=pv.s,x=pv.x,tick=race.tick!==this.particleTick;
     for(let i=0;i<race.racers.length;i++){
-      const r=race.racers[i],m=this.drivers[i],ss=lerp(r.ps,r.s,alpha),xx=lerp(r.px,r.x,alpha),w=C.world(ss,xx,r.height||0),q=C.sample(ss),angle=Math.atan2(q.tx,q.tz)+(r.yaw||r.steer*.035);
+      const r=race.racers[i],m=this.drivers[i],v=KartMotion.view(r,alpha),ss=v.s,xx=v.x,w=C.world(ss,xx,Math.max(0,v.height)),q=C.sample(ss),angle=Math.atan2(q.tx,q.tz)+v.yaw;
       m.position.set(w.x,w.y+.05+(r.rescue?Math.sin(Math.min(1,r.rescue)*Math.PI)*2:0),w.z);m.rotation.y=angle;
-      m.userData.body.rotation.z=m.userData.bike?clamp(-r.steer*r.v/170,-.48,.48):clamp(-r.lat*.045,-.14,.14);m.userData.body.position.y=Math.sin(r.s*.25)*Math.min(.022,r.v*.0003);
-      if(r.trick)m.userData.body.rotation.x=-clamp(((r.airTime||0)-(r.trickAt||0))/.6,0,1)*TAU;
-      else m.userData.body.rotation.x=0;
+      KartMotion.body(r,m);
       m.userData.head.rotation.z=r.drift?-.08*r.driftDir:0;
-      for(const wheel of m.userData.wheels){wheel.spin.rotation.x=r.s/.44;if(wheel.front)wheel.pivot.rotation.y=r.steer*.35;}
+      for(const wheel of m.userData.wheels){wheel.spin.rotation.x=ss/.44;if(wheel.front)wheel.pivot.rotation.y=v.steer*.35;}
       m.userData.shield.visible=r.shield>0||r.star>0;m.userData.shield.material.color.set(r.star>0?'#ffdc82':'#82f6ff');m.userData.shield.rotation.y=race.time*.5;
       m.visible=!(r.invuln&&Math.floor(race.time*15)%2&&!r.star);
       if(tick){this.marksFor(r,m);if(r.drift||r.turbo){const col=r.turbo?[.2,.8,1]:r.charge>2?[.9,.35,1]:r.charge>1.3?[1,.55,.1]:[.2,.7,1];
@@ -275,21 +274,21 @@ const Kart3D={
       if(!this.seenEffects.has(e)){this.seenEffects.add(e);for(let i=0;i<18;i++)this.particle(w,[1,.65,.2],Math.sin(i*2.4)*4,2+i%5,Math.cos(i*2.4)*4);}
     }
     for(const [e,m] of this.effectMeshes)if(!activeEffects.has(e)){this.scene.remove(m);m.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material&&!Array.from(KartModels.materials.values()).includes(o.material))o.material.dispose();});this.effectMeshes.delete(e);}
-    if(tick){const pos=this.particles.geometry.attributes.position,col=this.particles.geometry.attributes.color;
-      this.particleData.forEach((q,i)=>{q.life-=1/60;q.x+=q.vx/60;q.y+=q.vy/60;q.z+=q.vz/60;q.vy-=4/60;pos.setXYZ(i,q.life>0?q.x:0,q.life>0?q.y:-200,q.z);col.setXYZ(i,...q.color.map(c=>c*Math.max(0,q.life/.4)));});pos.needsUpdate=col.needsUpdate=true;this.particleTick=race.tick;
+    if(tick){const pos=this.particles.geometry.attributes.position,col=this.particles.geometry.attributes.color,dt=clamp(race.tick-this.particleTick,0,5)/60;
+      this.particleData.forEach((q,i)=>{q.life-=dt;q.x+=q.vx*dt;q.y+=q.vy*dt;q.z+=q.vz*dt;q.vy-=4*dt;pos.setXYZ(i,q.life>0?q.x:0,q.life>0?q.y:-200,q.z);const fade=Math.max(0,q.life/.4);col.setXYZ(i,q.color[0]*fade,q.color[1]*fade,q.color[2]*fade);});pos.needsUpdate=col.needsUpdate=true;this.particleTick=race.tick;
     }
     this.followCamera(race,p,alpha,this);
     const w=C.world(s,x);this.sun.position.set(w.x-65,w.y+110,w.z-50);this.sun.target.position.set(w.x,w.y,w.z);this.sun.target.updateMatrixWorld();
     this.renderer.shadowMap.enabled=!IS_XBOX&&!ART.lite&&Prefs.fx==='full';this.renderer.toneMappingExposure=C.info.theme==='neon'?1.18:1.12;
   },
   followCamera(race,p,alpha,view){
-    const T=KartGL,C=race.course,s=lerp(p.ps,p.s,alpha),x=lerp(p.px,p.x,alpha);
-    const behind=C.world(s-(8.6+p.v*.008),x*.85,4.7+(p.height||0)*.25),look=C.world(s+17+p.v*.04,x*.55,1.7+(p.height||0)*.35);
+    const T=KartGL,C=race.course,v=KartMotion.view(p,alpha),s=v.s,x=v.x;
+    const behind=C.world(s-(8.6+v.v*.008),x*.85,4.7+Math.max(0,v.height)*.25),look=C.world(s+17+v.v*.04,x*.55,1.7+Math.max(0,v.height)*.35);
     const target=new T.Vector3(behind.x,behind.y,behind.z),aim=new T.Vector3(look.x,look.y,look.z);
-    if(!view.cameraPos||Math.abs(s-(view.cameraS||0))>100){view.cameraPos=target;view.cameraLook=aim;}else{view.cameraPos.lerp(target,reducedMotion?.8:.36);view.cameraLook.lerp(aim,.4);}
+    if(!view.cameraPos||Math.abs(s-(view.cameraS||0))>100){view.cameraPos=target;view.cameraLook=aim;}else{view.cameraPos.lerp(target,GameFeel.blend(reducedMotion?.8:.36));view.cameraLook.lerp(aim,GameFeel.blend(.4));}
     view.cameraS=s;view.camera.position.copy(view.cameraPos);view.camera.lookAt(view.cameraLook);
-    this.skyMesh.position.copy(view.cameraPos);
-    const fov=58+Math.min(5,p.v/30)+(p.turbo&&!reducedMotion?4:0);if(Math.abs(view.camera.fov-fov)>.05){view.camera.fov=lerp(view.camera.fov,fov,.15);view.camera.updateProjectionMatrix();}
+    this.skyMesh.position.copy(view.cameraPos);this.skyMesh.updateMatrixWorld();
+    const fov=58+Math.min(5,p.v/30)+(p.turbo&&!reducedMotion?4:0);if(Math.abs(view.camera.fov-fov)>.05){view.camera.fov=lerp(view.camera.fov,fov,GameFeel.blend(.15));view.camera.updateProjectionMatrix();}
   },
   draw(race,alpha){
     if(!this.init()){
@@ -299,6 +298,10 @@ const Kart3D={
     if(this.race!==race)this.build(race);this.syncSize();this.animate(race,alpha);
     const players=race.online?race.racers.filter(r=>r.human).sort((a,b)=>(b===race.player?1:0)-(a===race.player?1:0)):[race.player],rects=KartRender.viewports(players.length),renderer=this.renderer;
     this.lastViewports=rects;
+    // Four cameras share the same world transforms. Recompute the scene graph
+    // once per frame; only the sky follows each individual camera afterward.
+    this.scene.matrixWorldAutoUpdate=players.length===1&&!race.online;
+    if(!this.scene.matrixWorldAutoUpdate)this.scene.updateMatrixWorld();
     if(players.length===1&&!race.online){renderer.setScissorTest(false);renderer.setViewport(0,0,renderer.domElement.width,renderer.domElement.height);renderer.render(this.scene,this.camera);KartRender.hud(race);return;}
     const k=renderer.domElement.width/W;renderer.setScissorTest(true);
     // One world and one GL context; only cameras and viewports multiply.

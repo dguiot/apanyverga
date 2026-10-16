@@ -59,7 +59,10 @@ const KartMusic={
 // Quiet mechanical engine and filtered tyre noise, without the old sawtooth buzz.
 Object.assign(KartSound,{
   effect(type){const a=Audio8;if(!a.ready)return;const t=a.ctx.currentTime;
-    if(type==='hit'||type==='land')KartMusic.drum(a.ctx,a.sfxGain,t,'kick',type==='hit'?.35:.12);
+    if(type.startsWith('drift')){const tier=Number(type.slice(-1));KartMusic.note(a.ctx,a.sfxGain,t,73+tier*4,.1,.055,'sine',3200);KartMusic.note(a.ctx,a.sfxGain,t+.035,80+tier*4,.13,.03,'sine',4000);}
+    else if(type==='boost'){a.noise(.17,.055,1300,.5,0,'bandpass',null,4200);KartMusic.note(a.ctx,a.sfxGain,t,69,.15,.04,'triangle',2400);}
+    else if(type==='parry'){a.tone('sine',1100,2100,.12,.07);a.noise(.06,.04,4500,.8);}
+    else if(type==='hit'||type==='land')KartMusic.drum(a.ctx,a.sfxGain,t,'kick',type==='hit'?.35:.12);
     else if(type==='swing')KartMusic.drum(a.ctx,a.sfxGain,t,'hat',.5);
     else{const midi=type==='back'?58:type==='jump'?76:84;KartMusic.note(a.ctx,a.sfxGain,t,midi,.16,.065,'sine',2400);if(type==='confirm')KartMusic.note(a.ctx,a.sfxGain,t+.065,midi+7,.2,.045,'sine',2400);}
   },
@@ -71,7 +74,7 @@ Object.assign(KartSound,{
       this.roadGain=a.ctx.createGain();this.roadGain.gain.value=0;this.road.connect(this.roadFilter);this.roadFilter.connect(this.roadGain);this.roadGain.connect(a.sfxGain);this.road.start();
     }
     const r=race.player;this.node.frequency.setTargetAtTime(31+r.v*.64,a.ctx.currentTime,.08);this.gain.gain.setTargetAtTime(.018+r.v*.00018,a.ctx.currentTime,.1);
-    this.roadFilter.frequency.setTargetAtTime(r.drift?1350:580,a.ctx.currentTime,.12);this.roadGain.gain.setTargetAtTime((r.drift?.045:.008)*Math.min(1,r.v/70),a.ctx.currentTime,.1);
+    this.roadFilter.frequency.setTargetAtTime(r.drift?1350:580,a.ctx.currentTime,.12);this.roadGain.gain.setTargetAtTime((r.height>.15?.001:r.drift?.045:.008)*Math.min(1,r.v/70),a.ctx.currentTime,.1);
   },
   stop(){for(const name of ['node','road'])if(this[name]){try{this[name].stop();this[name].disconnect();}catch(e){}this[name]=null;}for(const name of ['gain','roadGain','roadFilter'])if(this[name]){try{this[name].disconnect();}catch(e){}this[name]=null;}},
 });

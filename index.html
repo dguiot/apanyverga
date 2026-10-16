@@ -930,8 +930,8 @@ const ART = {
     if (typeof document !== 'undefined' && document.hidden) return;
     this.win.push(dt); this.winMs += dt;
     if (this.winMs < 1500 || this.win.length < 20) return; // ventanas de 1.5 s (en un equipo lento son pocos cuadros)
-    const s = this.win.sort((a, b) => a - b), med = s[s.length >> 1]; this.win = []; this.winMs = 0;
-    if (med < 19) { this.slowWins = 0; return; } // la mitad de los cuadros llega a tiempo: bien
+    const s = this.win.sort((a, b) => a - b), med = s[s.length >> 1], p90 = s[Math.floor(s.length * .9)]; this.win = []; this.winMs = 0;
+    if (med < 19 && p90 < 30) { this.slowWins = 0; return; } // también detectar tirones repetidos aunque la mediana sea buena
     if (++this.slowWins < 2) return;             // 3 s seguidos lento
     this.slowWins = 0;
     if (this.hi) this.hi = false;
@@ -1015,6 +1015,7 @@ function bindList(dev, action) { const m = Binds.forDev(dev); return (m[action] 
 // ---------- teclado ----------
 const keysDown = new Set();
 const keysTapped = new Set(); // pulsadas desde el último sondeo (no perder toques rápidos)
+const keyPulses = new Set(); // atajos nativos: sobreviven al sondeo de dispositivos hasta terminar el paso
 const keyOrder = new Map(); let keySeq = 0; // la última tecla pulsada gana (← y → a la vez)
 const Capture = { active: false, dev: null, action: null, t: 0, result: null, cancel: false, baseB: null, baseA: null };
 window.addEventListener('keydown', e => {
@@ -1027,11 +1028,11 @@ window.addEventListener('keydown', e => {
   if (Capture.active && e.code === 'Escape') { e.preventDefault(); Capture.cancel = true; return; }
   if (GAME_KEYS.has(e.code) || e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault();
   if (typeof TVBOX !== 'undefined' && TVBOX.holdKey(e)) return; // Xbox: la tecla puede ser el mismo botón del control
-  if (!e.repeat) { keysTapped.add(e.code); keyOrder.set(e.code, ++keySeq); }
+  if (!e.repeat) { keysTapped.add(e.code); keyPulses.add(e.code); keyOrder.set(e.code, ++keySeq); }
   keysDown.add(e.code);
 });
 window.addEventListener('keyup', e => { if (typeof TVBOX !== 'undefined' && TVBOX.holdKey(e, true)) return; keysDown.delete(e.code); });
-window.addEventListener('blur', () => keysDown.clear());
+window.addEventListener('blur', () => { keysDown.clear(); keysTapped.clear(); keyPulses.clear(); });
 
 function blankState() {
   return { x: 0, y: 0, cx: 0, cy: 0, attack: false, special: false, jump: false, shield: false, grab: false, smash: false, start: false, any: false, tapJump: true, digital: false };
@@ -1386,9 +1387,9 @@ window.addEventListener('blur', () => Rumble.stopAll());
 const _keyPrev = new Set();
 function keyEdge(dev, code) {
   if (dev !== 'kb1') return false;
-  return keysDown.has(code) && !_keyPrev.has(code);
+  return keyPulses.has(code) || keysDown.has(code) && !_keyPrev.has(code);
 }
-function endFrameKeys() { _keyPrev.clear(); for (const k of keysDown) _keyPrev.add(k); }
+function endFrameKeys() { _keyPrev.clear(); for (const k of keysDown) _keyPrev.add(k); keyPulses.clear(); }
 Binds.load();
 
 // ---- js/touch.js ----
@@ -1953,19 +1954,19 @@ const Audio8 = {
       case 'hit': {
         const p = clamp(k, 0.2, 3);
         this.noise(0.08 + p * 0.05, 0.35 + p * 0.1, 900 + p * 500, 0.8);
-        this.tone('square', 180 + p * 40, 50, 0.1 + p * 0.06, 0.18 + p * 0.06);
-        if (p > 1.5) this.tone('sawtooth', 90, 30, 0.35, 0.25);
+        this.tone('sine', 170 + p * 24, 45, 0.09 + p * 0.025, 0.18 + p * 0.035);
+        this.noise(.025, .12, 3200, .7);
         break;
       }
       case 'bighit':
         this.noise(0.4, 0.6, 700, 0.6, 0, 'lowpass', null, 200);
-        this.tone('sawtooth', 140, 35, 0.5, 0.35);
-        this.tone('square', 900, 200, 0.15, 0.12);
+        this.tone('sine', 130, 32, .24, .38);
+        this.noise(.035, .2, 3500, .6);
         break;
       case 'swing': this.noise(0.12, 0.12 * k, 2400, 1.4, 0, 'bandpass', null, 900); break;
-      case 'jump': this.tone('square', 260, 520, 0.1, 0.08); break;
-      case 'djump': this.tone('square', 330, 700, 0.12, 0.08); break;
-      case 'land': this.noise(0.06, 0.12, 400, 1); break;
+      case 'jump': this.noise(.07, .045, 1700, .6, 0, 'bandpass', null, 3000); this.tone('sine', 240, 420, .065, .035); break;
+      case 'djump': this.noise(.09, .055, 2100, .7, 0, 'bandpass', null, 3800); this.tone('sine', 330, 620, .09, .045); break;
+      case 'land': this.noise(.035 + .035 * k, .035 + .075 * k, 420, .7); this.tone('sine', 105, 48, .055, .025 + .045 * k); break;
       case 'shield': this.tone('triangle', 900, 1400, 0.08, 0.12); break;
       case 'shieldbreak': this.tone('square', 600, 80, 0.8, 0.2); this.noise(0.5, 0.3, 3000, 0.5); break;
       case 'dodge': this.noise(0.1, 0.1, 3500, 2); break;
@@ -6921,6 +6922,7 @@ STAGE_DEFS.stadium = (opts = {}) => {
 //  Solo cambia cómo se ven; la geometría y los eventos no se tocan.
 // ============================================================
 const SC = {
+  moteCache: new WeakMap(),
   // ---- texturas ----
   rockTex(key, base, dark, light, strata = 0.06) {
     const B = parseColor(base), D = parseColor(dark), L = parseColor(light);
@@ -7017,7 +7019,7 @@ const SC = {
     c.restore();
   },
   // partículas ambientales en pantalla (polvo de luz, ceniza, lluvia...)
-  motes(st, n, make) { if (!st._motes) st._motes = Array.from({ length: n }, (_, i) => make(i, true)); return st._motes; },
+  motes(st, n, make) { let ps = this.moteCache.get(st); if (!ps) { ps = Array.from({ length: n }, (_, i) => make(i, true)); this.moteCache.set(st, ps); } return ps; },
 };
 
 // ================================================================
@@ -7205,9 +7207,9 @@ SCENERY.temple = {
   drawFG(c) {
     // pétalos que el viento arrastra
     const ps = SC.motes(this, 26, (i) => ({ x: rand(-900, 900), y: rand(-700, 200), vx: rand(0.3, 1.2), vy: rand(0.4, 1), r: rand(2.5, 4.5), a: rand(0, TAU), sp: rand(0.02, 0.06) }));
-    const wind = this.wind > 0 ? this.windDir * 6 : 0;
+    const wind = this.wind > 0 ? this.windDir * 6 : 0, step = GameFeel.dt * 60;
     for (const p of ps) {
-      p.x += p.vx + wind; p.y += p.vy; p.a += p.sp;
+      p.x += (p.vx + wind) * step; p.y += p.vy * step; p.a += p.sp * step;
       if (p.y > 300 || p.x > 1100 || p.x < -1100) { p.y = rand(-800, -500); p.x = rand(-1000, 900); }
       c.save(); c.translate(p.x, p.y); c.rotate(p.a); c.scale(1, 0.55 + Math.sin(p.a * 2) * 0.35);
       c.fillStyle = 'rgba(255,214,222,.9)'; c.beginPath(); c.ellipse(0, 0, p.r, p.r * 0.6, 0, 0, TAU); c.fill();
@@ -7284,17 +7286,18 @@ SCENERY.volcano = {
     ART.drawLayer(c, spires, cam, 0.16, 80, { yk: 1.4 });
     // brasas que suben y ceniza que cae
     const em = SC.motes(this, 60, i => ({ x: rand(0, W), y: rand(0, H), v: rand(0.4, 1.6), s: rand(1, 2.6), ash: i % 3 === 0 }));
+    const step = GameFeel.dt * 60;
     c.save(); c.globalCompositeOperation = 'lighter';
     for (const e of em) {
       if (e.ash) continue;
-      e.y -= e.v * (erupt ? 2.2 : 1); e.x += Math.sin((t + e.y) * 0.02) * 0.4;
+      e.y -= e.v * (erupt ? 2.2 : 1) * step; e.x += Math.sin((t + e.y) * 0.02) * 0.4 * step;
       if (e.y < -10) { e.y = H + 10; e.x = rand(0, W); }
       c.fillStyle = `rgba(255,${150 + (e.s * 30 | 0)},60,${0.5 + Math.sin(t * 0.2 + e.x) * 0.3})`;
       c.fillRect(e.x, e.y, e.s, e.s);
     }
     c.restore();
     c.fillStyle = 'rgba(160,140,140,.35)';
-    for (const e of em) { if (!e.ash) continue; e.y += e.v * 0.5; e.x -= 0.3; if (e.y > H) { e.y = -5; e.x = rand(0, W + 200); } c.fillRect(e.x, e.y, 1.6, 1.6); }
+    for (const e of em) { if (!e.ash) continue; e.y += e.v * 0.5 * step; e.x -= 0.3 * step; if (e.y > H) { e.y = -5; e.x = rand(0, W + 200); } c.fillRect(e.x, e.y, 1.6, 1.6); }
   },
   drawStage(c) {
     const s = this.solids[0], t = this.t;
@@ -9149,6 +9152,7 @@ function applyHit(att, t, hit, dir, opts = {}) {
     if (hit.sleep && (t.grounded || hit.trap)) { t.setState('dizzy'); t.sf = Math.max(0, 150 - hit.sleep); spawnFx('zzz', t.x, t.y - 120 * t.size(), { life: 50 }); }
     // resbalón: al piso
     else if (hit.trip && t.grounded) { t.setState('down'); t.vx = dir * 2; spawnFx('drop', t.x, t.y - 20, { life: 30 }); }
+    t.updatePose();
     return true;
   }
   let a = hit.ang * Math.PI / 180;
@@ -9171,6 +9175,7 @@ function applyHit(att, t, hit, dir, opts = {}) {
   // salir volando devuelve las herramientas para regresar: especial hacia arriba, esquive y un salto
   if (t.tumble) { t.airUsed = {}; if (t.jumps < 1 && t.ch.jumps > 1) t.jumps = 1; }
   t.setState('hitstun');
+  t.updatePose(); // the victim reacts on the same frame that the hit connects
   spawnFx('impact', px, py, { col, r: 16 + dmg * 1.6 + kb * 0.8, ang: Math.atan2(ly, lx) });
   if (B && kb > 12) B.camKick = Math.max(B.camKick || 0, Math.min(0.075, kb * 0.0022));
   // golpe que seguramente saca del escenario: un instante en cámara lenta
@@ -9296,7 +9301,8 @@ function nearestTarget(p) {
 function drawProjectiles(c) {
   for (const p of BATTLE.projectiles) {
     if (p.delay > 0) continue;
-    c.save(); c.translate(p.x, p.y);
+    const visual = FightView.point(p);
+    c.save(); c.translate(visual.x, visual.y);
     switch (p.type) {
       case 'shuriken':
         c.rotate(p.t * 0.6);
@@ -9534,7 +9540,8 @@ function drawItems(c) {
   for (const it of BATTLE.items) {
     if (it.holder) continue;
     if (it.groundT > 780 && Math.floor(it.t / 4) % 2) continue;
-    c.save(); c.translate(it.x, it.y);
+    const visual = FightView.point(it);
+    c.save(); c.translate(visual.x, visual.y);
     if (it.type === 'orb') {
       const pulse = 1 + Math.sin(it.t * 0.2) * 0.08;
       ART.drawGlow(c, 0, 0, 90 * pulse, '#ff7a1a', 0.7);
@@ -10056,7 +10063,11 @@ class Fighter {
     if (this.bigTime > 0) { this.bigTime--; if (this.bigTime === 0) Audio8.sfx('shrink'); }
     this.scale = approach(this.scale, this.bigTime > 0 ? 1.45 : (this.baseScale || 1), 0.03);
     if (this.state !== 'shield') this.shieldHP = Math.min(100, this.shieldHP + 0.16);
-    if (this.hitlag > 0) { this.hitlag--; return; }
+    if (this.hitlag > 0) {
+      // A fresh command during contact freeze survives until control returns.
+      for (const b of ['jump', 'attack', 'special', 'grab', 'shield', 'smash']) if (this.ctrl.buffer[b] > 0 && this.ctrl.buffer[b] <= (BUFFER[b] || 5)) this.ctrl.buffer[b]--;
+      this.hitlag--; return;
+    }
     this.sf++; this.stateT++;
     if (this.flipT > 0) this.flipT--;
     if (this.stretch > 0) this.stretch = Math.max(0, this.stretch - 0.12);
@@ -10125,7 +10136,7 @@ class Fighter {
         if (c.buffered('special', 3) && c.y < -0.5) { c.consume('special'); this.special(); return; }
         // golpe durante el impulso: salto corto y el golpe sale al despegar
         if (!this.jsQueue && !this.jumpFromTap) { if (c.buffered('attack', 3)) { c.consume('attack'); this.jsQueue = 'attack'; } else if (c.buffered('special', 3)) { c.consume('special'); this.jsQueue = 'special'; } }
-        if (this.sf >= 4) {
+        if (this.sf >= 3) {
           const q = this.jsQueue; this.jsQueue = null;
           const full = !q && (c.held('jump') || (this.jumpFromTap && c.y < -0.5));
           const crouchK = abil(this).crouchJump && (this.crouchT || 0) >= 24 ? abil(this).crouchJump : 1; this.crouchT = 0;
@@ -10724,7 +10735,7 @@ class Fighter {
       }
     }
     // aterrizaje
-    const wasGrounded = this.grounded;
+    const wasGrounded = this.grounded, landingSpeed = this.vy + this.ly;
     if (!this.grounded && ny >= this.y - 0.01) {
       let best = null;
       for (const so of st.surfaces()) {
@@ -10754,11 +10765,15 @@ class Fighter {
       } else ny = so.y;
     }
     this.x = nx; this.y = ny;
-    if (!wasGrounded && this.grounded) Audio8.sfx('land');
+    if (!wasGrounded && this.grounded) Audio8.sfx('land', clamp(Math.abs(landingSpeed) / 16, .2, 1));
   }
   land(so) {
     this.coyoteT = 0;
     const prevVy = this.vy + this.ly;
+    if (!BATTLE.resim) {
+      const force = clamp(Math.abs(prevVy) / 22, 0, 1);
+      Rumble.play(Rumble.devOf(this), .04 + force * .18, .08 + force * .1, 40 + force * 45);
+    }
     this.grounded = true; this.surface = so; this.vy = 0; this.fastFall = false;
     this.jumps = this.ch.jumps - 1; this.airUsed = {};
     if (this.state === 'hitstun') {
@@ -10886,28 +10901,28 @@ class Fighter {
   // ---------- dibujo ----------
   draw(c) {
     if (this.dead || this.hidden) return;
-    const s = this.size();
+    const s = this.size(), visual = FightView.fighter(this);
     if (this.state === 'respawn') {
       c.fillStyle = withAlpha(this.color, 0.5);
-      c.beginPath(); c.ellipse(this.x, this.y + 4, 48, 10, 0, 0, TAU); c.fill();
+      c.beginPath(); c.ellipse(visual.x, visual.y + 4, 48, 10, 0, 0, TAU); c.fill();
       c.strokeStyle = '#fff'; c.lineWidth = 3; c.stroke();
     }
     // sombra en el suelo
     if (!this.grounded && BATTLE) {
-      const fy = BATTLE.stage.floorY(this.x);
-      if (this.x > BATTLE.stage.left && this.x < BATTLE.stage.right && fy > this.y) {
-        c.fillStyle = 'rgba(0,0,0,.18)'; c.beginPath(); c.ellipse(this.x, fy, 22 * s * clamp(1 - (fy - this.y) / 600, 0.3, 1), 5, 0, 0, TAU); c.fill();
+      const fy = BATTLE.stage.floorY(visual.x);
+      if (visual.x > BATTLE.stage.left && visual.x < BATTLE.stage.right && fy > visual.y) {
+        c.fillStyle = 'rgba(0,0,0,.18)'; c.beginPath(); c.ellipse(visual.x, fy, 22 * s * clamp(1 - (fy - visual.y) / 600, 0.3, 1), 5, 0, 0, TAU); c.fill();
       }
     }
     // aura del golpe final
     if (this.finalReady) {
-      const g = c.createRadialGradient(this.x, this.y - 50 * s, 10, this.x, this.y - 50 * s, 90 * s);
+      const g = c.createRadialGradient(visual.x, visual.y - 50 * s, 10, visual.x, visual.y - 50 * s, 90 * s);
       g.addColorStop(0, 'rgba(255,190,11,0.0)'); g.addColorStop(0.6, `rgba(255,190,11,${0.3 + Math.sin(performance.now() / 80) * 0.15})`); g.addColorStop(1, 'rgba(230,57,70,0)');
-      c.fillStyle = g; c.beginPath(); c.arc(this.x, this.y - 50 * s, 90 * s, 0, TAU); c.fill();
+      c.fillStyle = g; c.beginPath(); c.arc(visual.x, visual.y - 50 * s, 90 * s, 0, TAU); c.fill();
     }
-    const shakeX = this.hitlag > 0 && this.flinch > 0 ? rand(-3, 3) : 0;
+    const shakeX = !reducedMotion && this.hitlag > 0 && this.flinch > 0 ? FightView.noise((BATTLE.t + GameFeel.alpha) * 2, this.port + 501) * 2.5 : 0;
     c.save();
-    c.translate(this.x + shakeX, this.y);
+    c.translate(visual.x + shakeX, visual.y);
     if ((this.invuln > 0 && this.state !== 'attack' && this.state !== 'respawn' && Math.floor(this.invuln / 3) % 2) || this.state === 'dodge' || this.state === 'airdodge') c.globalAlpha = 0.55;
     if (BATTLE && BATTLE.mods && BATTLE.mods.ghosts && !['attack', 'hitstun', 'grabbed', 'holding'].includes(this.state) && !this.flinch) c.globalAlpha = 0.12;
     c.scale(this.face * s, s);
@@ -10920,7 +10935,7 @@ class Fighter {
     const item = this.item;
     // el mariachi saca la guitarra de la espalda para los golpes que la usan
     const gOut = this.id === 'mariachi' && !item && this.state === 'attack' && this.move && this.move.def && (this.move.def.guitar || animFor(this, this.move).limb === 'guitar');
-    ART.drawLit(c, this.port, [-160, -270, 160, 60], cc => drawCharacter(cc, this.id, this.pose, {
+    ART.drawLit(c, this.port, [-160, -270, 160, 60], cc => drawCharacter(cc, this.id, visual.pose, {
       outline, flip: this.face < 0, headScale: BATTLE && BATTLE.mods && BATTLE.mods.bigHeads ? 1.9 : 1, guitarOut: gOut,
       onHand: item ? (cc, hx, hy, ang) => {
         cc.save(); cc.translate(hx, hy);
@@ -10937,7 +10952,7 @@ class Fighter {
     // escudo
     if (this.state === 'shield') {
       // burbuja de energía: centro transparente, borde brillante, reflejo; destella en la ventana de parry
-      const r = (26 + this.shieldHP * 0.38) * s, cx = this.x, cy = this.y - 60 * s, pw = this.sf <= PHYS.parry;
+      const r = (26 + this.shieldHP * 0.38) * s, cx = visual.x, cy = visual.y - 60 * s, pw = this.sf <= PHYS.parry;
       const g = c.createRadialGradient(cx, cy, r * 0.2, cx, cy, r);
       g.addColorStop(0, withAlpha(this.color, 0.04)); g.addColorStop(0.7, withAlpha(this.color, 0.16)); g.addColorStop(1, withAlpha(this.color, 0.5));
       c.fillStyle = g; c.beginPath(); c.arc(cx, cy, r, 0, TAU); c.fill();
@@ -10947,11 +10962,11 @@ class Fighter {
       if (pw) ART.drawGlow(c, cx, cy, r * 1.6, '#ffffff', 0.35);
       if (this.shieldHP < 35) { c.strokeStyle = 'rgba(255,90,90,.7)'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(cx - r * 0.3, cy - r * 0.5); c.lineTo(cx, cy - r * 0.1); c.lineTo(cx - r * 0.1, cy + r * 0.3); c.moveTo(cx, cy - r * 0.1); c.lineTo(cx + r * 0.4, cy + r * 0.05); c.stroke(); }
     }
-    if (this.state === 'dizzy') for (let i = 0; i < 3; i++) { const a = performance.now() / 200 + i * 2.1; drawStar(c, this.x + Math.cos(a) * 26, this.y - 128 * s + Math.sin(a) * 6, 7, 3, '#ffd166'); }
+    if (this.state === 'dizzy') for (let i = 0; i < 3; i++) { const a = performance.now() / 200 + i * 2.1; drawStar(c, visual.x + Math.cos(a) * 26, visual.y - 128 * s + Math.sin(a) * 6, 7, 3, '#ffd166'); }
     // reflector / contraataque
     if (this.state === 'attack' && (this.inReflect() || this.inCounter())) {
       c.strokeStyle = this.inCounter() ? 'rgba(241,245,249,.8)' : 'rgba(72,202,228,.85)'; c.lineWidth = 4;
-      c.beginPath(); for (let i = 0; i < 6; i++) { const a = i / 6 * TAU + performance.now() / 300; c.lineTo(this.x + Math.cos(a) * 56 * s, this.y - 56 * s + Math.sin(a) * 56 * s); } c.closePath(); c.stroke();
+      c.beginPath(); for (let i = 0; i < 6; i++) { const a = i / 6 * TAU + performance.now() / 300; c.lineTo(visual.x + Math.cos(a) * 56 * s, visual.y - 56 * s + Math.sin(a) * 56 * s); } c.closePath(); c.stroke();
     }
     // haz de Daniel
     if (this.move && this.move.v.beam) {
@@ -10961,10 +10976,10 @@ class Fighter {
       c.fillStyle = g; c.fillRect(r.x, r.y + Math.sin(performance.now() / 30) * 4, r.w, r.h);
     }
     // indicador de jugador
-    const tagY = this.y - (this.state === 'ledge' ? 128 : 150) * s;
+    const tagY = visual.y - (this.state === 'ledge' ? 128 : 150) * s;
     c.fillStyle = this.color;
-    c.beginPath(); c.moveTo(this.x - 8, tagY); c.lineTo(this.x + 8, tagY); c.lineTo(this.x, tagY + 10); c.closePath(); c.fill();
-    text(this.cpu ? 'CPU' : (this.label || PLAYER_TAGS[this.port]), this.x, tagY - 12, 15, this.color, { stroke: '#10131a', strokeW: 4 });
+    c.beginPath(); c.moveTo(visual.x - 8, tagY); c.lineTo(visual.x + 8, tagY); c.lineTo(visual.x, tagY + 10); c.closePath(); c.fill();
+    text(this.cpu ? 'CPU' : (this.label || PLAYER_TAGS[this.port]), visual.x, tagY - 12, 15, this.color, { stroke: '#10131a', strokeW: 4 });
   }
 }
 
@@ -11691,7 +11706,7 @@ const Net = {
     setup.players.forEach((p, i) => { if (p.team === undefined || p.team === null) p.team = i % 2; });
     const enc = { pl: setup.players.map(p => [p.port, CHAR_ORDER.indexOf(p.char), p.cpu || 0, p.remote || (p.cpu ? null : ''), p.team || 0]), stg: STAGE_INFO.findIndex(s => s.id === setup.stage), ru: this.encRules(setup.rules), py: setup.party ? PARTY.findIndex(p => p.id === setup.party) : -1 };
     const peers = [...new Set(setup.players.filter(p => !p.cpu && p.remote).map(p => p.remote))];
-    const rb = this.rollbackChoice() !== '0' && window.APYV_WEB && peers.length && this.room && typeof this.room.fastReady === 'function' && this.room.fastReady(peers) && peers.every(p => this.presOf(p)?.rbc === 1);
+    const rb = this.rollbackChoice() !== '0' && window.APYV_WEB && peers.length && this.room && typeof this.room.fastReady === 'function' && this.room.fastReady(peers) && peers.every(p => this.presOf(p)?.rbc === RB_COMPAT);
     setup.rollback = !!rb; enc.rb = rb ? 1 : 0;
     if (rb) { setup.seed = (Math.random() * 4294967296) >>> 0; enc.sd = setup.seed; }
     else delete setup.seed;
@@ -11845,7 +11860,7 @@ const Net = {
   // ---------- cada fotograma ----------
   tick() {
     if (!this.ok) return;
-    const cap = window.APYV_WEB && this.room && typeof this.room.fastReady === 'function' && this.rollbackChoice() !== '0' ? 1 : 0;
+    const cap = window.APYV_WEB && this.room && typeof this.room.fastReady === 'function' && this.rollbackChoice() !== '0' ? RB_COMPAT : 0;
     if (this.rbCap !== cap) { this.rbCap = cap; this.set({ rbc: cap }); }
     if (this.role === 'host') {
       if (['modesel', 'charsel', 'stagesel'].includes(APP.screen)) { this.syncSlots(); this.publishLobby({ ph: 'lobby' }); }
@@ -12404,11 +12419,11 @@ class Battle {
     this.cam.x = lerp(this.cam.x, cx, 0.08);
     this.cam.y = lerp(this.cam.y, cy, 0.08);
   }
-  worldToScreen(x, y) { const c = this.cam; return [(x - c.x) * c.z + W / 2, (y - c.y) * c.z + H / 2]; }
+  worldToScreen(x, y) { const c = FightView.camera(this); return [(x - c.x) * c.z + W / 2, (y - c.y) * c.z + H / 2]; }
 
   // ---------- dibujo ----------
   draw() {
-    const c = ctx, cam = this.cam, st = this.stage;
+    const c = ctx, cam = FightView.camera(this), st = this.stage;
     ART.light = st.light || null;
     if (ART.lite) {
       // modo ligero: el fondo (cielo, nubes, montañas: lo que más pixeles pinta) a media resolución y estirado.
@@ -12422,7 +12437,8 @@ class Battle {
       c.drawImage(ART.bgCv, 0, 0, W, H);
     } else st.drawBG(c, cam);
     c.save();
-    const sx = this.shake ? rand(-this.shake, this.shake) : 0, sy = this.shake ? rand(-this.shake, this.shake) : 0;
+    const amp = reducedMotion ? 0 : this.shake, clock = (this.t + (this.paused ? 0 : GameFeel.alpha)) * 1.7;
+    const sx = amp * FightView.noise(clock, 71), sy = amp * FightView.noise(clock, 197);
     const z = cam.z * (1 + (this.camKick || 0));
     c.translate(W / 2 + sx, H / 2 + sy); c.scale(z, z); c.translate(-cam.x, -cam.y);
     st.drawStage(c);
@@ -12432,7 +12448,8 @@ class Battle {
     // sombras de contacto
     for (const f of this.fighters) {
       if (f.dead || f.hidden || !f.grounded) continue;
-      c.fillStyle = 'rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(f.x, f.y + 1, 26 * f.size(), 6, 0, 0, TAU); c.fill();
+      const v = FightView.fighter(f);
+      c.fillStyle = 'rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(v.x, v.y + 1, 26 * f.size(), 6, 0, 0, TAU); c.fill();
     }
     const order = this.fighters.slice().sort((a, b) => (a.cpu ? 0 : 1) - (b.cpu ? 0 : 1));
     for (const f of order) f.draw(c);
@@ -12523,7 +12540,7 @@ class Battle {
     const c = ctx;
     for (const f of this.fighters) {
       if (f.dead || f.stocks <= 0 || f.hidden) continue;
-      const [x, y] = this.worldToScreen(f.x, f.y - 56);
+      const v = FightView.fighter(f), [x, y] = this.worldToScreen(v.x, v.y - 56);
       const top = hudOnTop();
       if (x > -10 && x < W + 10 && y > (top ? 100 : -10) && y < (top ? H + 10 : H - 100)) continue;
       const bx = clamp(x, 60, W - 60), by = clamp(y, top ? 160 : 60, top ? H - 60 : H - 160);
@@ -12540,7 +12557,7 @@ class Battle {
   drawFighterLabels() {
     for (const f of this.fighters) {
       if (f.dead || f.hidden || f.stocks <= 0) continue;
-      const [x, y] = this.worldToScreen(f.x, f.y - 125 * f.size());
+      const v = FightView.fighter(f), [x, y] = this.worldToScreen(v.x, v.y - 125 * f.size());
       if (x < 30 || x > W - 30 || y < 80 || y > H - 110) continue;
       const local = !f.cpu && (Net.role === 'off' || f.avPeer === Net.myPeer());
       const tag = f.cpu ? 'CPU ' + (f.port + 1) : local ? 'TÚ · J' + (f.port + 1) : 'J' + (f.port + 1);
@@ -12782,6 +12799,9 @@ class RBStateCodec {
 // ---- js/rollback.js ----
 // Cada pantalla simula con entradas cuantizadas; el anfitrión decide eventos y resultados.
 const RB_WINDOW = 8, RB_NEUTRAL = [0, 0, 0, 0, 0];
+// Gameplay compatibility, independent of transport. Older open tabs fall back
+// to host-authoritative play instead of predicting different jump/buffer rules.
+const RB_COMPAT = 2;
 const rbSame = (a, b) => a && b && a.every((x, i) => x === b[i]);
 class RollbackSession {
   constructor(battle, opts) {
@@ -12793,7 +12813,7 @@ class RollbackSession {
       return (Devices.ctrls[f.dev] || Devices.ctrls[Net.localDev] || {}).cur || blankState();
     });
     this.send = opts.send || ((k, v, to, reliable) => reliable ? Net.room.stateSend(k, v, to) : Net.room.fastSend(k, v, to));
-    this.real = new Map(); this.used = new Map(); this.lastHeard = new Map(); this.captured = new Map();
+    this.real = new Map(); this.used = new Map(); this.lastHeard = new Map(); this.captured = new Map(); this.pendingRead = new Map(); this.delayLowerAt = null;
     this.snapshots = new Map(); this.hashes = new Map(); this.events = new Map(); this.cpuAt = new Map();
     this.rollbackFrom = null; this.running = false; this.stopped = false; this.off = [];
     this.metrics = { rollbacks: 0, resimFrames: 0, resimMs: 0, saveMs: 0, stalls: 0 };
@@ -12822,8 +12842,18 @@ class RollbackSession {
       if (this.cpuAt.has(p)) continue;
       const f = this.frame + this.delay, entries = this.real.get(p);
       const last = this.captured.get(p);
+      const current = this.read(p), pending = this.pendingRead.get(p), state = { ...current };
+      if (pending) {
+        for (const key of BUTTONS) state[key] = !!(current[key] || pending[key]);
+        if (!current.cx && !current.cy) { state.cx = pending.cx; state.cy = pending.cy; }
+      }
+      // Reducing input delay (or waiting for a missing packet) may revisit an
+      // already published future frame. Keep that frame immutable and retain
+      // short button presses for the next new frame.
+      if (last !== undefined && f <= last) { this.pendingRead.set(p, state); this.send('ri', this.inputMessage(p, last)); continue; }
       if (last !== undefined) for (let n = last + 1; n < f; n++) entries.set(n, entries.get(last) || RB_NEUTRAL);
-      if (!entries.has(f)) entries.set(f, ReplayCtrl.pack(this.read(p)));
+      if (!entries.has(f)) entries.set(f, ReplayCtrl.pack(state));
+      this.pendingRead.delete(p);
       this.captured.set(p, f); this.send('ri', this.inputMessage(p, f));
     }
   }
@@ -12957,6 +12987,12 @@ class RollbackSession {
       this.receive('rcpu', event, this.hostPeer); this.send('rcpu', event, undefined, true);
     }
   }
+  tuneDelay() {
+    const rtt = Math.max(0, ...this.rtts.values()), desired = rtt > 300 || this.resimAvg > 12 ? 4 : rtt > 200 || this.resimAvg > 6 ? 3 : 2;
+    if (desired >= this.delay) { this.delay = desired; this.delayLowerAt = null; }
+    else if (this.delayLowerAt === null) this.delayLowerAt = this.now();
+    else if (this.now() - this.delayLowerAt >= 3000) { this.delay--; this.delayLowerAt = this.now(); }
+  }
   tick() {
     if (this.stopped) return;
     this.ticks++;
@@ -12967,8 +13003,7 @@ class RollbackSession {
       for (const peer of peers) { const id = ++this.pingSeq; this.pings.set(id, { peer, at: this.now() }); this.send('rp', { ep: this.ep, id }, peer); }
       for (const [id, p] of this.pings) if (this.now() - p.at > 5000) this.pings.delete(id);
     }
-    const rtt = Math.max(0, ...this.rtts.values());
-    this.delay = Math.max(this.delay, rtt > 300 || this.resimAvg > 12 ? 4 : rtt > 200 || this.resimAvg > 6 ? 3 : 2);
+    this.tuneDelay();
     this.capture(); this.disconnects();
     if (!this.reconcile() || this.frame - this.confirmed > RB_WINDOW) {
       this.metrics.stalls++;
@@ -19759,15 +19794,14 @@ const Kart3D={
     b.finish(root,false);return root;
   },
   animate(race,alpha){
-    const T=KartGL,C=race.course,p=race.player,s=lerp(p.ps,p.s,alpha),x=lerp(p.px,p.x,alpha),tick=race.tick!==this.particleTick;
+    KartMotion.animate(race);
+    const T=KartGL,C=race.course,p=race.player,pv=KartMotion.view(p,alpha),s=pv.s,x=pv.x,tick=race.tick!==this.particleTick;
     for(let i=0;i<race.racers.length;i++){
-      const r=race.racers[i],m=this.drivers[i],ss=lerp(r.ps,r.s,alpha),xx=lerp(r.px,r.x,alpha),w=C.world(ss,xx,r.height||0),q=C.sample(ss),angle=Math.atan2(q.tx,q.tz)+(r.yaw||r.steer*.035);
+      const r=race.racers[i],m=this.drivers[i],v=KartMotion.view(r,alpha),ss=v.s,xx=v.x,w=C.world(ss,xx,Math.max(0,v.height)),q=C.sample(ss),angle=Math.atan2(q.tx,q.tz)+v.yaw;
       m.position.set(w.x,w.y+.05+(r.rescue?Math.sin(Math.min(1,r.rescue)*Math.PI)*2:0),w.z);m.rotation.y=angle;
-      m.userData.body.rotation.z=m.userData.bike?clamp(-r.steer*r.v/170,-.48,.48):clamp(-r.lat*.045,-.14,.14);m.userData.body.position.y=Math.sin(r.s*.25)*Math.min(.022,r.v*.0003);
-      if(r.trick)m.userData.body.rotation.x=-clamp(((r.airTime||0)-(r.trickAt||0))/.6,0,1)*TAU;
-      else m.userData.body.rotation.x=0;
+      KartMotion.body(r,m);
       m.userData.head.rotation.z=r.drift?-.08*r.driftDir:0;
-      for(const wheel of m.userData.wheels){wheel.spin.rotation.x=r.s/.44;if(wheel.front)wheel.pivot.rotation.y=r.steer*.35;}
+      for(const wheel of m.userData.wheels){wheel.spin.rotation.x=ss/.44;if(wheel.front)wheel.pivot.rotation.y=v.steer*.35;}
       m.userData.shield.visible=r.shield>0||r.star>0;m.userData.shield.material.color.set(r.star>0?'#ffdc82':'#82f6ff');m.userData.shield.rotation.y=race.time*.5;
       m.visible=!(r.invuln&&Math.floor(race.time*15)%2&&!r.star);
       if(tick){this.marksFor(r,m);if(r.drift||r.turbo){const col=r.turbo?[.2,.8,1]:r.charge>2?[.9,.35,1]:r.charge>1.3?[1,.55,.1]:[.2,.7,1];
@@ -19794,21 +19828,21 @@ const Kart3D={
       if(!this.seenEffects.has(e)){this.seenEffects.add(e);for(let i=0;i<18;i++)this.particle(w,[1,.65,.2],Math.sin(i*2.4)*4,2+i%5,Math.cos(i*2.4)*4);}
     }
     for(const [e,m] of this.effectMeshes)if(!activeEffects.has(e)){this.scene.remove(m);m.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material&&!Array.from(KartModels.materials.values()).includes(o.material))o.material.dispose();});this.effectMeshes.delete(e);}
-    if(tick){const pos=this.particles.geometry.attributes.position,col=this.particles.geometry.attributes.color;
-      this.particleData.forEach((q,i)=>{q.life-=1/60;q.x+=q.vx/60;q.y+=q.vy/60;q.z+=q.vz/60;q.vy-=4/60;pos.setXYZ(i,q.life>0?q.x:0,q.life>0?q.y:-200,q.z);col.setXYZ(i,...q.color.map(c=>c*Math.max(0,q.life/.4)));});pos.needsUpdate=col.needsUpdate=true;this.particleTick=race.tick;
+    if(tick){const pos=this.particles.geometry.attributes.position,col=this.particles.geometry.attributes.color,dt=clamp(race.tick-this.particleTick,0,5)/60;
+      this.particleData.forEach((q,i)=>{q.life-=dt;q.x+=q.vx*dt;q.y+=q.vy*dt;q.z+=q.vz*dt;q.vy-=4*dt;pos.setXYZ(i,q.life>0?q.x:0,q.life>0?q.y:-200,q.z);const fade=Math.max(0,q.life/.4);col.setXYZ(i,q.color[0]*fade,q.color[1]*fade,q.color[2]*fade);});pos.needsUpdate=col.needsUpdate=true;this.particleTick=race.tick;
     }
     this.followCamera(race,p,alpha,this);
     const w=C.world(s,x);this.sun.position.set(w.x-65,w.y+110,w.z-50);this.sun.target.position.set(w.x,w.y,w.z);this.sun.target.updateMatrixWorld();
     this.renderer.shadowMap.enabled=!IS_XBOX&&!ART.lite&&Prefs.fx==='full';this.renderer.toneMappingExposure=C.info.theme==='neon'?1.18:1.12;
   },
   followCamera(race,p,alpha,view){
-    const T=KartGL,C=race.course,s=lerp(p.ps,p.s,alpha),x=lerp(p.px,p.x,alpha);
-    const behind=C.world(s-(8.6+p.v*.008),x*.85,4.7+(p.height||0)*.25),look=C.world(s+17+p.v*.04,x*.55,1.7+(p.height||0)*.35);
+    const T=KartGL,C=race.course,v=KartMotion.view(p,alpha),s=v.s,x=v.x;
+    const behind=C.world(s-(8.6+v.v*.008),x*.85,4.7+Math.max(0,v.height)*.25),look=C.world(s+17+v.v*.04,x*.55,1.7+Math.max(0,v.height)*.35);
     const target=new T.Vector3(behind.x,behind.y,behind.z),aim=new T.Vector3(look.x,look.y,look.z);
-    if(!view.cameraPos||Math.abs(s-(view.cameraS||0))>100){view.cameraPos=target;view.cameraLook=aim;}else{view.cameraPos.lerp(target,reducedMotion?.8:.36);view.cameraLook.lerp(aim,.4);}
+    if(!view.cameraPos||Math.abs(s-(view.cameraS||0))>100){view.cameraPos=target;view.cameraLook=aim;}else{view.cameraPos.lerp(target,GameFeel.blend(reducedMotion?.8:.36));view.cameraLook.lerp(aim,GameFeel.blend(.4));}
     view.cameraS=s;view.camera.position.copy(view.cameraPos);view.camera.lookAt(view.cameraLook);
-    this.skyMesh.position.copy(view.cameraPos);
-    const fov=58+Math.min(5,p.v/30)+(p.turbo&&!reducedMotion?4:0);if(Math.abs(view.camera.fov-fov)>.05){view.camera.fov=lerp(view.camera.fov,fov,.15);view.camera.updateProjectionMatrix();}
+    this.skyMesh.position.copy(view.cameraPos);this.skyMesh.updateMatrixWorld();
+    const fov=58+Math.min(5,p.v/30)+(p.turbo&&!reducedMotion?4:0);if(Math.abs(view.camera.fov-fov)>.05){view.camera.fov=lerp(view.camera.fov,fov,GameFeel.blend(.15));view.camera.updateProjectionMatrix();}
   },
   draw(race,alpha){
     if(!this.init()){
@@ -19818,6 +19852,10 @@ const Kart3D={
     if(this.race!==race)this.build(race);this.syncSize();this.animate(race,alpha);
     const players=race.online?race.racers.filter(r=>r.human).sort((a,b)=>(b===race.player?1:0)-(a===race.player?1:0)):[race.player],rects=KartRender.viewports(players.length),renderer=this.renderer;
     this.lastViewports=rects;
+    // Four cameras share the same world transforms. Recompute the scene graph
+    // once per frame; only the sky follows each individual camera afterward.
+    this.scene.matrixWorldAutoUpdate=players.length===1&&!race.online;
+    if(!this.scene.matrixWorldAutoUpdate)this.scene.updateMatrixWorld();
     if(players.length===1&&!race.online){renderer.setScissorTest(false);renderer.setViewport(0,0,renderer.domElement.width,renderer.domElement.height);renderer.render(this.scene,this.camera);KartRender.hud(race);return;}
     const k=renderer.domElement.width/W;renderer.setScissorTest(true);
     // One world and one GL context; only cameras and viewports multiply.
@@ -19995,10 +20033,10 @@ const kartItemBuild=Kart3D.build;Kart3D.build=function(race){
 };
 const kartItemAnimate=Kart3D.animate;Kart3D.animate=function(race,alpha){
   kartItemAnimate.call(this,race,alpha);const C=race.course,tick=this.itemFxTick!==race.tick;this.itemFxTick=race.tick;
-  for(const r of race.racers){const ring=this.magnetRings[r.index],w=C.world(r.s,r.x,.2);ring.visible=r.magnet>0;ring.position.set(w.x,w.y,w.z);ring.scale.setScalar(1+Math.sin(race.time*5)*.1);
+  for(const r of race.racers){const visual=KartMotion.view(r,alpha),ring=this.magnetRings[r.index],w=C.world(visual.s,visual.x,.2);ring.visible=r.magnet>0;ring.position.set(w.x,w.y,w.z);ring.scale.setScalar(1+Math.sin(race.time*5)*.1);
     const type=r.item;let held=this.heldItems.get(r.index);if(held&&held.type!==type){this.scene.remove(held.mesh);held.mesh.traverse(o=>{if(o.geometry)o.geometry.dispose();});this.heldItems.delete(r.index);held=null;}
     if(type&&!held){const mesh=new KartGL.Group(),n=type==='triple'?3:1;for(let i=0;i<n;i++)mesh.add(this.itemModel(type==='triple'?'chile':type));this.scene.add(mesh);held={type,mesh};this.heldItems.set(r.index,held);}
-    if(held){held.mesh.children.forEach((m,i)=>{const a=race.time*1.6+i*TAU/held.mesh.children.length,s=r.s-3+Math.sin(a)*1.3,x=r.x+Math.cos(a)*.11,w=C.world(s,x,1.25);m.position.set(w.x,w.y,w.z);m.scale.setScalar(.38);m.rotation.y=Math.atan2(C.sample(s).tx,C.sample(s).tz)+a;});}
+    if(held){held.mesh.children.forEach((m,i)=>{const a=race.time*1.6+i*TAU/held.mesh.children.length,s=visual.s-3+Math.sin(a)*1.3,x=visual.x+Math.cos(a)*.11,w=C.world(s,x,1.25+Math.max(0,visual.height));m.position.set(w.x,w.y,w.z);m.scale.setScalar(.38);m.rotation.y=Math.atan2(C.sample(s).tx,C.sample(s).tz)+a;});}
   }
   for(const q of race.projectiles){const mesh=this.itemMeshes.get(q);if(!mesh)continue;
     if(q.type==='pinata')mesh.position.y+=Math.sin(clamp(q.age/1.45,0,1)*Math.PI)*4.4;
@@ -20076,7 +20114,10 @@ const KartMusic={
 // Quiet mechanical engine and filtered tyre noise, without the old sawtooth buzz.
 Object.assign(KartSound,{
   effect(type){const a=Audio8;if(!a.ready)return;const t=a.ctx.currentTime;
-    if(type==='hit'||type==='land')KartMusic.drum(a.ctx,a.sfxGain,t,'kick',type==='hit'?.35:.12);
+    if(type.startsWith('drift')){const tier=Number(type.slice(-1));KartMusic.note(a.ctx,a.sfxGain,t,73+tier*4,.1,.055,'sine',3200);KartMusic.note(a.ctx,a.sfxGain,t+.035,80+tier*4,.13,.03,'sine',4000);}
+    else if(type==='boost'){a.noise(.17,.055,1300,.5,0,'bandpass',null,4200);KartMusic.note(a.ctx,a.sfxGain,t,69,.15,.04,'triangle',2400);}
+    else if(type==='parry'){a.tone('sine',1100,2100,.12,.07);a.noise(.06,.04,4500,.8);}
+    else if(type==='hit'||type==='land')KartMusic.drum(a.ctx,a.sfxGain,t,'kick',type==='hit'?.35:.12);
     else if(type==='swing')KartMusic.drum(a.ctx,a.sfxGain,t,'hat',.5);
     else{const midi=type==='back'?58:type==='jump'?76:84;KartMusic.note(a.ctx,a.sfxGain,t,midi,.16,.065,'sine',2400);if(type==='confirm')KartMusic.note(a.ctx,a.sfxGain,t+.065,midi+7,.2,.045,'sine',2400);}
   },
@@ -20088,7 +20129,7 @@ Object.assign(KartSound,{
       this.roadGain=a.ctx.createGain();this.roadGain.gain.value=0;this.road.connect(this.roadFilter);this.roadFilter.connect(this.roadGain);this.roadGain.connect(a.sfxGain);this.road.start();
     }
     const r=race.player;this.node.frequency.setTargetAtTime(31+r.v*.64,a.ctx.currentTime,.08);this.gain.gain.setTargetAtTime(.018+r.v*.00018,a.ctx.currentTime,.1);
-    this.roadFilter.frequency.setTargetAtTime(r.drift?1350:580,a.ctx.currentTime,.12);this.roadGain.gain.setTargetAtTime((r.drift?.045:.008)*Math.min(1,r.v/70),a.ctx.currentTime,.1);
+    this.roadFilter.frequency.setTargetAtTime(r.drift?1350:580,a.ctx.currentTime,.12);this.roadGain.gain.setTargetAtTime((r.height>.15?.001:r.drift?.045:.008)*Math.min(1,r.v/70),a.ctx.currentTime,.1);
   },
   stop(){for(const name of ['node','road'])if(this[name]){try{this[name].stop();this[name].disconnect();}catch(e){}this[name]=null;}for(const name of ['gain','roadGain','roadFilter'])if(this[name]){try{this[name].disconnect();}catch(e){}this[name]=null;}},
 });
@@ -20342,7 +20383,8 @@ APP.kartVehiclesDraw=function(){
 const KART_NET_FIELDS=['s','x','v','yaw','velocityYaw','steer','lat','drift','driftDir','charge','turbo','shield','stun','invuln','height','vy','airTime','trick','coins','star','magnet','slow','slip','roulette','completedLaps','finish','nextCheckpoint','rescue','launch','rampCd','air','boostCd','slipCd','hitCd','bumpLat'];
 const KART_NET_ITEMS=Object.keys(KART_ITEMS);
 const KartOnline={
-  browsing:false,ep:0,seq:0,counters:[0,0,0],remote:new Map(),lastStateTick:-1,lastStateAt:0,sendTick:0,
+  browsing:false,ep:0,seq:0,counters:[0,0,0],remote:new Map(),lastStateTick:-1,lastStateAt:0,sendTick:0,entityIds:new WeakMap(),nextEntity:1,
+  entityId(entity){let id=this.entityIds.get(entity);if(!id){id=this.nextEntity++;this.entityIds.set(entity,id);}return id;},
   browse(){this.browsing=true;KartMenu.save();if(Net.user?.askName)Net.user.askName(false);APP.onSel=0;APP.go('online');},
   publish(extra){Object.assign(Net.lob,extra);const j=JSON.stringify(Net.lob);if(j!==Net.lastLobJSON){Net.lastLobJSON=j;Net.set({lob:Net.lob});}},
   lobby(){
@@ -20376,7 +20418,7 @@ const KartOnline={
     race.online=true;race.setup=s;race.spectator=!s.humans.some(p=>p.peer===Net.myPeer());
     race.racers.forEach((r,i)=>{r.human=i<s.humans.length;r.peer=s.humans[i]?.peer||null;r.label=r.peer?Net.nameOf(r.peer):CHARS[r.id].name;});
     race.player=race.racers.find(r=>r.peer===Net.myPeer())||race.racers[0];
-    this.ep=s.ep;this.seq=0;this.counters=[0,0,0];this.remote.clear();this.lastStateTick=-1;this.lastStateAt=performance.now();this.sendTick=0;
+    this.ep=s.ep;this.seq=0;this.counters=[0,0,0];this.remote.clear();this.lastStateTick=-1;this.lastStateAt=performance.now();this.sendTick=0;this.entityIds=new WeakMap();this.nextEntity=1;
     KartMenu.cupState=null;KartMenu.recorded=false;KartControls.prev={};KartControls.tapped.clear();KartControls.read();
     APP.go('kartRace');TouchPad.release();return true;
   },
@@ -20418,13 +20460,16 @@ const KartOnline={
   },
   snapshot(){
     const r=APP.kartRace,q=n=>typeof n==='number'?Math.round(n*100)/100:n;
+    const projectiles=r.projectiles.slice(-18),effects=r.effects.filter(e=>e.type!=='flame').slice(-4);
     const snap={k:1,e:this.ep,t:r.tick,g:[q(r.time),q(r.countdown),['grid','race','finish'].indexOf(r.phase),q(r.resultTime)],
       r:r.racers.map(p=>[...KART_NET_FIELDS.map(k=>q(p[k])),KART_NET_ITEMS.indexOf(p.item),p.disconnected?1:0]),
       b:r.course.boxes.map(b=>q(Math.max(0,b.ready-r.time))),c:r.course.coins.map(c=>q(Math.max(0,c.ready-r.time))),
-      p:r.projectiles.slice(-18).map(p=>[KART_NET_ITEMS.indexOf(p.type),p.owner,q(p.s),q(p.x),q(p.life),q(p.v),q(p.vx),q(p.age),p.target??-1,p.dir]),
-      l:r.racers.filter(p=>p.human).map(p=>p.lapTimes.map(q)),d:r.effects.filter(e=>e.type!=='flame').slice(-4).map(e=>[e.type,q(e.s),q(e.x),q(e.life),q(e.max),e.color])};
+      p:projectiles.map(p=>[KART_NET_ITEMS.indexOf(p.type),p.owner,q(p.s),q(p.x),q(p.life),q(p.v),q(p.vx),q(p.age),p.target??-1,p.dir]),
+      l:r.racers.filter(p=>p.human).map(p=>p.lapTimes.map(q)),d:effects.map(e=>[e.type,q(e.s),q(e.x),q(e.life),q(e.max),e.color]),
+      // Optional identity extension: old clients can still read the same packet.
+      ids:[projectiles.map(p=>this.entityId(p)),effects.map(e=>this.entityId(e))]};
     // Leave room for lobby/AV metadata under the original 4 KiB presence budget.
-    while(JSON.stringify(snap).length>3000&&(snap.p.length||snap.d.length)){if(snap.d.length)snap.d.shift();else snap.p.shift();}
+    while(JSON.stringify(snap).length>3000&&(snap.p.length||snap.d.length)){if(snap.d.length){snap.d.shift();snap.ids[1].shift();}else{snap.p.shift();snap.ids[0].shift();}}
     return snap;
   },
   pushState(){Net.set({st:this.snapshot()});},
@@ -20432,21 +20477,26 @@ const KartOnline={
     const race=APP.kartRace,fields=race?.setup?.v===1?KART_NET_FIELDS.slice(0,-1):KART_NET_FIELDS;
     if(!race||s.e!==this.ep||!Number.isSafeInteger(s.t)||s.t<=this.lastStateTick||!Array.isArray(s.g)||s.g.length!==4||!s.g.every(Number.isFinite)||!Array.isArray(s.r)||s.r.length!==8||s.r.some(a=>!Array.isArray(a)||a.length!==fields.length+2||a.some(v=>v!==null&&typeof v!=='boolean'&&!Number.isFinite(v))))return;
     if(!Array.isArray(s.p)||s.p.length>48||s.p.some(a=>!Array.isArray(a)||a.length!==10||!a.every(Number.isFinite)||!KART_NET_ITEMS[a[0]]||a[1]<0||a[1]>7))return;
+    if(s.ids&&(!Array.isArray(s.ids)||s.ids.length!==2||s.ids.some((a,i)=>!Array.isArray(a)||a.length!==(i?s.d?.length:s.p.length)||a.some(n=>!Number.isSafeInteger(n)||n<1)||new Set(a).size!==a.length)))return;
     const first=this.lastStateTick<0;this.lastStateTick=s.t;this.lastStateAt=performance.now();
     const oldPhase=race.phase,oldCount=Math.ceil(race.countdown);
     race.time=s.g[0];race.countdown=s.g[1];race.phase=['grid','race','finish'][s.g[2]]||'grid';race.resultTime=s.g[3];race.tick=s.t;
     if(!first&&oldPhase==='grid'){if(race.phase==='race')KartSound.effect('confirm');else if(Math.ceil(race.countdown)!==oldCount)KartSound.effect('menu');}
-    s.r.forEach((a,i)=>{const r=race.racers[i],old={s:r.s,x:r.x,yaw:r.yaw,velocityYaw:r.velocityYaw,v:r.v},wasFinish=r.finish,wasStun=r.stun,oldItem=r.item;
+    s.r.forEach((a,i)=>{const r=race.racers[i],visual=KartMotion.view(r,1),old={s:r.s,x:r.x,yaw:r.yaw,velocityYaw:r.velocityYaw,v:r.v},wasFinish=r.finish,wasStun=r.stun,oldItem=r.item,wasTrick=r.trick;
       fields.forEach((k,j)=>r[k]=a[j]);r.item=KART_NET_ITEMS[a[fields.length]]||null;r.disconnected=!!a[fields.length+1];
       r.serverS=r.s;r.serverX=r.x;
       if(!first&&r===race.player&&!race.spectator&&race.phase==='race'&&!r.rescue&&r.finish===null&&Math.abs(old.s-r.s)<25){r.s=lerp(old.s,r.s,.4);r.x=lerp(old.x,r.x,.35);r.yaw=lerp(old.yaw,r.yaw,.4);r.velocityYaw=lerp(old.velocityYaw,r.velocityYaw,.4);r.v=lerp(old.v,r.v,.45);}
       r.ps=r.s;r.px=r.x;
+      KartMotion.reconcile(r,visual,first||!!r.rescue||r.finish!==wasFinish||race.phase!=='race');
+      const motion=KartMotion.state(r);if(r.stun>wasStun+.3)motion.hitAge=0;
+      if(r.trick&&!wasTrick){motion.trickAge=0;motion.trickDuration=clamp((r.vy+Math.sqrt(r.vy*r.vy+48*r.height))/24-.04,.12,.6);}
       if(r.human&&s.l?.[i])r.lapTimes=s.l[i].filter(Number.isFinite);
       if(r===race.player&&!race.spectator){if(wasFinish===null&&r.finish!==null){race.say('¡META!');race.saveBest();KartSound.effect('confirm');}if(r.stun>wasStun+.3)race.feedback(r,'hit',.65);if(!oldItem&&r.item)KartSound.effect('confirm');}
     });
     race.course.boxes.forEach((b,i)=>b.ready=race.time+(+s.b?.[i]||0));race.course.coins.forEach((c,i)=>c.ready=race.time+(+s.c?.[i]||0));
-    race.projectiles=s.p.map(a=>({type:KART_NET_ITEMS[a[0]],owner:a[1],s:a[2],ps:a[2],x:a[3],life:a[4],v:a[5],vx:a[6],age:a[7],target:a[8]<0?undefined:a[8],dir:a[9]}));
-    race.effects=(s.d||[]).filter(a=>Array.isArray(a)&&['lightning','hit'].includes(a[0])&&a.slice(1,5).every(Number.isFinite)).map(a=>({type:a[0],s:a[1],x:a[2],life:a[3],max:a[4],color:a[5]}));
+    const oldProjectiles=new Map(race.projectiles.map(p=>[p.netId,p])),oldEffects=new Map(race.effects.map(e=>[e.netId,e]));
+    race.projectiles=s.p.map((a,i)=>{const id=s.ids?.[0][i],p=id&&oldProjectiles.get(id)||{};return Object.assign(p,{netId:id,type:KART_NET_ITEMS[a[0]],owner:a[1],s:a[2],ps:a[2],x:a[3],life:a[4],v:a[5],vx:a[6],age:a[7],target:a[8]<0?undefined:a[8],dir:a[9]});});
+    race.effects=(s.d||[]).map((a,i)=>({a,id:s.ids?.[1][i]})).filter(({a})=>Array.isArray(a)&&['lightning','hit'].includes(a[0])&&a.slice(1,5).every(Number.isFinite)).map(({a,id})=>Object.assign(id&&oldEffects.get(id)||{},{netId:id,type:a[0],s:a[1],x:a[2],life:a[3],max:a[4],color:a[5]}));
     this.sort(race);
   },
   sort(r){r.order=r.racers.slice().sort((a,b)=>a.finish!==null&&b.finish!==null?a.finish-b.finish:a.finish!==null?-1:b.finish!==null?1:b.s-a.s);},
@@ -20549,6 +20599,150 @@ const kartOnlineFocus=APP.focusNative;APP.focusNative=function(d){
   return kartOnlineFocus.call(this,d);
 };
 
+// ---- js/game-feel.js ----
+// Presentation lives outside the simulation: no render clock, spring or camera
+// correction enters a rollback snapshot, collision test or network checksum.
+const GameFeel = {
+  dt: 1 / 60, alpha: 1, rendering: false, droppedMs: 0,
+  samples: new Float32Array(900), sampleAt: 0, sampleCount: 0,
+  frame(ms) {
+    this.dt = clamp(ms / 1000, 0, .05);
+    if (document.hidden || ms <= 0) return;
+    this.samples[this.sampleAt++ % this.samples.length] = ms;
+    this.sampleCount = Math.min(this.samples.length, this.sampleCount + 1);
+  },
+  // Same response in seconds at 30, 60, 120 and 144 Hz.
+  blend(at60, dt = this.dt) { return 1 - Math.pow(1 - at60, Math.max(0, dt) * 60); },
+  spring(s, key, target, omega, dt = this.dt) {
+    const vk = key + 'V', x = (s[key] || 0) - target, v = s[vk] || 0;
+    const e = Math.exp(-omega * dt), t = (v + omega * x) * dt;
+    s[key] = target + (x + t) * e; s[vk] = (v - omega * t) * e;
+    return s[key];
+  },
+  metrics() {
+    const a = Array.from(this.samples.subarray(0, this.sampleCount)).sort((x, y) => x - y);
+    const q = n => a.length ? +a[Math.min(a.length - 1, Math.floor(a.length * n))].toFixed(2) : 0;
+    return { frames: a.length, medianMs: q(.5), p95Ms: q(.95), p99Ms: q(.99), over34ms: a.filter(x => x > 34).length, droppedMs: Math.round(this.droppedMs) };
+  },
+  resetMetrics() { this.sampleAt = this.sampleCount = this.droppedMs = 0; },
+};
+
+const FightView = {
+  battles: new WeakMap(), fighters: new WeakMap(), objects: new WeakMap(),
+  copy(f) { return { x: f.x, y: f.y, pose: Object.fromEntries(Object.entries(f.pose).map(([k, v]) => [k, Array.isArray(v) ? v.slice() : v])), state: f.state, face: f.face, grounded: f.grounded, dead: f.dead, hidden: f.hidden, hitlag: f.hitlag }; },
+  before(b) {
+    const from = new Map(b.fighters.map(f => [f.port, this.copy(f)]));
+    this.battles.set(b, { from, cam: { ...b.cam }, tick: b.t });
+    for (const p of [...b.projectiles, ...b.items]) this.objects.set(p, { x: p.x, y: p.y, b, tick: b.t + 1 });
+  },
+  after(b) {
+    const rec = this.battles.get(b); if (!rec) return;
+    rec.tick = b.t;
+    for (const f of b.fighters) this.fighters.set(f, { from: rec.from.get(f.port), b, tick: b.t });
+  },
+  fighter(f, alpha = GameFeel.alpha) {
+    const rec = this.fighters.get(f), p = rec?.from, b = rec?.b;
+    if (!p || rec.tick !== b.t || b.paused || b.view || f.dead || f.hidden) return f;
+    // Teleports, landings, takeoff and contact freeze appear immediately.
+    const command = f.state !== p.state && ['dash', 'attack', 'jumpsquat', 'shield', 'dodge', 'airdodge'].includes(f.state);
+    const snap = command || f.hitlag > 0 || p.dead !== f.dead || p.hidden !== f.hidden || p.grounded !== f.grounded || Math.hypot(f.x - p.x, f.y - p.y) > 100 || ['ledge', 'grabbed', 'holding', 'respawn'].includes(f.state);
+    const x = snap ? f.x : lerp(p.x, f.x, alpha), y = snap ? f.y : lerp(p.y, f.y, alpha);
+    // Active attack poses stay on their exact hitbox frame.
+    const snapPose = snap || f.state === 'attack' || p.state === 'attack' || f.state !== p.state || f.face !== p.face;
+    return { x, y, pose: snapPose ? f.pose : blendPose(p.pose, f.pose, alpha) };
+  },
+  point(p, alpha = GameFeel.alpha) {
+    const old = this.objects.get(p);
+    if (!old || old.b.paused || old.b.view || old.tick !== old.b.t || Math.hypot(p.x - old.x, p.y - old.y) > 100) return p;
+    return { x: lerp(old.x, p.x, alpha), y: lerp(old.y, p.y, alpha) };
+  },
+  camera(b, alpha = GameFeel.alpha) {
+    const old = this.battles.get(b);
+    if (!old || old.tick !== b.t || b.paused || b.view) return b.cam;
+    return { x: lerp(old.cam.x, b.cam.x, alpha), y: lerp(old.cam.y, b.cam.y, alpha), z: lerp(old.cam.z, b.cam.z, alpha) };
+  },
+  // Clocked noise, rather than a new random displacement on every monitor refresh.
+  noise(t, seed) { const a = Math.floor(t), u = smooth01(t - a); return lerp(hash1(a, seed), hash1(a + 1, seed), u) * 2 - 1; },
+};
+const feelBattleUpdate = Battle.prototype.update;
+Battle.prototype.update = function () {
+  // The outer rollback call captures the final display state once, rather than
+  // allocating pose copies for every replayed historical frame.
+  if (this.resim || this.rollbackSession?.running) return feelBattleUpdate.call(this);
+  FightView.before(this); const out = feelBattleUpdate.call(this); FightView.after(this); return out;
+};
+
+const KartMotion = {
+  states: new WeakMap(),
+  sample(r) { return { s: r.s, x: r.x, yaw: r.yaw || 0, height: r.height || 0, steer: r.steer, v: r.v, lat: r.lat, vy: r.vy, trick: r.trick, stun: r.stun, turbo: r.turbo, charge: r.charge, drift: r.drift, rescue: r.rescue, finish: r.finish }; },
+  state(r) {
+    let q = this.states.get(r);
+    if (!q) { q = { prev: this.sample(r), tick: -1, offsetS: 0, offsetX: 0, offsetH: 0, offsetYaw: 0, roll: 0, pitch: 0, bounce: 0, trickAge: 1, trickDuration: .6, hitAge: 1 }; this.states.set(r, q); }
+    return q;
+  },
+  before(race) { for (const r of race.racers) { const q = this.state(r); q.prev = this.sample(r); q.race = race; } },
+  after(race) {
+    for (const r of race.racers) {
+      const q = this.state(r), p = q.prev; q.tick = race.tick;
+      if (p.height > 0 && r.height === 0 && p.vy < 0 && !r.rescue) {
+        const force = clamp(-p.vy / 14, .1, 1); q.bounceV = -force * 7;
+        if (p.height > .08 || force > .3) race.feedback(r, 'land', force * .25);
+      }
+      if (r.trick && !p.trick) { q.trickAge = 0; q.trickDuration = clamp((r.vy + Math.sqrt(r.vy * r.vy + 48 * r.height)) / 24 - .04, .12, .6); }
+      if (r.stun > p.stun + .2) q.hitAge = 0;
+      const tier = c => c > 2 ? 3 : c > 1.3 ? 2 : c > .7 ? 1 : 0;
+      if (!r.drift) q.driftCue = 0;
+      if (r.drift && tier(r.charge) > (q.driftCue || 0)) { q.driftCue = tier(r.charge); race.feedback(r, 'drift' + q.driftCue, .08 + q.driftCue * .04); }
+      if (r.turbo > p.turbo + .2 && performance.now() - (q.boostCueAt ?? -1000) > 300) { q.boostCueAt = performance.now(); race.feedback(r, 'boost', .23); }
+    }
+  },
+  view(r, alpha = GameFeel.alpha) {
+    const q = this.state(r), p = q.prev, snap = q.race?.paused && !q.race.online || r.rescue || Math.abs(r.s - p.s) > 60 || Math.abs(r.x - p.x) > .8;
+    const a = snap ? 1 : alpha;
+    return { s: lerp(p.s, r.s, a) + q.offsetS, x: lerp(p.x, r.x, a) + q.offsetX,
+      yaw: lerp(p.yaw, r.yaw || 0, a) + q.offsetYaw, height: lerp(p.height, r.height || 0, a) + q.offsetH,
+      steer: lerp(p.steer, r.steer, a), v: lerp(p.v, r.v, a), lat: lerp(p.lat, r.lat, a), q };
+  },
+  // Keep the picture continuous while the host corrects the real driving state.
+  // Large moves (rescue, finish, teleport) snap and cannot leave a phantom kart.
+  reconcile(r, previous, hard) {
+    const q = this.state(r);
+    if (hard || Math.abs(previous.s - r.s) > 18 || Math.abs(previous.x - r.x) > .6) q.offsetS = q.offsetX = q.offsetH = q.offsetYaw = 0;
+    else {
+      q.offsetS = clamp(previous.s - r.s, -12, 12); q.offsetX = clamp(previous.x - r.x, -.4, .4);
+      q.offsetH = clamp(previous.height - r.height, -1, 1); q.offsetYaw = clamp(previous.yaw - r.yaw, -.4, .4);
+    }
+    q.prev = this.sample(r);
+  },
+  animate(race, dt = GameFeel.dt) {
+    // The world advances once even when it is rendered through four cameras.
+    if (race.paused && !race.online) dt = 0;
+    const decay = Math.exp(-18 * dt);
+    for (const r of race.racers) {
+      const q = this.state(r), p = q.prev, V = kartVehicle(r.vehicle);
+      q.offsetS *= decay; q.offsetX *= decay; q.offsetH *= decay; q.offsetYaw *= decay;
+      const roll = V.kind.endsWith('bike') ? clamp(-r.steer * r.v / 170, -.48, .48) : clamp(-r.lat * .045, -.14, .14);
+      const acceleration = clamp((r.v - p.v) * 60, -180, 160);
+      const pitch = r.height > .15 ? clamp(-r.vy * .018, -.22, .24) : clamp(-acceleration * .0007, -.1, .13);
+      GameFeel.spring(q, 'roll', reducedMotion ? 0 : roll, 18, dt);
+      GameFeel.spring(q, 'pitch', reducedMotion ? 0 : pitch, 16, dt);
+      GameFeel.spring(q, 'bounce', 0, 20, dt);
+      q.trickAge += dt; q.hitAge += dt;
+    }
+  },
+  body(r, mesh) {
+    const q = this.state(r), b = mesh.userData.body, progress = clamp(q.trickAge / q.trickDuration, 0, 1);
+    b.rotation.z = q.roll;
+    b.rotation.x = q.pitch - (reducedMotion ? 0 : TAU * smooth01(progress));
+    b.rotation.y = reducedMotion || q.hitAge >= .65 ? 0 : TAU * easeOut(q.hitAge / .65);
+    b.position.y = clamp(q.bounce, -.24, .12) + Math.sin(r.s * .25) * Math.min(.018, r.v * .0002);
+  },
+};
+const feelKartUpdate = KartRace.prototype.update;
+KartRace.prototype.update = function (input, dt) { if (this.paused) return feelKartUpdate.call(this, input, dt); KartMotion.before(this); const out = feelKartUpdate.call(this, input, dt); KartMotion.after(this); return out; };
+const feelKartPredict = KartOnline.predict;
+KartOnline.predict = function (input) { const race = APP.kartRace; KartMotion.before(race); const out = feelKartPredict.call(this, input); KartMotion.after(race); return out; };
+
 // ---- js/main.js ----
 // ============================================================
 //  BUCLE PRINCIPAL (60 Hz fijos)
@@ -20596,11 +20790,15 @@ function step() {
 function render() {
   ctx.setTransform(VIEW.scale * VIEW.dpr, 0, 0, VIEW.scale * VIEW.dpr, 0, 0);
   ctx.clearRect(0, 0, W, H);
-  try { APP.draw(); } catch (e) { console.error(e); }
+  GameFeel.alpha = clamp(acc / STEP, 0, 1); GameFeel.rendering = true;
+  try { APP.draw(); } catch (e) { console.error(e); } finally { GameFeel.rendering = false; }
 }
 function frame(now) {
   if ((APP.screen === 'battle' && BATTLE && BATTLE.phase === 'fight' && !BATTLE.paused) || (APP.screen === 'kartRace' && APP.kartRace && !APP.kartRace.paused)) ART.measure(now - lastT);
-  acc += Math.min(120, now - lastT); lastT = now;
+  const elapsed = Math.max(0, now - lastT); GameFeel.frame(elapsed); lastT = now;
+  // A stalled tab cannot build an ever-growing queue of old controls.
+  const pending = acc + elapsed; acc = Math.min(STEP * 5, pending);
+  GameFeel.droppedMs += Math.max(0, pending - acc);
   let n = 0;
   while (acc >= STEP && n < 5) { step(); acc -= STEP; n++; }
   render();

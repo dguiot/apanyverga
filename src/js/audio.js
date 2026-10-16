@@ -88,19 +88,19 @@ const Audio8 = {
       case 'hit': {
         const p = clamp(k, 0.2, 3);
         this.noise(0.08 + p * 0.05, 0.35 + p * 0.1, 900 + p * 500, 0.8);
-        this.tone('square', 180 + p * 40, 50, 0.1 + p * 0.06, 0.18 + p * 0.06);
-        if (p > 1.5) this.tone('sawtooth', 90, 30, 0.35, 0.25);
+        this.tone('sine', 170 + p * 24, 45, 0.09 + p * 0.025, 0.18 + p * 0.035);
+        this.noise(.025, .12, 3200, .7);
         break;
       }
       case 'bighit':
         this.noise(0.4, 0.6, 700, 0.6, 0, 'lowpass', null, 200);
-        this.tone('sawtooth', 140, 35, 0.5, 0.35);
-        this.tone('square', 900, 200, 0.15, 0.12);
+        this.tone('sine', 130, 32, .24, .38);
+        this.noise(.035, .2, 3500, .6);
         break;
       case 'swing': this.noise(0.12, 0.12 * k, 2400, 1.4, 0, 'bandpass', null, 900); break;
-      case 'jump': this.tone('square', 260, 520, 0.1, 0.08); break;
-      case 'djump': this.tone('square', 330, 700, 0.12, 0.08); break;
-      case 'land': this.noise(0.06, 0.12, 400, 1); break;
+      case 'jump': this.noise(.07, .045, 1700, .6, 0, 'bandpass', null, 3000); this.tone('sine', 240, 420, .065, .035); break;
+      case 'djump': this.noise(.09, .055, 2100, .7, 0, 'bandpass', null, 3800); this.tone('sine', 330, 620, .09, .045); break;
+      case 'land': this.noise(.035 + .035 * k, .035 + .075 * k, 420, .7); this.tone('sine', 105, 48, .055, .025 + .045 * k); break;
       case 'shield': this.tone('triangle', 900, 1400, 0.08, 0.12); break;
       case 'shieldbreak': this.tone('square', 600, 80, 0.8, 0.2); this.noise(0.5, 0.3, 3000, 0.5); break;
       case 'dodge': this.noise(0.1, 0.1, 3500, 2); break;

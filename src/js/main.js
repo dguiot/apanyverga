@@ -45,11 +45,15 @@ function step() {
 function render() {
   ctx.setTransform(VIEW.scale * VIEW.dpr, 0, 0, VIEW.scale * VIEW.dpr, 0, 0);
   ctx.clearRect(0, 0, W, H);
-  try { APP.draw(); } catch (e) { console.error(e); }
+  GameFeel.alpha = clamp(acc / STEP, 0, 1); GameFeel.rendering = true;
+  try { APP.draw(); } catch (e) { console.error(e); } finally { GameFeel.rendering = false; }
 }
 function frame(now) {
   if ((APP.screen === 'battle' && BATTLE && BATTLE.phase === 'fight' && !BATTLE.paused) || (APP.screen === 'kartRace' && APP.kartRace && !APP.kartRace.paused)) ART.measure(now - lastT);
-  acc += Math.min(120, now - lastT); lastT = now;
+  const elapsed = Math.max(0, now - lastT); GameFeel.frame(elapsed); lastT = now;
+  // A stalled tab cannot build an ever-growing queue of old controls.
+  const pending = acc + elapsed; acc = Math.min(STEP * 5, pending);
+  GameFeel.droppedMs += Math.max(0, pending - acc);
   let n = 0;
   while (acc >= STEP && n < 5) { step(); acc -= STEP; n++; }
   render();

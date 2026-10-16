@@ -235,11 +235,11 @@ class Battle {
     this.cam.x = lerp(this.cam.x, cx, 0.08);
     this.cam.y = lerp(this.cam.y, cy, 0.08);
   }
-  worldToScreen(x, y) { const c = this.cam; return [(x - c.x) * c.z + W / 2, (y - c.y) * c.z + H / 2]; }
+  worldToScreen(x, y) { const c = FightView.camera(this); return [(x - c.x) * c.z + W / 2, (y - c.y) * c.z + H / 2]; }
 
   // ---------- dibujo ----------
   draw() {
-    const c = ctx, cam = this.cam, st = this.stage;
+    const c = ctx, cam = FightView.camera(this), st = this.stage;
     ART.light = st.light || null;
     if (ART.lite) {
       // modo ligero: el fondo (cielo, nubes, montañas: lo que más pixeles pinta) a media resolución y estirado.
@@ -253,7 +253,8 @@ class Battle {
       c.drawImage(ART.bgCv, 0, 0, W, H);
     } else st.drawBG(c, cam);
     c.save();
-    const sx = this.shake ? rand(-this.shake, this.shake) : 0, sy = this.shake ? rand(-this.shake, this.shake) : 0;
+    const amp = reducedMotion ? 0 : this.shake, clock = (this.t + (this.paused ? 0 : GameFeel.alpha)) * 1.7;
+    const sx = amp * FightView.noise(clock, 71), sy = amp * FightView.noise(clock, 197);
     const z = cam.z * (1 + (this.camKick || 0));
     c.translate(W / 2 + sx, H / 2 + sy); c.scale(z, z); c.translate(-cam.x, -cam.y);
     st.drawStage(c);
@@ -263,7 +264,8 @@ class Battle {
     // sombras de contacto
     for (const f of this.fighters) {
       if (f.dead || f.hidden || !f.grounded) continue;
-      c.fillStyle = 'rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(f.x, f.y + 1, 26 * f.size(), 6, 0, 0, TAU); c.fill();
+      const v = FightView.fighter(f);
+      c.fillStyle = 'rgba(0,0,0,.35)'; c.beginPath(); c.ellipse(v.x, v.y + 1, 26 * f.size(), 6, 0, 0, TAU); c.fill();
     }
     const order = this.fighters.slice().sort((a, b) => (a.cpu ? 0 : 1) - (b.cpu ? 0 : 1));
     for (const f of order) f.draw(c);
@@ -354,7 +356,7 @@ class Battle {
     const c = ctx;
     for (const f of this.fighters) {
       if (f.dead || f.stocks <= 0 || f.hidden) continue;
-      const [x, y] = this.worldToScreen(f.x, f.y - 56);
+      const v = FightView.fighter(f), [x, y] = this.worldToScreen(v.x, v.y - 56);
       const top = hudOnTop();
       if (x > -10 && x < W + 10 && y > (top ? 100 : -10) && y < (top ? H + 10 : H - 100)) continue;
       const bx = clamp(x, 60, W - 60), by = clamp(y, top ? 160 : 60, top ? H - 60 : H - 160);
@@ -371,7 +373,7 @@ class Battle {
   drawFighterLabels() {
     for (const f of this.fighters) {
       if (f.dead || f.hidden || f.stocks <= 0) continue;
-      const [x, y] = this.worldToScreen(f.x, f.y - 125 * f.size());
+      const v = FightView.fighter(f), [x, y] = this.worldToScreen(v.x, v.y - 125 * f.size());
       if (x < 30 || x > W - 30 || y < 80 || y > H - 110) continue;
       const local = !f.cpu && (Net.role === 'off' || f.avPeer === Net.myPeer());
       const tag = f.cpu ? 'CPU ' + (f.port + 1) : local ? 'TÚ · J' + (f.port + 1) : 'J' + (f.port + 1);

@@ -270,6 +270,7 @@ function applyHit(att, t, hit, dir, opts = {}) {
     if (hit.sleep && (t.grounded || hit.trap)) { t.setState('dizzy'); t.sf = Math.max(0, 150 - hit.sleep); spawnFx('zzz', t.x, t.y - 120 * t.size(), { life: 50 }); }
     // resbalón: al piso
     else if (hit.trip && t.grounded) { t.setState('down'); t.vx = dir * 2; spawnFx('drop', t.x, t.y - 20, { life: 30 }); }
+    t.updatePose();
     return true;
   }
   let a = hit.ang * Math.PI / 180;
@@ -292,6 +293,7 @@ function applyHit(att, t, hit, dir, opts = {}) {
   // salir volando devuelve las herramientas para regresar: especial hacia arriba, esquive y un salto
   if (t.tumble) { t.airUsed = {}; if (t.jumps < 1 && t.ch.jumps > 1) t.jumps = 1; }
   t.setState('hitstun');
+  t.updatePose(); // the victim reacts on the same frame that the hit connects
   spawnFx('impact', px, py, { col, r: 16 + dmg * 1.6 + kb * 0.8, ang: Math.atan2(ly, lx) });
   if (B && kb > 12) B.camKick = Math.max(B.camKick || 0, Math.min(0.075, kb * 0.0022));
   // golpe que seguramente saca del escenario: un instante en cámara lenta
@@ -417,7 +419,8 @@ function nearestTarget(p) {
 function drawProjectiles(c) {
   for (const p of BATTLE.projectiles) {
     if (p.delay > 0) continue;
-    c.save(); c.translate(p.x, p.y);
+    const visual = FightView.point(p);
+    c.save(); c.translate(visual.x, visual.y);
     switch (p.type) {
       case 'shuriken':
         c.rotate(p.t * 0.6);

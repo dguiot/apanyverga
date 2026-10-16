@@ -72,6 +72,7 @@ function bindList(dev, action) { const m = Binds.forDev(dev); return (m[action] 
 // ---------- teclado ----------
 const keysDown = new Set();
 const keysTapped = new Set(); // pulsadas desde el último sondeo (no perder toques rápidos)
+const keyPulses = new Set(); // atajos nativos: sobreviven al sondeo de dispositivos hasta terminar el paso
 const keyOrder = new Map(); let keySeq = 0; // la última tecla pulsada gana (← y → a la vez)
 const Capture = { active: false, dev: null, action: null, t: 0, result: null, cancel: false, baseB: null, baseA: null };
 window.addEventListener('keydown', e => {
@@ -84,11 +85,11 @@ window.addEventListener('keydown', e => {
   if (Capture.active && e.code === 'Escape') { e.preventDefault(); Capture.cancel = true; return; }
   if (GAME_KEYS.has(e.code) || e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault();
   if (typeof TVBOX !== 'undefined' && TVBOX.holdKey(e)) return; // Xbox: la tecla puede ser el mismo botón del control
-  if (!e.repeat) { keysTapped.add(e.code); keyOrder.set(e.code, ++keySeq); }
+  if (!e.repeat) { keysTapped.add(e.code); keyPulses.add(e.code); keyOrder.set(e.code, ++keySeq); }
   keysDown.add(e.code);
 });
 window.addEventListener('keyup', e => { if (typeof TVBOX !== 'undefined' && TVBOX.holdKey(e, true)) return; keysDown.delete(e.code); });
-window.addEventListener('blur', () => keysDown.clear());
+window.addEventListener('blur', () => { keysDown.clear(); keysTapped.clear(); keyPulses.clear(); });
 
 function blankState() {
   return { x: 0, y: 0, cx: 0, cy: 0, attack: false, special: false, jump: false, shield: false, grab: false, smash: false, start: false, any: false, tapJump: true, digital: false };
@@ -443,7 +444,7 @@ window.addEventListener('blur', () => Rumble.stopAll());
 const _keyPrev = new Set();
 function keyEdge(dev, code) {
   if (dev !== 'kb1') return false;
-  return keysDown.has(code) && !_keyPrev.has(code);
+  return keyPulses.has(code) || keysDown.has(code) && !_keyPrev.has(code);
 }
-function endFrameKeys() { _keyPrev.clear(); for (const k of keysDown) _keyPrev.add(k); }
+function endFrameKeys() { _keyPrev.clear(); for (const k of keysDown) _keyPrev.add(k); keyPulses.clear(); }
 Binds.load();

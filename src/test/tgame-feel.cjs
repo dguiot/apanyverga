@@ -1,0 +1,118 @@
+// Game-feel acceptance: timing, render purity, rollback, refresh rates and net corrections.
+const {chromium}=require('playwright');
+const {pathToFileURL}=require('node:url');
+const path=require('node:path');
+(async()=>{
+ const browser=await chromium.launch({headless:true,...(process.env.CHROME_PATH?{executablePath:process.env.CHROME_PATH}:{})});
+ try{
+  const page=await browser.newPage({viewport:{width:1280,height:720}}),errors=[];
+  page.on('pageerror',e=>errors.push(e.stack));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
+  await page.addInitScript(()=>{window.requestAnimationFrame=()=>0;});
+  await page.route('**/config.js',r=>r.fulfill({contentType:'application/javascript',body:'window.APYV_CONFIG={};'}));
+  await page.goto(pathToFileURL(path.resolve(__dirname,'../../index.html')).href);
+  const checks=await page.evaluate(()=>{
+   const out=[],ok=(name,pass,details)=>out.push({name,pass:!!pass,details});
+   const fresh=()=>{
+    const b=new Battle({seed:8801,players:[{port:0,char:'daniel',dev:'feel0'},{port:1,char:'nacho',dev:'feel1'}],stage:'temple',rules:{mode:'stock',stocks:99,time:0,items:0}},{demo:true});
+    b.phase='fight';for(let i=0;i<80;i++)tick(b);return b;
+   };
+   const tick=(b,inputs=[])=>{BATTLE=b;for(let i=0;i<b.fighters.length;i++)b.fighters[i].ctrl.update({...blankState(),tapJump:false,...inputs[i]});b.update();};
+   let b=fresh(),f=b.fighters[0];f.startJumpsquat();
+   for(let i=0;i<2;i++)tick(b,[{jump:true}]);ok('jump keeps a readable two-frame anticipation',f.grounded&&f.state==='jumpsquat');
+   tick(b,[{jump:true}]);ok('takeoff occurs after three simulation frames',!f.grounded&&f.vy<0&&f.state==='air');
+   const takeoff=FightView.fighter(f,0);ok('takeoff is visible immediately rather than interpolated into the floor',takeoff.y===f.y);
+   const jumpHeight=held=>{const B=fresh(),p=B.fighters[0],floor=p.y;p.ctrl.update({...blankState(),tapJump:false,jump:true});p.ctrl.consume('jump');p.startJumpsquat();let top=floor;for(let i=0;i<90;i++){tick(B,[{jump:held}]);top=Math.min(top,p.y);if(i>3&&p.grounded)break;}return floor-top;};
+   const short=jumpHeight(false),full=jumpHeight(true);ok('tap and hold retain distinct, controllable jump heights',full>short*1.5&&short>30,{short,full});
+   b=fresh();f=b.fighters[0];f.hitlag=12;
+   for(let i=0;i<12;i++)tick(b,[{attack:i===4}]);
+   ok('a released attack remains queued through contact freeze',f.ctrl.buffered('attack')&&f.state==='idle');
+   tick(b);ok('queued attack starts as soon as contact freeze ends',f.state==='attack');
+   b=fresh();f=b.fighters[0];tick(b,[{x:1}]);ok('initial dash responds on the input frame',f.state==='dash'&&FightView.fighter(f,0).x===f.x);for(let i=1;i<15;i++)tick(b,[{x:1}]);
+   const a=FightView.fighter(f,0),z=FightView.fighter(f,1),mid=FightView.fighter(f,.5);
+   ok('movement has intermediate render positions between physics ticks',z.x>a.x&&Math.abs(mid.x-(a.x+z.x)/2)<1e-8,{from:a.x,to:z.x,middle:mid.x});
+   const camera0=FightView.camera(b,0),camera1=FightView.camera(b,1);ok('camera shares the movement interpolation clock',Number.isFinite(camera0.z)&&camera0.x!==camera1.x);
+   f.startMove('jab1');tick(b);ok('attack pose is always the exact active simulation pose',FightView.fighter(f,.2).pose===f.pose);
+   const target=b.fighters[1];target.invuln=0;target.setState('idle');target.pose=mkPose(POSES.idle);
+   applyHit(f,target,{dmg:10,bkb:8,kbg:6,ang:40,effect:'normal'},1);
+   ok('victim reacts on the contact frame before hitstop begins',target.hitlag>0&&target.state==='hitstun'&&target.pose.face==='hurt');
+   const frozen=FightView.fighter(target,.1);ok('contact freeze never drifts between render positions',frozen.x===target.x&&frozen.y===target.y);
+   const saved=b.saveState(),hash=b.checksum(),codec=new RBStateCodec(b),wire=JSON.stringify(codec.encode(saved));
+   for(const alpha of [0,.1,.25,.5,.75,.99]){GameFeel.alpha=alpha;b.draw();}
+   ok('rendering at extra refreshes leaves gameplay checksum unchanged',b.checksum()===hash);
+   const afterWire=JSON.stringify(codec.encode(b.saveState()));
+   const wireDiff=()=>{const a=JSON.parse(wire).nodes,z=JSON.parse(afterWire).nodes;return z.map((v,i)=>JSON.stringify(v)!==JSON.stringify(a[i])?{i,before:a[i],after:v}:null).filter(Boolean).slice(0,8);};
+   ok('presentation clocks and springs are absent from rollback wire state',wire===afterWire&&!wire.includes('offsetS')&&!wire.includes('trickAge'),wire===afterWire?undefined:wireDiff());
+   b.loadState(codec.decode(JSON.parse(wire)));ok('rollback state roundtrip preserves combat',b.checksum()===hash);
+   const rb=fresh(),history=[];let replayHash;
+   const input=n=>[{x:n%180<90?.8:-.8,jump:n%91<5,attack:n%31===0,special:n%173===0},{x:n%200<100?-.7:.7,jump:n%113<4,attack:n%43===0}];
+   for(let i=0;i<300;i++){if(i===100)history.push(rb.saveState());tick(rb,input(i));}replayHash=rb.checksum();
+   rb.loadState(history[0]);rb.resim=true;
+   for(let i=100;i<300;i++)tick(rb,input(i));rb.resim=false;
+   ok('200 frames replay identically after a rollback',rb.checksum()===replayHash,{expected:replayHash,actual:rb.checksum()});
+   const delayBattle=fresh();let clock=0,raw={...blankState(),tapJump:false};
+   const session=new RollbackSession(delayBattle,{myPeer:'feel-host',hostPeer:'feel-host',owners:{0:'feel-host',1:'feel-guest'},ep:1,now:()=>clock,read:()=>raw,send:()=>{}});
+   session.delay=4;session.rtts.set('feel-guest',140);session.tuneDelay();clock=3100;session.tuneDelay();clock=6200;session.tuneDelay();
+   ok('combat input delay recovers after a temporary network or CPU spike',session.delay===2);
+   session.rtts.set('feel-guest',350);session.tuneDelay();ok('poor connections still receive the protective four-frame delay',session.delay===4);
+   session.frame=10;session.capture();const oldInput=JSON.stringify(session.real.get(0).get(14));
+   session.frame=11;session.delay=2;raw={...raw,attack:true};session.capture();session.frame=12;raw={...raw,attack:false};session.capture();session.frame=13;session.capture();
+   const attackMask=1<<BUTTONS.indexOf('attack');
+   ok('delay recovery never overwrites an input already sent to other peers',JSON.stringify(session.real.get(0).get(14))===oldInput);
+   ok('a one-frame button tap survives input-delay recovery',!!(session.real.get(0).get(15)[4]&attackMask));
+   session.frame=14;session.capture();ok('retained tap is consumed once',!(session.real.get(0).get(16)[4]&attackMask));session.stop();
+   // Constant-target analytic springs and camera response must agree in seconds.
+   const hz=[30,60,120,144],springs=hz.map(rate=>{const s={roll:0};for(let i=0;i<rate;i++)GameFeel.spring(s,'roll',.4,12,1/rate);return s.roll;});
+   ok('suspension response is identical at 30/60/120/144 Hz',Math.max(...springs)-Math.min(...springs)<1e-10,springs);
+   const r=new KartRace(KART_TRACKS[0],'daniel',1,false,811);r.phase='race';r.racers=[r.player];let p=r.player;p.s=100;p.ps=100;p.x=p.px=0;p.v=75;
+   KartMotion.before(r);r.drive(p,{gas:true,steer:.7},1/60);r.tick++;KartMotion.after(r);
+   const v0=KartMotion.view(p,0),v1=KartMotion.view(p,1),vm=KartMotion.view(p,.5);
+   ok('kart position, steering and yaw interpolate together',v0.s<vm.s&&vm.s<v1.s&&v0.yaw!==v1.yaw&&vm.steer>v0.steer);
+   r.paused=true;ok('paused local karts do not oscillate with the render clock',KartMotion.view(p,0).s===KartMotion.view(p,.9).s);r.paused=false;
+   const originalS=p.s,visible=KartMotion.view(p,1);p.s-=3;p.x+=.04;KartMotion.reconcile(p,visible,false);
+   const corrected=KartMotion.view(p,1);ok('small network correction does not jump the rendered kart',Math.abs(corrected.s-visible.s)<1e-8&&Math.abs(corrected.x-visible.x)<1e-8);
+   ok('network smoothing never changes the authoritative physics position',p.s===originalS-3);
+   for(let i=0;i<30;i++)KartMotion.animate(r,1/60);
+   ok('network visual offset converges within half a second',Math.abs(KartMotion.view(p,1).s-p.s)<.001);
+   const old=KartMotion.view(p,1);p.s+=100;KartMotion.reconcile(p,old,true);ok('rescue or large correction snaps without a phantom vehicle',KartMotion.view(p,1).s===p.s);
+   KartMotion.before(r);p.height=1;p.vy=-10;KartMotion.after(r);KartMotion.before(r);p.height=0;p.vy=0;r.tick++;KartMotion.after(r);
+   ok('landing creates a bounded suspension impulse',KartMotion.state(p).bounceV<0);
+   KartMotion.animate(r,1/60);ok('landing compression is visible',KartMotion.state(p).bounce<0);
+   for(let i=0;i<60;i++)KartMotion.animate(r,1/60);ok('suspension settles after landing',Math.abs(KartMotion.state(p).bounce)<.001);
+   const mock={userData:{body:{rotation:{},position:{}}}},q=KartMotion.state(p);q.trickAge=.08;q.trickDuration=.2;KartMotion.body(p,mock);const angle=mock.userData.body.rotation.x;
+   KartMotion.animate(r,.02);KartMotion.body(p,mock);ok('trick rotation continues smoothly after the gameplay landing',mock.userData.body.rotation.x<angle);
+   Kart3D.init();Kart3D.build(r);Kart3D.race=r;
+   const cameraPositions=hz.map(rate=>{
+    const view={camera:Kart3D.camera.clone()};view.camera.fov=58;p.turbo=0;p.s=100;p.ps=100;KartMotion.reconcile(p,KartMotion.view(p,1),true);GameFeel.dt=1/rate;Kart3D.followCamera(r,p,1,view);
+    p.s=p.ps=140;KartMotion.reconcile(p,KartMotion.view(p,1),true);p.turbo=2;
+    for(let i=0;i<rate;i++)Kart3D.followCamera(r,p,1,view);return [...view.camera.position.toArray(),view.camera.fov];
+   });
+   ok('real chase cameras and turbo FOV agree across refresh rates',cameraPositions.every(a=>a.every((v,i)=>Math.abs(v-cameraPositions[0][i])<.06)),cameraPositions);
+   const savedReduced=reducedMotion;reducedMotion=true;KartMotion.animate(r,.05);KartMotion.body(p,mock);ok('reduced motion removes trick and hit spins',Math.abs(mock.userData.body.rotation.x-KartMotion.state(p).pitch)<1e-9&&mock.userData.body.rotation.y===0);reducedMotion=savedReduced;
+   // Stable entity identity prevents rebuilding every projectile/effect each snapshot.
+   APP.kartRace=r;r.racers=Array.from({length:8},(_,i)=>i?p={...r.player,index:i,human:false}:r.player);r.player=r.racers[0];r.setup={v:2};r.online=true;KartOnline.ep=17;KartOnline.lastStateTick=-1;
+   r.projectiles=[{type:'chile',owner:0,s:160,ps:160,x:0,life:4,v:185,vx:0,age:.2,dir:1,target:1}];r.effects=[{type:'hit',s:155,x:0,life:.5,max:.55,color:'#ffc53d'}];
+   let snap=KartOnline.snapshot();snap.t=300;KartOnline.applyState(snap);const projectile=r.projectiles[0],effect=r.effects[0];snap.t++;snap.p[0][2]+=3;KartOnline.applyState(snap);
+   ok('projectile geometry identity survives repeated host snapshots',r.projectiles[0]===projectile&&projectile.s===163);
+   ok('impact identity survives snapshots without replaying the particle burst',r.effects[0]===effect);
+   const legacy={...snap,t:snap.t+1};delete legacy.ids;KartOnline.applyState(legacy);ok('legacy snapshots without entity identities remain compatible',KartOnline.lastStateTick===legacy.t);
+   const bad={...snap,t:legacy.t+1,ids:[[NaN],[1]]};KartOnline.applyState(bad);ok('malformed identity extension is rejected',KartOnline.lastStateTick===legacy.t);
+   ok('network packet retains the existing presence budget',JSON.stringify(snap).length<3000);
+   r.racers.slice(0,4).forEach(p=>p.human=true);Kart3D.build(r);Kart3D.race=r;
+   let matrixUpdates=0;const updateMatrices=Kart3D.scene.updateMatrixWorld.bind(Kart3D.scene);Kart3D.scene.updateMatrixWorld=function(...args){matrixUpdates++;return updateMatrices(...args);};
+   Kart3D.draw(r,1);ok('four viewports update shared world transforms once per rendered frame',Kart3D.lastViewports.length===4&&matrixUpdates===1,{matrixUpdates});
+   const beforeZ=Kart3D.drivers[0].matrixWorld.elements[14];r.player.s+=10;KartMotion.reconcile(r.player,KartMotion.view(r.player,1),true);Kart3D.draw(r,1);
+   ok('shared-transform optimization keeps animated vehicles moving',Kart3D.drivers[0].matrixWorld.elements[14]!==beforeZ);
+   window.dispatchEvent(new KeyboardEvent('keydown',{code:'KeyV',key:'v',bubbles:true}));window.dispatchEvent(new KeyboardEvent('keyup',{code:'KeyV',key:'v',bubbles:true}));Devices.poll();
+   ok('native menu shortcuts retain taps shorter than one physics tick',keyEdge('kb1','KeyV'));endFrameKeys();ok('a short menu tap fires once',!keyEdge('kb1','KeyV'));
+   const stepBefore=step,drawBefore=APP.draw,updateBefore=APP.update;let steps=0;step=()=>steps++;APP.draw=()=>{};APP.update=()=>{};APP.screen='main';
+   lastT=100;acc=0;GameFeel.resetMetrics();frame(1100);const afterStall=acc;frame(1117);
+   ok('a one-second browser stall leaves no growing simulation backlog',afterStall<STEP&&acc<STEP&&steps<=6,{steps,afterStall,acc});
+   ok('performance counters report discarded wall time',GameFeel.metrics().droppedMs>900);
+   step=stepBefore;APP.draw=drawBefore;APP.update=updateBefore;
+   return out;
+  });
+  for(const c of checks)console.log((c.pass?'PASS ':'FAIL ')+c.name+(c.details?' '+JSON.stringify(c.details):''));
+  console.log('Browser errors: '+JSON.stringify(errors));console.log(JSON.stringify({passed:checks.filter(c=>c.pass).length,total:checks.length}));
+  if(checks.some(c=>!c.pass)||errors.length)process.exitCode=1;
+ }finally{await browser.close();}
+})().catch(e=>{console.error(e);process.exitCode=1;});

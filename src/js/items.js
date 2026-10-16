@@ -158,7 +158,8 @@ function drawItems(c) {
   for (const it of BATTLE.items) {
     if (it.holder) continue;
     if (it.groundT > 780 && Math.floor(it.t / 4) % 2) continue;
-    c.save(); c.translate(it.x, it.y);
+    const visual = FightView.point(it);
+    c.save(); c.translate(visual.x, visual.y);
     if (it.type === 'orb') {
       const pulse = 1 + Math.sin(it.t * 0.2) * 0.08;
       ART.drawGlow(c, 0, 0, 90 * pulse, '#ff7a1a', 0.7);

@@ -7,6 +7,29 @@ pantalla táctil) o en línea, cada quien desde su casa, con cámara y voz.
 
 Al entrar, elige **Peleas** o **Esmash Kart**. Las peleas conservan sus modos y su online.
 
+## Respuesta y movimiento
+
+Ambos modos mantienen una simulación fija de 60 Hz. El dibujo interpola posiciones y cámaras
+entre esos pasos; en las peleas, las poses activas de ataque y el contacto se muestran en su
+cuadro exacto. El salto despega tras tres cuadros de anticipación y los comandos nuevos se
+conservan durante la pausa de impacto. Los golpes y aterrizajes combinan reacción corporal,
+sonido y vibración según su intensidad.
+
+Los karts tienen inclinación de carrocería y motos, suspensión al aterrizar y acrobacias que
+terminan su giro con continuidad. La cámara responde por tiempo transcurrido, también en
+pantalla dividida. Los niveles del derrape y la salida del turbo tienen señales sonoras y hápticas.
+Las correcciones pequeñas del anfitrión se absorben visualmente, y los objetos y efectos
+conservan su identidad entre paquetes para reutilizar geometría y evitar repetir explosiones.
+
+La calidad automática responde a tirones repetidos además del promedio. El bucle limita la
+acumulación de pasos tras una pestaña bloqueada. La suavidad y los resortes son solo de dibujo:
+no alteran colisiones, velocidades ni la igualdad del estado confirmado online.
+
+En peleas, el retardo de entrada vuelve gradualmente a dos cuadros cuando mejora la conexión;
+los toques breves se conservan durante esa transición. Para simular con rollback, todas las
+pestañas deben tener la misma versión de jugabilidad. Una pestaña antigua usa el modo existente
+con el anfitrión como autoridad; recarga todos los jugadores para activar la versión nueva.
+
 ## Esmash Kart
 
 Carreras locales para **un jugador contra siete CPU**, y **salas online para hasta cuatro pilotos**,
@@ -149,3 +172,10 @@ para jugar. Licencia y entrada del bundle: `src/vendor/THREE-LICENSE.txt` y `src
 `node src/test/tkart-vehicles.cjs` verifica la selección y persistencia, geometría de los seis vehículos,
 dos ruedas en las motos, 54 vueltas para comparar tiempos, respuesta por peso, intercepción de
 cohetes, los doce modelos de ítems, materiales y cielos de las tres pistas, y el límite de caché de miniaturas.
+
+`node src/test/tgame-feel.cjs` comprueba tiempos de salto y búfer durante impactos, dibujo sin
+mutar el combate, repetición tras rollback, recuperación del retardo de entrada, cámara y
+suspensión a 30/60/120/144 Hz, pausa, corrección online y continuidad de las entidades recibidas.
+`node src/test/trollback.js` compara dos navegadores con WebRTC real, latencia y pérdidas,
+incluyendo dibujo durante la partida y comparación de estados confirmados. Estas pruebas
+no sustituyen la medición de FPS ni las pruebas de tacto en el dispositivo final.
