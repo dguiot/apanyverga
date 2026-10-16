@@ -5,6 +5,39 @@
 Juego de peleas estilo Smash para hasta 4 jugadores: en la misma pantalla (teclado, controles o
 pantalla táctil) o en línea, cada quien desde su casa, con cámara y voz.
 
+Al entrar, elige **Peleas** o **Esmash Kart**. Las peleas conservan sus modos y su online.
+
+## Esmash Kart
+
+Carreras locales para **un jugador contra siete CPU**, con los **15 personajes originales**,
+sus caras y karts con sus colores. El online y el multijugador local corresponden por ahora a las peleas.
+
+- **Mercado del Sol** — 8.9 km por vuelta; curvas enlazadas, adoquines, puestos y un puente estrecho.
+- **Cañón de Fuego** — 10.1 km; horquillas, desniveles, rocas móviles y puentes sobre el cañón.
+- **Cumbre Neón** — 11.0 km; eses, asfalto mojado, curvas cerradas y luces nocturnas.
+- Tres vueltas por carrera; carrera individual o copa de las tres pistas con puntuación acumulada.
+- 100, 150 y 200 cc; asistencia de dirección opcional. Velocidad, aceleración y agarre dependen del personaje.
+- Derrape con tres niveles de mini turbo, placas de aceleración y salida turbo al acelerar al final del 2.
+- Seis ítems: chile teledirigido, tortilla que rebota, trampa de salsa, pan turbo, burbuja protectora y piñata explosiva.
+- Minimapa, aviso de curvas, posición, tiempos por vuelta y récord por pista, cilindrada y asistencia, guardado en este navegador.
+- Simulación a 60 Hz e interpolación de dibujo; ajustes de calidad compartidos con las peleas. Pausa automática al cambiar de ventana.
+
+| Acción | Teclado | Control estándar |
+| --- | --- | --- |
+| Acelerar | W / ↑ | RT / A |
+| Frenar | S / ↓ | LT |
+| Girar | A D / ← → | Stick izquierdo / cruceta |
+| Derrapar; soltar para turbo | Espacio / Shift | X / RB |
+| Usar o lanzar ítem | E / J | LB |
+| Lanzar hacia atrás | Q, o freno + ítem | B, o LT + LB |
+| Rescate al centro | R | Y |
+| Pausa | Esc / Enter | Menú ☰ |
+
+En celular, los botones cambian a **Gas, Freno, Derrape, Ítem y Atrás**. En el garaje,
+X / Espacio cambia la cilindrada y LT / RT / L alterna la asistencia. En la selección de pista,
+X / Espacio alterna carrera individual y copa. Los controles de carrera tienen su propio esquema;
+la reasignación del menú «Configurar botones» se aplica a las peleas.
+
 **Jugar:** https://dguiot.github.io/apanyverga/ (compu y celular).
 
 **iPhone:** Safari no deja que una página se ponga en pantalla completa. Desliza la página hacia
@@ -49,3 +82,9 @@ cd src && OUT=.. python3 build_web.py
 
 `src/test/` tiene la prueba en línea de punta a punta con un Supabase simulado
 (`cd src && python3 build_web.py && node test/tweb.js`, requiere Playwright).
+
+Las carreras se verifican desde la raíz con `node src/test/tkart.cjs` y
+`node src/test/tkart-devices.cjs` (requieren Playwright y Chromium; `CHROME_PATH` permite usar
+una instalación de Chrome o Edge). La primera prueba cubre controles, ítems, puntos de control,
+determinismo y 9 carreras completas —tres pistas × tres cilindradas—, además del arranque de una pelea.
+La segunda cubre control estándar, pantalla táctil, copa, récords, pérdida de foco y calidad Xbox.

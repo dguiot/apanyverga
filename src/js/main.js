@@ -30,7 +30,7 @@ function step() {
   Devices.poll();
   try { Net.tick(); } catch (e) { console.error(e); }
   try { UIFocus.begin(); } catch (e) { console.error(e); }
-  if (Pointer.clicked && APP.screen !== 'battle' && hover(W - 58, 14, 44, 44)) { Audio8.setMuted(!Audio8.muted); Pointer.clicked = false; }
+  if (Pointer.clicked && !['battle', 'kartRace'].includes(APP.screen) && hover(W - 58, 14, 44, 44)) { Audio8.setMuted(!Audio8.muted); Pointer.clicked = false; }
   if (Pointer.clicked && avButtonShown()) { const b = AV_BTN; if (hover(b.x, b.y, b.w, b.h)) { AV.click(b); Pointer.clicked = false; } }
   if (AV.on && keyEdge('kb1', 'KeyM')) { AV.setMic(!AV.mic); Toasts.push(AV.mic ? '🎤 Micrófono abierto' : '🔇 Micrófono silenciado'); }
   try { AV.tick(); } catch (e) { console.error(e); }
@@ -47,7 +47,7 @@ function render() {
   try { APP.draw(); } catch (e) { console.error(e); }
 }
 function frame(now) {
-  if (APP.screen === 'battle' && BATTLE && BATTLE.phase === 'fight' && !BATTLE.paused) ART.measure(now - lastT);
+  if ((APP.screen === 'battle' && BATTLE && BATTLE.phase === 'fight' && !BATTLE.paused) || (APP.screen === 'kartRace' && APP.kartRace && !APP.kartRace.paused)) ART.measure(now - lastT);
   acc += Math.min(120, now - lastT); lastT = now;
   let n = 0;
   while (acc >= STEP && n < 5) { step(); acc -= STEP; n++; }

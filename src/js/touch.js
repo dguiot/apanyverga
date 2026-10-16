@@ -291,7 +291,7 @@ const IOSFS = {
     return TouchPad.landscape() && short > 0 && window.innerHeight < short - 24;
   },
   want() {
-    const m = this.mode(), fight = ['battle', 'netview'].includes(APP.screen), root = document.documentElement;
+    const m = this.mode(), fight = ['battle', 'netview', 'kartRace'].includes(APP.screen), root = document.documentElement;
     if (m !== this.roll) { this.roll = m; root.classList.toggle('iosroll', m); }
     if (fight !== this.fight) { this.fight = fight; root.classList.toggle('fight', fight); }
     if (!m || fight || ['demo', 'vs'].includes(APP.screen)) return '';

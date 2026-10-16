@@ -1,7 +1,7 @@
 {
   "name": "Esmash Bros",
   "short_name": "Esmash Bros",
-  "description": "…y se nos acabó el pan. Peleas para hasta 4, en la misma pantalla o en línea.",
+  "description": "Peleas para hasta 4 y Esmash Kart: 15 personajes, tres circuitos y objetos lanzables.",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",

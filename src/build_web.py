@@ -21,7 +21,7 @@ html = html.replace('<link rel="stylesheet" href="fonts/inline.css">', '<style>\
 icon = "data:image/svg+xml," + "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23e63946'/%3E%3Ctext x='32' y='47' font-size='40' text-anchor='middle' font-family='Impact,Arial Black,sans-serif' fill='%23ffc53d'%3EV%3C/text%3E%3C/svg%3E"
 head = ('<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'
         '<meta name="theme-color" content="#060d18">\n'
-        '<meta name="description" content="Esmash Bros: juego de peleas para hasta 4 jugadores, en la misma pantalla o en línea con voz y cámara.">\n'
+        '<meta name="description" content="Esmash Bros: peleas para hasta 4 y Esmash Kart, carreras con 15 personajes, tres circuitos y objetos lanzables.">\n'
         f'<link rel="icon" href="{icon}">\n'
         # "Agregar a inicio": desde el ícono abre a pantalla completa y de lado (en iPhone es la única forma)
         '<link rel="manifest" href="manifest.webmanifest">\n'
@@ -39,7 +39,7 @@ for n in (180, 192, 512): (out / 'icons' / f'icon-{n}.png').write_bytes((root / 
 (out / 'manifest.webmanifest').write_text('''{
   "name": "Esmash Bros",
   "short_name": "Esmash Bros",
-  "description": "…y se nos acabó el pan. Peleas para hasta 4, en la misma pantalla o en línea.",
+  "description": "Peleas para hasta 4 y Esmash Kart: 15 personajes, tres circuitos y objetos lanzables.",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",
