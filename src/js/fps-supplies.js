@@ -50,7 +50,7 @@ const FPSSupplies={
   }
  },
  explode(m,g){
-  const point={...g.pos},owner=m.players[g.owner];m.effects.push({type:'blast',a:point,owner:g.owner,life:1.2,maxLife:1.2,seq:++m.effectSeq});m.sound('blast',owner);
+  const point={...g.pos},owner=m.players[g.owner];m.effects.push({type:'blast',a:point,owner:g.owner,life:1.2,maxLife:1.2,seq:++m.effectSeq});
   for(const q of m.players){if(q.dead||q.invuln)continue;const target={x:q.x,y:q.y+FPSBody.eyeHeight(q)*.65,z:q.z},dx=target.x-point.x,dy=target.y-point.y,dz=target.z-point.z,d=Math.hypot(dx,dy,dz);if(d>this.blastRadius)continue;
    // Solid cover protects against the explosion; foliage does not. Sample
    // torso and head so a low parapet affords partial rather than total cover.
