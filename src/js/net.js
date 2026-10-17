@@ -430,7 +430,7 @@ const InviteBox = {
       + (navigator.share ? '<button data-a="share">Compartir…</button>' : '')
       + (url ? '<a data-a="wa" target="_blank" rel="noopener">WhatsApp</a>' : '')
       + '<button data-a="close">Listo</button></div></div>';
-    el.querySelector('.inv-code b').textContent = Net.code || '';
+    el.querySelector('.inv-code b').textContent = (Net.role==='guest'?Net.hostPres()?.code:Net.code) || '';
     if (url) { const inp = el.querySelector('.inv-url'); inp.value = url; inp.addEventListener('focus', () => inp.select()); el.querySelector('[data-a=wa]').href = 'https://wa.me/?text=' + encodeURIComponent(Net.inviteText()); }
     else el.querySelector('.inv-help').textContent = Net.inviteMsg();
     const say = ok => { const o = el.querySelector('.inv-ok'); if (!o) return; o.textContent = ok ? '✓ Copiado: pégalo en WhatsApp, iMessage o correo' : 'Selecciona el link y cópialo (Ctrl+C / ⌘C)'; o.classList.toggle('bad', !ok); };
