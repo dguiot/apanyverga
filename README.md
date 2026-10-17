@@ -369,6 +369,14 @@ y cabezas alineadas, tiros de cabeza de pie/agachado, recuperación interrumpida
 pausa, reaparición, teclado/mando inalámbrico, recargas animadas y validación online.
 `node src/test/tfps-polish.cjs` comprueba las cinco miras sin oclusión, caída y viaje
 de las balas, impactos, límites gráficos y liberación de recursos al salir del FPS.
+`node src/test/tfps-architecture.cjs` recorre las entradas y escaleras de los cuatro
+edificios, comprueba el acceso a azoteas y la cobertura de sus ventanas empotradas,
+verifica que el terreno queda bajo los pisos y compara píxeles para detectar
+transparencia incorrecta en la lente de Horizonte sin apuntar. Al apuntar, el arma
+se oculta y la cámara del mundo conserva su zoom sin tapar la mira. Los agarres de
+pistola y de guardamanos usan poses diferentes, conservando piel, guantes y mangas
+del personaje de Esmash. La arquitectura comparte un solo diseño entre colisiones
+y renderizado; las ventanas son vidrio opaco como cobertura, sin destrucción.
 `node src/test/tstage-music.cjs` renderiza audio real, mide nivel/saturación, distingue
 las doce composiciones, comprueba la identidad del lobby y sus transiciones/ajustes.
 

@@ -26,19 +26,7 @@ const FPSWorld={
  init(){
   if(this.solids.length)return;
   const block=(x,z,w,d,h,type='wall',base=this.height(x,z))=>{const q={x,z,w,d,h,y:base,type};this.solids.push(q);return q;};
-  // Two accessible buildings. Doorways, windows and stair flights are geometry
-  // and collision together, so visual cover is also ballistic cover.
-  for(const [x,z,w,d,h,col] of [[38,22,26,22,7,'#d3c1a1'],[-44,-34,25,30,9,'#92a4a1']]){
-   const y=this.height(x,z);block(x-w/2,z,1,d,h,'plaster',y).color=col;block(x+w/2,z,1,d,h,'plaster',y).color=col;
-   block(x,z-d/2,w,1,h,'plaster',y).color=col;
-   block(x-w*.33,z+d/2,w*.34,1,h,'plaster',y).color=col;block(x+w*.33,z+d/2,w*.34,1,h,'plaster',y).color=col;
-   block(x,z+d/2,w*.32,1,h-3.2,'plaster',y+3.2).color=col;
-   block(x,z,w+1,d+1,.45,'roof',y+h);
-   block(x,z,w-.5,d-.5,.2,'floor',y-.2);
-   for(let j=0;j<24;j++)block(x+w/2+3,z-d/2+j*.95,3.6,1.02,(j+1)*(h+.45)/24,'stair',y);
-   block(x+w/2+1.5,z+d/2+.9,4.4,3,.4,'roof',y+h+.05);
-   this.decor.push({type:'building',x,z,w,d,h,y});
-  }
+  for(const args of [[38,22,26,22,7,'#d3c1a1'],[-44,-34,25,30,9,'#92a4a1']])FPSArchitecture.add(this,block,...args);
   const rng=srand(7441);
   for(let i=0;i<34;i++){
    const x=(rng()-.5)*180,z=(rng()-.5)*180;
@@ -51,14 +39,7 @@ const FPSWorld={
   this.dress(block);this.cover(block);FPSSupplies.populate(this);
  },
  dress(block){
-  for(const [x,z,w,d,h,color]of [[86,-48,24,25,6.5,'#d89973'],[-53,65,28,19,5.7,'#dfd5ba']]){
-   const y=this.height(x,z);for(const side of [-1,1])block(x+side*w/2,z,.7,d,h,'plaster',y).color=color;
-   block(x,z-d/2,w,.7,h,'plaster',y).color=color;
-   for(const side of [-1,1])block(x+side*w*.32,z+d/2,w*.36,.7,h,'plaster',y).color=color;
-   block(x,z+d/2,w*.28,.7,h-3.1,'plaster',y+3.1).color=color;block(x,z,w+1,d+1,.35,'roof',y+h);block(x,z,w,d,.22,'floor',y-.22);
-   for(let j=0;j<24;j++)block(x+w/2+2.5,z-d/2+j*d/24,3.5,d/24+.05,(j+1)*(h+.35)/24,'stair',y);
-   this.decor.push({type:'building',x,z,w,d,h,y});
-  }
+  for(const args of [[86,-48,24,25,6.5,'#d89973'],[-53,65,28,19,5.7,'#dfd5ba']])FPSArchitecture.add(this,block,...args);
   for(const [x,z,w,d,h,type]of [[-22,-17,8,1.1,1.1,'stone'],[22,16,8,1.1,1.1,'stone'],[-26,25,1.2,9,1.2,'stone'],[24,-29,1.2,8,1.2,'stone'],[56,62,12,4.8,3,'container'],[72,61,12,4.8,3,'container'],[61,74,4.8,12,3,'container'],[-73,-2,9,1,1.3,'stone'],[46,-62,5,2,1.2,'barrier']])block(x,z,w,d,h,type);
   for(const x of [-7,7])block(x,-76,1.5,1.8,7.4,'stone');block(0,-76,15.5,1.8,1.2,'stone',this.height(0,-76)+6.2);
   const tx=91,tz=87,base=this.height(tx,tz);for(const x of [-3,3])for(const z of [-3,3])block(tx+x,tz+z,.42,.42,10.7,'steel',base);

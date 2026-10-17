@@ -7,25 +7,33 @@ const FPSHandArt={
   for(const j of [0,rings.length-1]){const center=pos.length/3;pos.push(rings[j][3]||0,rings[j][0],rings[j][4]||0);uv.push(.5,j?1:0);if(colors){const c=new T.Color(colors[j%colors.length]);cols.push(c.r,c.g,c.b);}for(let i=0;i<segments;i++){const a=j*(segments+1)+i;ix.push(...(j?[center,a+1,a]:[center,a,a+1]));}}
   const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(pos,3));g.setAttribute('uv',new T.Float32BufferAttribute(uv,2));if(colors)g.setAttribute('color',new T.Float32BufferAttribute(cols,3));g.setIndex(ix);g.computeVertexNormals();return g;
  },
- hand(id,left=false){
+ hand(id,left=false,support=false){
   const T=KartGL,L=CharacterDesign.get(id),g=new T.Group(),b=FPSScenery.batch(),glove=!!L.glove,col=L.glove||L.skin,skin=FPSGear.material(col,glove?'fabric':'skin'),crease=FPSGear.material(shade(col,-.12),glove?'fabric':'skin'),nail=FPSGear.material(shade(col,.1),'skin');g.userData={design:L,fingers:[]};
-  // A tapered carpal base, asymmetrical palm and thenar pad, with a real wrist.
-  const palm=this.loft([[-.091,.019,.023,.004,.01],[-.07,.023,.026,.006,.012],[-.045,.025,.033,.008,.014],[-.012,.023,.04,.007,.012],[.027,.022,.038,.004,.005],[.052,.017,.029,-.001,-.004],[.061,.008,.019,-.005,-.007]],20);b.geometry(palm,skin,[0,0,0]);b.add('sphere',skin,[.005,.004,.031],[.023,.043,.027]);
-  const arc=(points,r,material=skin)=>{const curve=new T.CatmullRomCurve3(points.map(p=>new T.Vector3(...p)));b.geometry(new T.TubeGeometry(curve,12,r,7,false),material,[0,0,0]);};
-  for(let i=0;i<4;i++){
-   const y=.043-i*.027,shorten=[0,0,.004,.01][i],a=[-.002,y,-.02],knuckle=[-.028,y+.002,-.046+shorten],joint=[-.047,y-.001,-.033+shorten],tip=[-.041,y-.003,-.007+shorten],r=[.0105,.011,.0103,.0088][i];
-   arc([a,knuckle,joint,tip],r);b.add('sphere',skin,knuckle,[r*1.17,r*.91,r*1.05]);b.add('sphere',skin,joint,[r*.93,r*.83,r*.9]);
-   // Fine creases follow the bent joints instead of a black ring around a tube.
-   arc([[-.027,y-r*.6,-.054+shorten],[-.03,y,-.056+shorten],[-.03,y+r*.6,-.053+shorten]],.00065,crease);
-   if(!glove&&(!L.species||L.species==='mariachi'))b.add('sphere',nail,[-.046,y-.003,.0005+shorten],[.0018,.006,.0065]);
-   if(L.hand==='claw')b.add('cone',nail,[-.044,y,.01+shorten],[.006,.023,.006],[Math.PI/2,0,.1]);g.userData.fingers.push({tip,length:[.075,.083,.078,.063][i]});
+  // Palm: 10 cm long, 6 cm across, 2.5 cm thick. No overlapping thenar sphere.
+  const palm=this.loft(support?[[-.09,.016,.021,-.063,.012],[-.068,.021,.029,-.047,.008],[-.046,.029,.042,-.025,.002],[-.031,.032,.044,-.009,-.002],[-.023,.027,.035,0,-.003]]:[[-.065,.016,.019,.006,.009],[-.048,.017,.023,.009,.01],[-.025,.015,.029,.012,.008],[.005,.014,.031,.012,.003],[.031,.012,.027,.01,-.003],[.045,.009,.02,.007,-.007]],20);b.geometry(palm,skin,[0,0,0]);
+  const arc=(points,r,material=skin)=>{const curve=new T.CatmullRomCurve3(points.map(p=>new T.Vector3(...p)));b.geometry(new T.TubeGeometry(curve,18,r,10,false),material,[0,0,0]);};
+  // Taper the distal phalanx and close the fingertip; joints share a surface.
+  const finger=(points,r)=>{const curve=new T.CatmullRomCurve3(points.map(p=>new T.Vector3(...p))),geo=new T.TubeGeometry(curve,22,r,12,false),pos=geo.attributes.position;for(let j=0;j<=22;j++){const t=j/22,c=curve.getPointAt(t),scale=lerp(1,.72,t*t);for(let k=0;k<=12;k++){const i=j*13+k;pos.setXYZ(i,c.x+(pos.getX(i)-c.x)*scale,c.y+(pos.getY(i)-c.y)*scale,c.z+(pos.getZ(i)-c.z)*scale);}}geo.computeVertexNormals();b.geometry(geo,skin,[0,0,0]);const end=points.at(-1);b.add('sphere',skin,end,[r*.73,r*.73,r*.73]);};
+  if(support){
+   // A rifle fore-end is horizontal: the fingers line up along the barrel,
+   // curl up its far side and meet the thumb on the near side.
+   for(let i=0;i<4;i++){const z=-.035+i*.023,r=i===3?.0078:.009,tip=[.016,.019-i*.001,z];finger([[-.012,-.028,z],[.021,-.037,z],[.041,-.018,z],[.038,.007,z],tip],r);g.userData.fingers.push({tip,length:.077});if(!glove)arc([[.031,-.026,z-r*.5],[.035,-.025,z],[.034,-.023,z+r*.5]],.0004,crease);if(L.hand==='claw')b.add('cone',nail,[.012,.026,z],[.004,.014,.004]);}
+   finger([[-.041,-.052,.014],[-.045,-.027,-.008],[-.038,-.005,-.034],[-.026,.007,-.061]],.0105);g.userData.wrist=[-.063,-.088,.012];b.finish(g,false);return g;
   }
-  arc([[.013,.028,.025],[-.008,.023,.049],[-.032,.008,.048],[-.04,-.007,.026]],.013);b.add('sphere',skin,[-.02,.015,.048],[.015,.016,.013]);
-  if(!glove){for(let i=0;i<3;i++)arc([[.028,-.055,.011+i*.007],[.031,-.03,.002+i*.009],[.029,-.006,-.007+i*.01]],.00055,crease);for(let i=0;i<2;i++)arc([[.019,-.077+i*.004,-.004],[.026,-.076+i*.004,.012],[.019,-.076+i*.004,.028]],.0006,crease);}
-  else{const pad=FPSGear.material(shade(col,-.27));for(let i=0;i<4;i++)b.add('sphere',pad,[.024,.04-i*.027,-.012],[.004,.011,.012]);for(const z of [-.022,.033])arc([[.021,-.067,z],[.026,-.015,z],[.021,.034,z]],.0008,nail);}
-  b.finish(g,false);if(left)g.scale.x=-1;return g;
+  for(let i=0;i<4;i++){
+   const y=.035-i*.023,shorten=[0,0,.003,.008][i],a=[.007,y,-.021],knuckle=[-.014,y,-.039+shorten],joint=[-.039,y-.002,-.029+shorten],tip=[-.039,y-.004,.007+shorten],r=[.009,.0095,.009,.0078][i];
+   finger([a,knuckle,joint,tip],r);
+   // Fine creases follow the bent joints instead of a black ring around a tube.
+   arc([[-.011,y-r*.55,-.047+shorten],[-.014,y,-.048+shorten],[-.017,y+r*.55,-.045+shorten]],.00045,crease);
+   if(!glove&&(!L.species||L.species==='mariachi'))b.add('sphere',nail,[-.041,y-.004,.011+shorten],[.0035,.0058,.001]);
+   if(L.hand==='claw')b.add('cone',nail,[-.039,y,.02+shorten],[.004,.016,.004],[Math.PI/2,0,.1]);g.userData.fingers.push({tip,length:[.075,.083,.078,.063][i]});
+  }
+  finger([[.018,.008,.015],[.018,.031,.004],[.008,.039,-.023],[-.008,.036,-.052],[-.018,.03,-.066]].map(([x,y,z])=>[x,y,support?-z:z]),.01);
+  if(!glove){for(let i=0;i<2;i++)arc([[.023,-.047,.004+i*.01],[.027,-.02,-.003+i*.009],[.023,.013,-.013+i*.009]],.00035,crease);arc([[.015,-.055,-.006],[.022,-.055,.01],[.014,-.055,.026]],.0004,crease);}
+  else{const pad=FPSGear.material(shade(col,-.18));for(let i=0;i<4;i++)b.add('sphere',pad,[.022,.031-i*.023,-.009],[.002,.008,.01]);}
+  b.finish(g,false);if(left)g.scale.x=-1;g.userData.wrist=[left?-.006:.006,-.063,.009];return g;
  },
- arm(id){const L=CharacterDesign.get(id),sleeved=L.sleeve==='long';return this.loft([[-.5,.052,.046],[-.36,.055,.048],[-.1,.049,.041],[.18,.039,.034],[.34,.032,.029],[.44,.027,.024],[.5,.024,.024]],20);},
+ arm(id){const L=CharacterDesign.get(id),sleeved=L.sleeve==='long';return this.loft([[-.5,.052,.046],[-.36,.055,.048],[-.1,.049,.041],[.18,.039,.034],[.34,.032,.029],[.44,.023,.021],[.5,.017,.019]],20);},
 };
 const FPSWeaponArt={
  profile(points,width,bevel=.0015){
@@ -98,19 +106,25 @@ const FPSWeaponArt={
    for(const side of [-1,1])for(let i=0;i<3;i++)mb.add('box',dark,[side*.022,-.104-i*.037,magZ+.01],[.0015,.003,.059]);
   }else{mb.add('cylinder',FPSGear.material('#b69a56','metal'),[0,-.07,.02],[.011,.056,.011],[Math.PI/2,0,0]);}
   b.finish(body,false);mb.finish(magazine,false);
-  if(id===4){const mesh=new T.Mesh(new T.CylinderGeometry(.055,.055,.29,32,1,true),metal);mesh.rotation.x=Math.PI/2;mesh.position.set(0,.16,-.025);mesh.name='open-scope-tube';body.add(mesh);}
+  if(id===4){
+   const mesh=new T.Mesh(new T.CylinderGeometry(.055,.055,.29,32,1,true),metal);mesh.rotation.x=Math.PI/2;mesh.position.set(0,.16,-.025);mesh.name='open-scope-tube';body.add(mesh);
+   // Off-axis optics reflect coated glass. Opaque depth stops the hip view
+   // looking through the tube; ADS uses the unobstructed world camera instead.
+   const cv=mkCanvas(256,256),c=cv.getContext('2d'),gradient=c.createRadialGradient(90,76,5,128,128,128);gradient.addColorStop(0,'#72abb8');gradient.addColorStop(.27,'#284f64');gradient.addColorStop(.7,'#112a3b');gradient.addColorStop(1,'#050e18');c.fillStyle=gradient;c.fillRect(0,0,256,256);c.strokeStyle='rgba(163,222,230,.38)';c.lineWidth=5;c.beginPath();c.arc(128,128,105,3.7,5.3);c.stroke();const map=new T.CanvasTexture(cv);map.colorSpace=T.SRGBColorSpace;
+   for(const side of [-1,1]){const lens=new T.Mesh(new T.SphereGeometry(1,32,16),new T.MeshStandardMaterial({map,color:'#a8c7db',metalness:.48,roughness:.17}));lens.scale.set(.052,.052,.006);lens.position.set(0,.16,side<0?-.172:.122);lens.name='scope-coated-lens-'+side;body.add(lens);}
+  }
   for(const side of [-1,1]){const logo=new T.Mesh(new T.PlaneGeometry(id===0?.085:.125,.028),this.label(['C9 / 9×19','VSP / 9 mm','SIERRA / 5.56','T12 / 12 GA','HZ / .308'][id]));logo.rotation.y=side*Math.PI/2;logo.position.set(side*.034,-.016,id===0?.04:.053);body.add(logo);}
   if(!thirdPerson){
    const sleeve=FPSGear.material(L.sleeve==='long'?L.top:L.skin,L.sleeve==='long'?'fabric':'skin'),cuff=FPSGear.material(L.wrap||shade(L.top,-.2),'fabric');
-   for(const left of [false,true]){const arm=new T.Mesh(FPSHandArt.arm(character),sleeve),band=new T.Mesh(new T.CylinderGeometry(.025,.027,1,18),cuff);root.add(arm,band);const hand=FPSHandArt.hand(character,left);hand.name=character+':fps-'+(left?'left':'right')+'-hand';root.add(hand);root.userData[left?'leftHand':'rightHand']=hand;root.userData.arms.push({mesh:arm,band,elbow:new T.Vector3(left?-.23:.15,-.3,left?.25:.42),left});}
+   for(const left of [false,true]){const arm=new T.Mesh(FPSHandArt.arm(character),sleeve),band=new T.Mesh(new T.CylinderGeometry(.025,.027,1,18),cuff);root.add(arm,band);const hand=FPSHandArt.hand(character,left,left&&id!==0);hand.name=character+':fps-'+(left?'left':'right')+'-hand';root.add(hand);root.userData[left?'leftHand':'rightHand']=hand;root.userData.arms.push({mesh:arm,band,elbow:new T.Vector3(left?-.23:.15,-.3,left?.25:.42),left});}
   }
   const flash=FPSFX.sprite({map:FPSFX.texture(),transparent:true,depthWrite:false,blending:T.AdditiveBlending,color:'#fff0c2'});flash.scale.set(.19,.19,1);flash.position.set(0,.018,-long*.86);flash.visible=false;body.add(flash);root.userData.flash=flash;this.animate(root,{gun:id,reloading:0,recoil:0,throwTimer:0});return root;
  },
- grip(id,left,reach=0){const long=[.34,.54,.8,.88,1.07][id];return left?[lerp(id===0?-.026:-.033,-.025,reach),lerp(id===0?-.118:-.053,-.19,reach),lerp(id===0?.073:-long*.3,-.025,reach)]:[.029,-.12,.076];},
+ grip(id,left,reach=0){const long=[.34,.54,.8,.88,1.07][id];return left?[lerp(id===0?-.031:0,-.025,reach),lerp([-.132,.003,.003,-.008,-.044][id],-.19,reach),lerp(id===0?.057:-long*.3,-.025,reach)]:[.029,-.12,.076];},
  animate(gun,p){
   const u=gun.userData,id=p.gun,t=p.reloading?clamp(1-p.reloading/FPS_GUNS[id].reload,0,1):0,reach=Math.sin(t*Math.PI),pull=id===3?Math.sin(t*Math.PI*3):Math.sin(clamp((t-.15)/.65,0,1)*Math.PI),throwing=clamp((p.throwTimer||0)/.5,0,1);u.body.position.z=p.recoil*.2;
   u.magazine.visible=id!==3||!!p.reloading;u.magazine.position.set(.018*pull,-.14*Math.max(0,pull),.04*pull);u.magazine.rotation.x=.15*pull;
-  if(u.leftHand){u.rightHand.position.set(...this.grip(id,false));u.rightHand.rotation.set(0,0,-.13);u.leftHand.position.set(...this.grip(id,true,reach));u.leftHand.rotation.set(0,0,lerp(id===0?-.12:-.96,-.32,reach));u.leftHand.position.y+=throwing*.08;u.leftHand.position.z-=Math.sin(throwing*Math.PI)*.14;}
-  for(const arm of u.arms){const hand=arm.left?u.leftHand:u.rightHand,wrist=new KartGL.Vector3(.003,-.082,.012).applyEuler(hand.rotation).add(hand.position),d=wrist.clone().sub(arm.elbow);arm.mesh.position.copy(wrist).add(arm.elbow).multiplyScalar(.5);arm.mesh.quaternion.setFromUnitVectors(new KartGL.Vector3(0,1,0),d.clone().normalize());arm.mesh.scale.y=d.length();arm.band.position.copy(wrist).lerp(arm.elbow,.045);arm.band.quaternion.copy(arm.mesh.quaternion);arm.band.scale.y=d.length()*.06;}
+  if(u.leftHand){u.rightHand.position.set(...this.grip(id,false));u.rightHand.rotation.set(0,0,-.13);u.leftHand.position.set(...this.grip(id,true,reach));u.leftHand.rotation.set(0,0,lerp(id===0?-.12:0,-.32,reach));u.leftHand.position.y+=throwing*.08;u.leftHand.position.z-=Math.sin(throwing*Math.PI)*.14;}
+  for(const arm of u.arms){const hand=arm.left?u.leftHand:u.rightHand,wrist=new KartGL.Vector3(...hand.userData.wrist).applyEuler(hand.rotation).add(hand.position),d=wrist.clone().sub(arm.elbow);arm.mesh.position.copy(wrist).add(arm.elbow).multiplyScalar(.5);arm.mesh.quaternion.setFromUnitVectors(new KartGL.Vector3(0,1,0),d.clone().normalize());arm.mesh.scale.y=d.length();arm.band.position.copy(wrist).lerp(arm.elbow,.05);arm.band.quaternion.copy(arm.mesh.quaternion);arm.band.scale.set(1,d.length()*.06,1);}
  },
 };
