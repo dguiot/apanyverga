@@ -429,6 +429,9 @@ const InviteBox = {
   },
   open(copied) {
     this.close();
+    // Keyup belongs to the dialog after focus moves. Clear the menu's held
+    // keys now so Enter or an arrow cannot remain stuck behind the dialog.
+    keysDown.clear();keysTapped.clear();keyPulses.clear();
     const url = Net.inviteURL(), el = this.el = document.createElement('div');
     el.id = 'invite';
     el.innerHTML = '<div class="inv-card" role="dialog" aria-modal="true" aria-labelledby="inv-t">'
@@ -459,5 +462,5 @@ const InviteBox = {
     const first = el.querySelector('[data-a=close]'); try { first.focus({ preventScroll: true }); } catch (e) { /* nada */ }
     Audio8.sfx('confirm');
   },
-  close() { if (!this.el) return; this.el.remove(); this.el = null; try { canvas.focus({ preventScroll: true }); } catch (e) { /* nada */ } },
+  close() { if (!this.el) return; this.el.remove(); this.el = null;keysDown.clear();keysTapped.clear();keyPulses.clear();try { canvas.focus({ preventScroll: true }); } catch (e) { /* nada */ } },
 };
