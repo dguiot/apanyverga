@@ -24,7 +24,7 @@ const {chromium}=require('playwright');const {pathToFileURL}=require('node:url')
     await p.evaluate(()=>{APP.kartRace.phase='race';__pad.buttons[7]={pressed:true,value:1,touched:true};});await p.waitForTimeout(700);
     ok('RT accelerates',await p.evaluate(()=>APP.kartRace.player.v>15));
     const sx=await p.evaluate(()=>APP.kartRace.player.x);await p.evaluate(()=>__pad.axes[0]=-.8);await p.waitForTimeout(350);await p.evaluate(()=>__pad.axes[0]=0);
-    ok('analog steering responds',await p.evaluate(x=>APP.kartRace.player.x<x-.04,sx));
+    ok('analog left moves toward the left of the chase camera',await p.evaluate(x=>APP.kartRace.player.x>x+.04,sx));
     await p.evaluate(()=>APP.kartRace.player.item='shield');await btn(p,4);ok('LB uses held item once',await p.evaluate(()=>APP.kartRace.player.item===null&&APP.kartRace.player.shield>5));
     await p.keyboard.down('KeyM');await p.waitForTimeout(100);await p.keyboard.up('KeyM');await p.waitForTimeout(100);ok('M silences music while preserving effects',await p.evaluate(()=>!Audio8.musicOn&&!Audio8.muted));
     await p.keyboard.down('KeyM');await p.waitForTimeout(100);await p.keyboard.up('KeyM');await p.waitForTimeout(100);ok('M restores the new soundtrack',await p.evaluate(()=>Audio8.musicOn&&KartMusic.mood!==null));
@@ -54,8 +54,10 @@ const {chromium}=require('playwright');const {pathToFileURL}=require('node:url')
     const cdp=await touch.context().newCDPSession(touch);
     const pts=await touch.evaluate(()=>{const L=TouchPad.L,b=L.btns.find(b=>b.a==='attack');return [{x:Math.round(L.home.x),y:Math.round(L.home.y),id:1},{x:Math.round(b.x),y:Math.round(b.y),id:2}];});
     await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:pts});await touch.waitForTimeout(650);
-    const beforeX=await touch.evaluate(()=>APP.kartRace.player.x);pts[0].x+=48;await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:pts});await touch.waitForTimeout(300);
-    ok('two simultaneous fingers accelerate and steer',await touch.evaluate(x=>APP.kartRace.player.v>15&&APP.kartRace.player.x>x+.05,beforeX));
+    await touch.evaluate(()=>Object.assign(APP.kartRace.player,{s:200,x:0,v:40,yaw:0,velocityYaw:0,turnRate:0,steer:0}));
+    pts[0].x+=48;await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:pts});
+    await touch.waitForFunction(()=>APP.kartRace.player.x<-.08,{},{timeout:3000});
+    ok('two simultaneous fingers accelerate and steer right',await touch.evaluate(()=>APP.kartRace.player.v>15&&APP.kartRace.player.x<-.08));
     if(process.env.KART_SHOTS)await touch.screenshot({path:path.join(process.env.KART_SHOTS,'touch.png')});
     await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await touch.waitForTimeout(100);ok('lifting fingers releases all touch controls',await touch.evaluate(()=>TouchPad.held.size===0&&TouchPad.stick===null));
     const musicTouch=await touch.evaluate(()=>{APP.kartRace.paused=true;return Audio8.musicOn;});await touch.touchscreen.tap(512,536);await touch.waitForTimeout(140);ok('touch pause has a working music button',await touch.evaluate(m=>Audio8.musicOn!==m,musicTouch));

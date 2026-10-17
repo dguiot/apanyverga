@@ -40,7 +40,9 @@ const KartControls = {
     }
     const t=Devices.ctrls.touch;
     if(TouchPad.active&&t){const c=t.cur;if(Math.abs(c.x)>.08)steer=c.x;gas=gas||c.attack;brake=brake||c.special;drift=drift||c.jump;item=item||c.shield;rear=rear||c.grab;pause=pause||c.start;}
-    const now={steer,gas:!!gas,brake:!!brake,drift:!!drift,item:!!item,rear:!!rear,pause:!!pause,rescue:!!rescue,music:has('KeyM')};
+    // Course lateral +x is screen-left from the chase camera. Convert human
+    // screen-right input here once; AI, physics and network packets use course space.
+    const now={steer:-steer,gas:!!gas,brake:!!brake,drift:!!drift,item:!!item,rear:!!rear,pause:!!pause,rescue:!!rescue,music:has('KeyM')};
     const out={...now,itemPressed:(now.item&&!this.prev.item)||(now.rear&&!this.prev.rear),driftPressed:now.drift&&!this.prev.drift,pausePressed:now.pause&&!this.prev.pause,rescuePressed:now.rescue&&!this.prev.rescue,musicPressed:now.music&&!this.prev.music};
     this.prev=now;this.tapped.clear();return out;
   },

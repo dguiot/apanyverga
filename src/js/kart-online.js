@@ -194,7 +194,7 @@ APP.kartLobbyUpdate=function(){
 };
 APP.kartLobbyDraw=function(){
   const host=Net.role==='host',lob=host?Net.lob:Net.hostPres()?.lob||{},players=lob.players||[],M=KartMenu,cur=host?M.char:Net.guest.ch,mine=players.some(p=>p.peer===Net.myPeer());
-  M.header('SALA ESMASH KART','CÓDIGO '+(host?Net.code:Net.hostPres()?.code||'…')+'  ·  Hasta cuatro pilotos · voz, cámara y pantalla dividida');
+  M.header('SALA ESMASH KART','CÓDIGO '+(host?Net.code:Net.hostPres()?.code||'…')+'  ·  Hasta cuatro pilotos · voz, cámara y vista individual');
   for(let i=0;i<4;i++){const b={x:42+i*307,y:120,w:287,h:183},p=players[i];KartRender.panel(b.x,b.y,b.w,b.h);
     if(p){const id=CHAR_ORDER[p.ch]||CHAR_ORDER[0],cam=AV.videoFor(p.peer);if(cam)drawVideoCover(ctx,cam.v,b.x+12,b.y+12,94,80,cam.mirror);else ctx.drawImage(KartRender.kartSprite(id,p.vh).img,b.x+12,b.y+7,108,104);
       text(Net.nameOf(p.peer),b.x+125,b.y+38,17,PAPER,{align:'left',body:true,weight:700});text(CHARS[id].name,b.x+125,b.y+71,19,GOLD,{align:'left',weight:700});
@@ -209,7 +209,7 @@ APP.kartLobbyDraw=function(){
   M.button('VEHÍCULO: '+kartVehicle(M.vehicle).name+' · V / Y',{x:42,y:576,w:758,h:48});
   text('← → piloto · A: '+(host?'iniciar · LT / RT: pista · X: cilindrada':'listo')+' · U / LB: invitar',43,640,14,'#c3d7df',{align:'left',body:true});
   M.button('← SALIR',{x:42,y:652,w:196,h:42});M.button('INVITAR · U / LB',{x:253,y:652,w:256,h:42});
-  text('Cada quien conduce su piloto. Todos ven las cámaras de la carrera.',1235,682,14,TEAL,{align:'right',body:true});
+  text('Cada quien conduce y ve su propio piloto a pantalla completa.',1235,682,14,TEAL,{align:'right',body:true});
 };
 const kartOnlineFocus=APP.focusNative;APP.focusNative=function(d){
   if(this.screen==='kartLobby'){
