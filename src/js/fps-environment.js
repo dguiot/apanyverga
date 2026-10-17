@@ -30,8 +30,11 @@ const FPSScenery={
  cover(q,batch){
   const T=KartGL,bag=q.type==='sandbag',rock=q.type==='gabion',mat=this.material(bag?'sandbag':rock?'gabion':'wood',bag?'#ede1be':rock?'#d3d2b5':'#a5b5a2'),rim=this.material('steel','#697570'),wood=this.material('wood','#cfb48c');
   // The dense core fills its collision envelope. The small bevel is cosmetic.
-  const geo=new T.BoxGeometry(q.w-(bag?.05:0),q.h-(bag?.12:0),q.d*(bag?.62:1));batch.geometry(geo,mat,[q.x,q.y+q.h/2,q.z]);
-  if(bag){if(!KartModels.geometry.has('fps-sandbag'))KartModels.geometry.set('fps-sandbag',new T.SphereGeometry(1,12,6));for(let row=0;row<4;row++)for(let i=0;i<Math.ceil(q.w/.85);i++){const width=q.w/Math.ceil(q.w/.85);batch.add('fps-sandbag',mat,[q.x-q.w/2+width*(i+.5),q.y+.16+row*.3,q.z],[width*.53,.18,q.d*.53]);}}
+  const geo=new T.BoxGeometry(q.w-(bag?.05:0),q.h-(bag?.3:0),q.d*(bag?.4:1));batch.geometry(geo,mat,[q.x,q.y+q.h/2,q.z]);
+  if(bag){
+   if(!KartModels.geometry.has('fps-sandbag')){const g=new T.BoxGeometry(1,1,1,4,3,4),p=g.attributes.position,n=g.attributes.normal;for(let i=0;i<p.count;i++){const v=new T.Vector3(p.getX(i),p.getY(i),p.getZ(i)),inner=v.clone().clampScalar(-.3,.3),normal=v.clone().sub(inner).normalize();v.copy(inner).addScaledVector(normal,.2);p.setXYZ(i,v.x,v.y,v.z);n.setXYZ(i,normal.x,normal.y,normal.z);}KartModels.geometry.set('fps-sandbag',g);}
+   const count=Math.ceil(q.w/.85),width=q.w/count;for(let row=0;row<4;row++)for(let i=0;i<count+(row%2);i++){const start=Math.max(-q.w/2,-q.w/2+(i-(row%2)*.5)*width),end=Math.min(q.w/2,-q.w/2+(i+1-(row%2)*.5)*width);batch.add('fps-sandbag',mat,[q.x+(start+end)/2,q.y+.155+row*.3,q.z],[(end-start)*1.035,.32,q.d*1.035]);}
+  }
   else if(rock){for(const s of [-1,1]){batch.add('box',rim,[q.x+s*q.w/2,q.y+q.h/2,q.z],[.035,q.h,.035]);batch.add('box',rim,[q.x,q.y+q.h,q.z+s*q.d/2],[q.w,.025,.025]);}}
   else{for(const side of [-1,1])for(const k of [-1,1]){batch.add('box',rim,[q.x+k*q.w*.36,q.y+q.h/2,q.z+side*(q.d/2+.025)],[.09,q.h,.05]);batch.add('box',wood,[q.x,q.y+q.h/2+k*(q.h/2-.1),q.z+side*(q.d/2+.04)],[q.w,.13,.08]);}batch.add('box',rim,[q.x,q.y+q.h+.025,q.z],[q.w,.04,q.d]);}
  },
