@@ -1,33 +1,6 @@
 'use strict';
-// ============================================================
-//  DIBUJO DE PERSONAJES: estilo arcade de peleas (proporciones
-//  realistas, músculo sombreado) + caras con foto
-// ============================================================
-const FACE_IMG = {}, FACE_HURT = {}, FACE_PORT = {};
-function tintCanvas(img, col) {
-  const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
-  const x = c.getContext('2d'); x.drawImage(img, 0, 0);
-  x.globalCompositeOperation = 'source-atop'; x.fillStyle = col; x.fillRect(0, 0, c.width, c.height);
-  return c;
-}
-function loadFaces() {
-  const data = typeof FACE_DATA !== 'undefined' ? FACE_DATA : {};
-  for (const [id, f] of Object.entries(data)) {
-    const img = new Image();
-    img.onload = () => { FACE_IMG[id] = img; FACE_HURT[id] = tintCanvas(img, 'rgba(255,40,40,.42)'); };
-    img.src = f.head;
-    const p = new Image(); p.onload = () => { FACE_PORT[id] = p; }; p.src = f.port;
-  }
-}
+// Animated Canvas fallback. All identities live in character-design.js.
 
-// sleeve: 'long' | 'short' | 'none'   ·   hairBack: pelo detrás de la foto
-const LOOKS = {
-  daniel: { skin: '#b97a5a', hair: '#2e241c', hairBack: 'long', toonBeard: 'short', top: '#3d5e8e', top2: '#2a4268', pattern: '#cfc39c', inner: '#f2efe9', garment: 'fleece', sleeve: 'long', pants: '#2b2f3a', shoe: '#1d1d1f', sole: '#d9d4c8', wrap: '#ece6da', accent: '#2ec4b6', build: { chest: 17, waist: 12.5, arm: 0.98, leg: 0.98 }, prop: { leg: 1.0, torso: 1.05, arm: 1.03, head: 1.02 } },
-  nacho:  { skin: '#d6a084', hair: '#8a6444', hairBack: 'mullet', toonBeard: 'stubble', top: '#1d1d21', top2: '#101013', garment: 'tee', sleeve: 'short', pants: '#39404e', shoe: '#e8e4dc', sole: '#8a8578', glove: '#c1121f', accent: '#ff9f1c', build: { chest: 20.5, waist: 11.5, arm: 1.18, leg: 1.03 }, prop: { leg: 1.05, torso: 1.03, arm: 1.1, head: 0.97 } },
-  pablo:  { skin: '#cc8e70', hair: '#231c18', hairBack: 'short', toonBeard: 'short', top: '#9a9ca2', top2: '#72747a', garment: 'hoodie', sleeve: 'long', sash: '#d62839', pants: '#23262d', shoe: '#121216', sole: '#3a3d45', wrap: '#2a2d34', accent: '#e63946', build: { chest: 15, waist: 10, arm: 0.9, leg: 0.93 }, prop: { leg: 0.96, torso: 0.95, arm: 0.97, head: 1.03 } },
-  robes:  { skin: '#b98470', hair: '#3b2f28', hairBack: 'bun', beard: 'full', eye: '#241509', top: '#1d1d21', top2: '#111114', garment: 'tee', sleeve: 'short', shades: true, tattoo: '#2b3a4a', pants: '#34404f', shoe: '#4a3a2c', sole: '#2a2119', accent: '#95d5b2', build: { chest: 24.5, waist: 19, belly: 1, arm: 1.4, leg: 1.3 }, prop: { leg: 0.91, torso: 1.1, arm: 1.04, head: 0.98, neck: 0.7 } },
-  nicole: { skin: '#dcae95', hair: '#c49a62', hairBack: 'long', hairLen: 46, eye: '#3f6e8a', lips: '#b5485d', top: '#bfa28a', top2: '#94796a', garment: 'blouse', sleeve: 'long', necklace: true, pants: '#2f3542', shoe: '#efe9e1', sole: '#a39a8f', accent: '#48cae4', build: { chest: 13.5, waist: 8.8, hips: 12.5, arm: 0.8, leg: 0.88 }, prop: { leg: 1.12, torso: 0.95, arm: 1.0, head: 0.93, neck: 1.15 } },
-};
 
 // lo que un personaje lleva en la mano cuando no carga un objeto (el capote del torero)
 const HAND_PROPS = {};
@@ -118,18 +91,20 @@ function walkPose(phase, amp, lean, guard) {
 const SK_BASE = { thigh: 27, shin: 26, torso: 37, upper: 21, fore: 20, neck: 7.5, headRX: 10.8, headRY: 14 };
 let SK = SK_BASE; // esqueleto del personaje que se está dibujando o animando (cada persona tiene el suyo)
 let DRAW_POSE = null, DRAW_OPT = {}; // la pose que se está dibujando (mandíbula, cola, alas…)
+const CHARACTER_SKELETONS = new Map();
 function skOf(id) {
   const L = LOOKS[id]; if (!L) return SK_BASE;
-  if (!L.K) {
+  if (!CHARACTER_SKELETONS.has(id)) {
     const p = Object.assign({ leg: 1, torso: 1, arm: 1, head: 1, neck: 1 }, L.prop || {});
-    L.K = { thigh: SK_BASE.thigh * p.leg, shin: SK_BASE.shin * p.leg, torso: SK_BASE.torso * p.torso, upper: SK_BASE.upper * p.arm, fore: SK_BASE.fore * p.arm,
+    const K = { thigh: SK_BASE.thigh * p.leg, shin: SK_BASE.shin * p.leg, torso: SK_BASE.torso * p.torso, upper: SK_BASE.upper * p.arm, fore: SK_BASE.fore * p.arm,
       neck: SK_BASE.neck * p.neck, headRX: SK_BASE.headRX * p.head, headRY: SK_BASE.headRY * p.head };
     // altura de cadera+torso respecto al esqueleto con el que se diseñaron los golpes (47 + 34)
-    L.K.bodyK = (L.K.thigh + L.K.shin + L.K.torso) / 81;
+    K.bodyK = (K.thigh + K.shin + K.torso) / 81;
     // cuánto cuelga de la orilla: manos arriba sobre el borde
-    L.K.hang = L.K.thigh + L.K.shin + L.K.torso * 0.989 - 4 + L.K.upper * 0.996 + L.K.fore * 0.998 + 5 - 20.5;
+    K.hang = K.thigh + K.shin + K.torso * 0.989 - 4 + K.upper * 0.996 + K.fore * 0.998 + 5 - 20.5;
+    CHARACTER_SKELETONS.set(id,K);
   }
-  return L.K;
+  return CHARACTER_SKELETONS.get(id);
 }
 function useSK(id) { SK = skOf(id); return SK; }
 let OUTW = 1.05; // grosor del contorno (más grueso solo cuando destella)
@@ -332,7 +307,7 @@ function drawTorso(c, id, L, B, OUT) {
 }
 
 // Dibuja un personaje con los pies en (0,0) mirando a la derecha.
-// opt.flip: el lienzo está espejado (mira a la izquierda) → la foto se des-espeja.
+// opt.flip: el lienzo está espejado (mira a la izquierda).
 function drawCharacter(c, id, pose, opt = {}) {
   useSK(id);
   const L = LOOKS[id], B = L.build;
@@ -394,13 +369,13 @@ function drawCharacter(c, id, pose, opt = {}) {
 }
 
 function drawHairBack(c, id, L, x, y, pose, OUT) {
-  if (!L.hairBack && L.style !== 'ponytail') return; // también sin foto: la cara dibujada lleva su pelo
+  if (!L.hairBack && L.style !== 'ponytail') return; // la cabeza comparte la silueta del cabello
   c.save(); c.translate(x, y); c.rotate(pose.lean * 0.25);
   if (L.hairBack === 'long') {
     const sw = Math.sin(performance.now() / 400) * 1.5, len = L.hairLen || 30, k = len / 30;
-    if (FACE_IMG[id]) { c.fillStyle = OUT; c.beginPath(); c.ellipse(-3, 8 * k, 17.5, 23 * k, 0.08, 0, TAU); c.fill(); }
+
     c.fillStyle = L.hair; c.beginPath(); c.moveTo(-17, -4); c.quadraticCurveTo(-21 + sw, len * 0.75, -11, len); c.lineTo(9, len); c.quadraticCurveTo(17, len * 0.6, 14, -4); c.quadraticCurveTo(0, -20, -17, -4); c.fill();
-    if (!FACE_IMG[id]) { c.strokeStyle = OUT; c.lineWidth = 1.6; c.stroke(); } // cara dibujada: contorno fino en vez de la sombra detrás de la foto
+    c.strokeStyle = OUT; c.lineWidth = 1.6; c.stroke(); // contorno del cabello
     c.strokeStyle = shade(L.hair, 0.2); c.lineWidth = 1; for (let i = -12; i < 12; i += 5) { c.beginPath(); c.moveTo(i, 0); c.quadraticCurveTo(i - 2 + sw, len * 0.55, i - 1, len - 2); c.stroke(); }
     c.strokeStyle = shade(L.hair, -0.18); c.beginPath(); c.moveTo(-4, 4); c.quadraticCurveTo(-7 + sw, len * 0.6, -5, len - 3); c.stroke();
   } else if (L.hairBack === 'bun') {
@@ -423,19 +398,8 @@ function drawHead(c, id, face = 'normal', opt = {}) {
   useSK(id);
   const L = LOOKS[id], OUT = opt.outline || 'rgba(8,10,16,.92)';
   if (L.species) return drawCreatureHead(c, L, face, OUT);
-  const img = FACE_IMG[id];
-  if (img) {
-    const d = FACE_DATA[id];
-    const w = SK.headRX * 2.25 * d.scale, h = w * d.hh / d.hw;
-    c.save();
-    if (opt.flip) c.scale(-1, 1);
-    c.drawImage((face === 'hurt' || face === 'ko') && FACE_HURT[id] ? FACE_HURT[id] : img, -w / 2, -h / 2 - 1, w, h);
-    c.restore();
-    if (L.headwear && typeof drawHeadwear === 'function') drawHeadwear(c, id, L, OUT, true);
-    return;
-  }
   drawToonHead(c, id, L, face, OUT);
-  if (L.headwear && typeof drawHeadwear === 'function') drawHeadwear(c, id, L, OUT, false);
+  if (L.headwear && typeof drawHeadwear === 'function') drawHeadwear(c, id, L, OUT);
 }
 function drawToonHead(c, id, L, face, OUT, clipInside) {
   const RX = SK.headRX, RY = SK.headRY;
@@ -459,7 +423,7 @@ function drawToonHead(c, id, L, face, OUT, clipInside) {
   c.fillStyle = g; c.fill();
   if (clipInside) { c.save(); headPath(0); c.clip(); clipInside(c, RX, RY); c.restore(); }
   // barba
-  const beard = L.beard || (!FACE_IMG[id] && L.toonBeard);
+  const beard = L.beard || L.toonBeard;
   if (beard === 'short' || beard === 'stubble') {
     c.save(); headPath(0); c.clip();
     c.fillStyle = beard === 'short' ? shade(L.hair, 0.05) : withAlpha(shade(L.hair, 0.1), 0.45);
@@ -520,8 +484,8 @@ function drawHairFront(c, id, L, RX, RY, OUT) {
     c.quadraticCurveTo(-RX * 0.4, -RY * 0.45, -RX * 0.55, RY * 0.3);
     c.closePath(); c.fill(); c.stroke();
     c.fillStyle = L.accent; c.beginPath(); c.arc(-RX * 0.85, -RY * 0.3, 2.2, 0, TAU); c.fill();
-  } else if (L.hairBack && !FACE_IMG[id]) {
-    // pelo dibujado (versión sin fotos): el copete según su peinado
+  } else if (L.hairBack) {
+    // el copete según su peinado
     if (L.hairBack === 'long') {
       c.moveTo(-RX - 2.5, RY * 0.55);
       c.bezierCurveTo(-RX - 3.5, -RY * 1.25, RX * 0.85, -RY * 1.42, RX + 2, -RY * 0.12);
@@ -546,39 +510,21 @@ function drawHairFront(c, id, L, RX, RY, OUT) {
   }
 }
 
-// Retrato para HUD / menús: foto real si existe; si no, la cabeza dibujada
+// Portraits use the original Esmash drawing, shared with the 3D textures.
 function drawPortrait(c, id, x, y, r, face = 'normal') {
-  const p = FACE_PORT[id];
-  if (p) {
-    const s = r * 2.35;
-    c.drawImage(p, x - s / 2, y - s * 0.46, s, s);
-    if (face === 'ko' || face === 'hurt') { c.fillStyle = face === 'ko' ? 'rgba(10,12,20,.55)' : 'rgba(230,57,70,.28)'; c.fillRect(x - s / 2, y - s * 0.46, s, s); }
-    return;
-  }
+  useSK(id);
   c.save(); c.translate(x, y + r * 0.1); c.scale(r / SK.headRY, r / SK.headRY);
   drawHead(c, id, face);
   c.restore();
 }
-// Retrato grande de busto (selección, VS): foto o busto dibujado
+// Selection / versus bust.
 function drawBust(c, id, x, y, w, h, face = 'normal', flip = false) {
-  const p = FACE_PORT[id];
-  c.save(); c.beginPath(); c.rect(x, y, w, h); c.clip();
-  if (p) {
-    const s = Math.min(Math.max(w, h) * 1.02, h * 1.12);
-    c.imageSmoothingQuality = 'high';
-    if (flip) { c.translate(x + w, 0); c.scale(-1, 1); c.drawImage(p, (w - s) / 2, y + (h - s) * 0.35, s, s); }
-    else c.drawImage(p, x + (w - s) / 2, y + (h - s) * 0.35, s, s);
-    // integra el fondo de la foto con el color del panel
-    const vg = c.createRadialGradient(x + w / 2, y + h * 0.42, s * 0.28, x + w / 2, y + h * 0.45, s * 0.62);
-    vg.addColorStop(0, 'rgba(7,9,15,0)'); vg.addColorStop(1, 'rgba(7,9,15,.75)');
-    c.fillStyle = vg; c.fillRect(x, y, w, h);
-  } else {
-    const k = h / 70;
-    c.translate(x + w / 2, y + h * 1.62); c.scale((flip ? -1 : 1) * k, k);
-    drawCharacter(c, id, mkPose({ armF: [0.6, 1.9], armB: [0.4, 2.0], face }), { flip });
-  }
-  c.restore();
+  c.save(); c.beginPath(); c.rect(x,y,w,h); c.clip();
+  const k=h/70;
+  c.translate(x+w/2,y+h*1.62);c.scale((flip?-1:1)*k,k);
+  drawCharacter(c,id,mkPose({armF:[.6,1.9],armB:[.4,2],face}),{flip});c.restore();
 }
+
 function drawStar(c, x, y, r1, r2, col, rot = -Math.PI / 2) {
   c.beginPath();
   for (let i = 0; i < 10; i++) { const r = i % 2 ? r2 : r1, a = rot + i * Math.PI / 5; c.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r); }

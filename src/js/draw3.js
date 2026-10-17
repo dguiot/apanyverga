@@ -5,31 +5,9 @@
 //  Cada uno cambia la silueta: sombrero y guitarra, espinas y garras,
 //  cabezota con bracitos, capa y botas, branquias y cola con aleta.
 // ============================================================
-Object.assign(LOOKS, {
-  mariachi: { species: 'mariachi', skin: '#c68b62', hair: '#1b1512', eye: '#2b1a10', lips: '#7a3e2c', top: '#17171b', top2: '#0b0b0e', garment: 'charro', sleeve: 'long',
-    pants: '#17171b', studs: '#d9dde3', feet: 'boot', shoe: '#2b1d14', sole: '#120c08', heel: 1, accent: '#e9c46a', tie: '#c1121f', shirt: '#f4efe8',
-    hat: '#1a1a1f', hatTrim: '#d9dde3', hatBand: '#e9c46a', back: 'guitar', mustache: '#1b1512',
-    build: { chest: 18, waist: 12, arm: 1.0, leg: 1.0 }, prop: { leg: 1.0, torso: 1.02, arm: 1.02, head: 1.0 } },
-  chupa: { species: 'chupa', skin: '#7d8c74', skin2: '#4f5c49', belly: '#a9b39b', eye: '#ff2d2d', spine: '#2f3a2c', top: '#7d8c74', top2: '#4f5c49', garment: 'chupa', sleeve: 'none',
-    pants: '#6c7a64', hand: 'claw', claw: '#e9e4d4', feet: 'claw', back: 'spines', accent: '#ff2d2d', neckW: 6,
-    tail: { kind: 'chupa', col: '#4f5c49', tip: '#2f3a2c' },
-    build: { chest: 14, waist: 9, arm: 0.8, leg: 0.84 }, prop: { leg: 1.08, torso: 0.98, arm: 1.28, head: 1.05, neck: 1.25 } },
-  dino: { species: 'dino', skin: '#4f8f5d', skin2: '#2f6b3d', belly: '#e7d8a8', stripe: '#2a5e36', eye: '#ffbe0b', teeth: '#f4efe8', top: '#4f8f5d', top2: '#2f6b3d', garment: 'scales', sleeve: 'none',
-    pants: '#4f8f5d', scales: 1, hand: 'claw', claw: '#f4efe8', feet: 'claw', accent: '#ffbe0b', neckW: 17,
-    tail: { kind: 'dino', col: '#4f8f5d', belly: '#e7d8a8', spot: '#2a5e36' },
-    build: { chest: 22, waist: 18, arm: 0.95, leg: 1.42, belly: 1 }, prop: { leg: 0.9, torso: 0.95, arm: 0.52, head: 1.45, neck: 0.85 } },
-  luchador: { species: 'luchador', skin: '#c98b62', hair: '#d62828', eye: '#2b1a10', lips: '#7a3e2c', mask: '#eef1f4', mask2: '#ffbe0b', maskTrim: '#d62828',
-    top: '#c98b62', top2: '#a06a47', garment: 'bare', sleeve: 'none', pants: '#d62828', legCol: '#c98b62', trunks: '#d62828', bootH: 0.62, boot: '#eef1f4',
-    feet: 'boot', shoe: '#eef1f4', sole: '#d62828', wrap: '#eef1f4', back: 'cape', cape: '#d62828', capeIn: '#ffbe0b', accent: '#ffbe0b',
-    build: { chest: 23.5, waist: 13, arm: 1.25, leg: 1.12 }, prop: { leg: 1.02, torso: 1.06, arm: 1.08, head: 0.98, neck: 0.8 } },
-  axo: { species: 'axo', skin: '#f2a7bb', skin2: '#d9829a', belly: '#fbd6de', gill: '#e0526f', gill2: '#ff8fab', eye: '#1b1418', top: '#f2a7bb', top2: '#d9829a', garment: 'axo', sleeve: 'none',
-    pants: '#f2a7bb', hand: 'mitt', feet: 'web', bandana: '#2ec4b6', accent: '#2ec4b6', neckW: 12,
-    tail: { kind: 'axo', col: '#f2a7bb', fin: 'rgba(255,196,210,.6)' },
-    build: { chest: 15, waist: 14.5, arm: 0.95, leg: 0.95, belly: 1 }, prop: { leg: 0.78, torso: 0.9, arm: 0.86, head: 1.32, neck: 0.55 } },
-});
+
 // Chilazo ahora es un chile de pies a cabeza: el tronco y la cabeza son una sola pieza
-Object.assign(LOOKS.chilazo, { plan: 'pepper', feet: 'boot', shoe: '#ffd166', sole: '#9d0208', bootH: 0.45, boot: '#ffd166', pants: '#2ec4b6',
-  build: { chest: 19, waist: 15, arm: 0.95, leg: 0.92 }, prop: { leg: 0.92, torso: 1.0, arm: 1.0, head: 1.0 } });
+
 
 // ---------- manos ----------
 function drawHand2(c, L, x, y, a, k, col, OUT, back) {
