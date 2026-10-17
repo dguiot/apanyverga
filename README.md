@@ -323,6 +323,22 @@ escudos, munición, cambio de arma, recarga, reaparición, controles de mando, v
 primera persona y división exclusivamente local. `node src/test/tfps-online.cjs` comprueba
 cuatro navegadores con WebRTC, AV, predicción, latencia/pérdida, autoridad del anfitrión,
 validación de paquetes, resultados, espectadores y revancha usando la señalización simulada.
+
+En FPS, mantener **C / Ctrl** o **B / ○** permite agacharse. La postura reduce la
+velocidad, la altura física, la cámara, el origen de disparo y las zonas de impacto;
+un techo bajo impide levantarse hasta tener espacio. Los sacos de arena, gaviones,
+cajas de suministros y troncos del campo bloquean balas y movimiento.
+Los impactos en cabeza hacen **×1.65** de daño, también contra jugadores agachados.
+La vida se recupera a **15 puntos por segundo tras 5 segundos sin daño**. Un impacto
+al escudo también reinicia la espera; el escudo se obtiene en las recogidas del mapa.
+En online, el anfitrión resuelve daño y recuperación; cada persona conserva su vista.
+Las manos, mangas y detalles del vestuario mantienen el diseño único de Esmash.
+
+`node src/test/tfps-cover.cjs` comprueba cobertura real, postura bajo techos, cámaras
+y cabezas alineadas, tiros de cabeza de pie/agachado, recuperación interrumpida,
+pausa, reaparición, teclado/mando inalámbrico, recargas animadas y validación online.
+`node src/test/tfps-polish.cjs` comprueba las cinco miras sin oclusión, caída y viaje
+de las balas, impactos, límites gráficos y liberación de recursos al salir del FPS.
 `node src/test/tstage-music.cjs` renderiza audio real, mide nivel/saturación, distingue
 las doce composiciones, comprueba la identidad del lobby y sus transiciones/ajustes.
 

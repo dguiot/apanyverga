@@ -4,7 +4,7 @@ const ModeControls={
  primary:new Map(),
  maps:{
   kart:{gas:{keys:['KeyW','ArrowUp'],buttons:[7,0,12]},brake:{keys:['KeyS','ArrowDown'],buttons:[6,13]},drift:{keys:['Space','ShiftLeft','ShiftRight'],buttons:[2,5]},item:{keys:['KeyE','KeyJ'],buttons:[4]},rear:{keys:['KeyQ'],buttons:[1]},pause:{keys:['Escape','Enter'],buttons:[9]}},
-  fps:{sprint:{keys:['ShiftLeft','ShiftRight'],buttons:[10]},jump:{keys:['Space'],buttons:[0]},reload:{keys:['KeyR'],buttons:[2,5]},swap:{keys:['KeyQ'],buttons:[3]},pause:{keys:['Escape'],buttons:[9]},fire:{keys:[],buttons:[7]},aim:{keys:[],buttons:[6]}},
+  fps:{crouch:{keys:['KeyC','ControlLeft','ControlRight'],buttons:[1]},sprint:{keys:['ShiftLeft','ShiftRight'],buttons:[10]},jump:{keys:['Space'],buttons:[0]},reload:{keys:['KeyR'],buttons:[2,5]},swap:{keys:['KeyQ'],buttons:[3]},pause:{keys:['Escape'],buttons:[9]},fire:{keys:[],buttons:[7]},aim:{keys:[],buttons:[6]}},
  },
  pad(mode,dev=null){
   if(dev)return padInfo.find(p=>'pad'+p.index===dev)||null;
@@ -20,7 +20,7 @@ const ModeControls={
  help(mode){
   const k=a=>this.keyLabel(mode,a),p=a=>this.padLabel(mode,a);
   if(mode==='kart')return [['Dirección','A D / ← →','Palanca izquierda / cruceta'],['Acelerar / frenar','W S / ↑ ↓','RT / A / ↑ · LT / ↓'],['Derrape / acrobacia','Espacio / Shift',p('drift')],['Lanzar objeto adelante',k('item'),p('item')],['Lanzar objeto atrás',k('rear'),p('rear')],['Pausa / ajustes',k('pause'),'Menu / Options']];
-  return [['Mover / mirar','WASD / ratón','Palancas izquierda / derecha'],['Correr (pulsar palanca)','Shift',p('sprint')],['Apuntar / disparar','Clic derecho / izquierdo','LT / RT · L2 / R2'],['Recargar',k('reload'),p('reload')],['Saltar',k('jump'),p('jump')],['Arma / pausa','1–5 / Q / rueda · Esc','Y / △ · Menu / Options']];
+  return [['Mover / mirar','WASD / ratón','Palancas izquierda / derecha'],['Correr (pulsar palanca)','Shift',p('sprint')],['Apuntar / disparar','Clic derecho / izquierdo','LT / RT · L2 / R2'],['Recargar',k('reload'),p('reload')],['Saltar / agacharse (mantener)','Espacio / C o Ctrl','A / ✕ · B / ○ (mantener)'],['Arma / pausa','1–5 / Q / rueda · Esc','Y / △ · Menu / Options']];
  },
  diagnostic(){const pads=padInfo.map(p=>shortPadName(p.id)+' #'+(p.index+1)),held=padInfo.flatMap(p=>p.buttons.flatMap((v,i)=>v?[PAD_BTN[i]||'Botón '+i]:[]));return pads.length?pads.join(' · ')+'  |  '+(held.join(', ')||'Pulsa un botón para comprobarlo aquí'):'Sin mando detectado · conecta el mando y pulsa un botón';},
 };

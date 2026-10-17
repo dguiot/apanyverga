@@ -6,23 +6,37 @@ const FPSScenery={
  begin(){this.textures.clear();this.materials.clear();},
  texture(kind){
   if(this.textures.has(kind))return this.textures.get(kind);const T=KartGL,n=512,cv=mkCanvas(n,n),c=cv.getContext('2d'),rng=srand(9713+kind.length*107),im=c.createImageData(n,n);
-  const palette={plaster:[222,210,185],stone:[152,151,138],grass:[116,135,78],earth:[174,148,104],steel:[137,153,155],wood:[157,125,84],roof:[114,135,139]},base=palette[kind]||palette.stone;
+  const palette={plaster:[222,210,185],stone:[152,151,138],grass:[112,135,87],earth:[174,148,104],steel:[137,153,155],wood:[157,125,84],roof:[114,135,139],sandbag:[184,171,134],gabion:[153,151,132],supply:[142,128,97]},base=palette[kind]||palette.stone;
   for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=(y*n+x)*4,noise=(rng()-.5)*(kind==='plaster'?13:35)+Math.sin(x*.037)*Math.cos(y*.051)*(kind==='plaster'?.7:9)+Math.sin(x*.11+y*.023)*(kind==='plaster'?.4:3);for(let k=0;k<3;k++)im.data[i+k]=clamp(base[k]+noise,0,255);im.data[i+3]=255;}c.putImageData(im,0,0);
   if(kind==='plaster'){for(let i=0;i<85;i++){const x=rng()*n,y=rng()*n;c.fillStyle='rgba(91,80,61,.07)';c.fillRect(x,y,2+rng()*27,2+rng()*6);}for(let i=0;i<6;i++){let x=rng()*n,y=rng()*n;c.strokeStyle='rgba(81,76,65,.25)';c.lineWidth=.6;c.beginPath();c.moveTo(x,y);for(let j=0;j<8;j++){x+=(rng()-.5)*14;y+=rng()*9;c.lineTo(x,y);}c.stroke();}}
   if(kind==='stone'){for(let row=0;row<8;row++)for(let col=-1;col<5;col++){const x=col*128+(row%2)*64,y=row*64;c.strokeStyle='#656f66';c.lineWidth=2;c.strokeRect(x+1,y+1,126,62);c.strokeStyle='rgba(237,234,212,.35)';c.lineWidth=1;c.strokeRect(x+4,y+4,120,56);}}
   if(kind==='grass')for(let i=0;i<15000;i++){const x=rng()*n,y=rng()*n;c.strokeStyle=i%3?'rgba(49,75,32,.22)':'rgba(222,211,137,.3)';c.lineWidth=.5;c.beginPath();c.moveTo(x,y);c.lineTo(x+(rng()-.5)*4,y-2-rng()*8);c.stroke();}
   if(kind==='steel'||kind==='roof'){for(let i=0;i<32;i++){const x=i*16;c.fillStyle='rgba(13,40,48,.23)';c.fillRect(x,0,3,n);c.fillStyle='rgba(240,248,237,.25)';c.fillRect(x+3,0,2,n);}for(let i=0;i<80;i++){c.fillStyle='rgba(139,79,41,.2)';c.fillRect(rng()*n,rng()*n,1+rng()*3,3+rng()*26);}}
   if(kind==='wood'){for(let i=0;i<65;i++){c.strokeStyle='rgba(61,43,29,.15)';c.beginPath();c.moveTo(i*8,0);c.bezierCurveTo(i*8+9,180,i*8-8,330,i*8+2,n);c.stroke();}for(let i=0;i<5;i++){c.fillStyle='#635b41';c.fillRect(i*104,0,2,n);}}
+  if(kind==='sandbag'){for(let i=0;i<n;i+=4){c.fillStyle='rgba(40,43,27,.1)';c.fillRect(i,0,1,n);c.fillRect(0,i,n,1);}c.strokeStyle='rgba(58,52,31,.4)';c.setLineDash([3,3]);c.strokeRect(8,8,n-16,n-16);}
+  if(kind==='gabion'){for(let i=0;i<1300;i++){const x=rng()*n,y=rng()*n;c.fillStyle=['#7b8177','#b1b29e','#959a87','#c4c2ac'][i%4];c.beginPath();c.ellipse(x,y,4+rng()*9,3+rng()*6,rng()*3,0,TAU);c.fill();}c.strokeStyle='rgba(37,50,48,.7)';c.lineWidth=1.4;for(let i=0;i<n;i+=24){c.beginPath();c.moveTo(i,0);c.lineTo(i,n);c.moveTo(0,i);c.lineTo(n,i);c.stroke();}}
   if(kind==='cliff')for(let i=0;i<34;i++){const y=i*16+rng()*8;c.strokeStyle=i%3?'rgba(68,66,53,.3)':'rgba(222,211,178,.45)';c.lineWidth=1+rng()*4;c.beginPath();for(let x=0;x<=n;x+=10)c.lineTo(x,y+Math.sin(x*.017+i)*7+Math.sin(x*.053)*3);c.stroke();}
   const tex=new T.CanvasTexture(cv);tex.colorSpace=T.SRGBColorSpace;tex.wrapS=tex.wrapT=T.RepeatWrapping;tex.anisotropy=8;this.textures.set(kind,tex);return tex;
  },
  material(kind,color='#ffffff',vertexColors=false){const key=kind+color+vertexColors;if(!this.materials.has(key)){const map=this.texture(kind);this.materials.set(key,new KartGL.MeshStandardMaterial({color,map,bumpMap:map,bumpScale:kind==='stone'?.065:kind==='plaster'?.012:.025,roughness:kind==='steel'?.57:.91,metalness:kind==='steel'?.55:0,vertexColors}));}return this.materials.get(key);},
  box(view,b,batch){
+  if(['sandbag','gabion','supply'].includes(b.type)){this.cover(b,batch);return;}
   const T=KartGL,geo=new T.BoxGeometry(b.w,b.h,b.d),p=geo.attributes.position,n=geo.attributes.normal,uv=geo.attributes.uv;
   for(let i=0;i<p.count;i++){const nx=Math.abs(n.getX(i)),ny=Math.abs(n.getY(i));uv.setXY(i,(nx>.5?p.getZ(i):p.getX(i))/3.5,(ny>.5?p.getZ(i):p.getY(i))/3.5);}
   const kind=b.type==='plaster'?'plaster':['steel','container'].includes(b.type)?'steel':b.type==='roof'?'roof':['crate','bridge','trunk'].includes(b.type)?'wood':'stone';
   const color=b.color||({container:b.x>65?'#4a8290':'#bb7650',roof:'#d0ddd7',trunk:'#88775a',crate:'#d1ad7c',barrier:'#d4d9cb',steel:'#65828b',bridge:'#c2a57f',stone:'#d1cdb7'}[b.type])||'#d6d5c7';
   batch.geometry(geo,this.material(kind,color),[b.x,b.y+b.h/2,b.z]);
+ },
+ cover(q,batch){
+  const T=KartGL,bag=q.type==='sandbag',rock=q.type==='gabion',mat=this.material(bag?'sandbag':rock?'gabion':'wood',bag?'#ede1be':rock?'#d3d2b5':'#a5b5a2'),rim=this.material('steel','#697570'),wood=this.material('wood','#cfb48c');
+  // The dense core fills its collision envelope. The small bevel is cosmetic.
+  const geo=new T.BoxGeometry(q.w-(bag?.05:0),q.h-(bag?.3:0),q.d*(bag?.4:1));batch.geometry(geo,mat,[q.x,q.y+q.h/2,q.z]);
+  if(bag){
+   if(!KartModels.geometry.has('fps-sandbag')){const g=new T.BoxGeometry(1,1,1,4,3,4),p=g.attributes.position,n=g.attributes.normal;for(let i=0;i<p.count;i++){const v=new T.Vector3(p.getX(i),p.getY(i),p.getZ(i)),inner=v.clone().clampScalar(-.3,.3),normal=v.clone().sub(inner).normalize();v.copy(inner).addScaledVector(normal,.2);p.setXYZ(i,v.x,v.y,v.z);n.setXYZ(i,normal.x,normal.y,normal.z);}KartModels.geometry.set('fps-sandbag',g);}
+   const count=Math.ceil(q.w/.85),width=q.w/count;for(let row=0;row<4;row++)for(let i=0;i<count+(row%2);i++){const start=Math.max(-q.w/2,-q.w/2+(i-(row%2)*.5)*width),end=Math.min(q.w/2,-q.w/2+(i+1-(row%2)*.5)*width);batch.add('fps-sandbag',mat,[q.x+(start+end)/2,q.y+.155+row*.3,q.z],[(end-start)*1.035,.32,q.d*1.035]);}
+  }
+  else if(rock){for(const s of [-1,1]){batch.add('box',rim,[q.x+s*q.w/2,q.y+q.h/2,q.z],[.035,q.h,.035]);batch.add('box',rim,[q.x,q.y+q.h,q.z+s*q.d/2],[q.w,.025,.025]);}}
+  else{for(const side of [-1,1])for(const k of [-1,1]){batch.add('box',rim,[q.x+k*q.w*.36,q.y+q.h/2,q.z+side*(q.d/2+.025)],[.09,q.h,.05]);batch.add('box',wood,[q.x,q.y+q.h/2+k*(q.h/2-.1),q.z+side*(q.d/2+.04)],[q.w,.13,.08]);}batch.add('box',rim,[q.x,q.y+q.h+.025,q.z],[q.w,.04,q.d]);}
  },
  batch(){const bins=new Map(),T=KartGL;return {geometry(g,mat,pos){g.translate(...pos);if(!bins.has(mat))bins.set(mat,[]);bins.get(mat).push(g);},add(type,mat,pos,scale,rot){const g=KartModels.geo(type).clone().applyMatrix4(KartModels.matrix(pos,scale,rot));if(!bins.has(mat))bins.set(mat,[]);bins.get(mat).push(g);},finish(scene,cast=true){for(const [mat,gs]of bins){const merged=T.mergeGeometries(gs,false),mesh=new T.Mesh(merged,mat);gs.forEach(g=>g.dispose());mesh.castShadow=cast;mesh.receiveShadow=true;scene.add(mesh);}bins.clear();}};},
  build(view){
