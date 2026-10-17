@@ -327,6 +327,7 @@ const Devices = {
     return out;
   },
   navCalc(c, dev) {
+    if(typeof ShellUI!=='undefined'&&ShellUI.ownsNavigation?.())return ShellUI.readNavigation(dev);
     const out = {};
     const dirs = [['left', c.x < -0.6], ['right', c.x > 0.6], ['up', c.y < -0.6], ['down', c.y > 0.6]];
     c._rep = c._rep || {};

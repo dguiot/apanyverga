@@ -48,7 +48,7 @@ const KartRender={
     ctx.lineCap='butt';
   },
   time(t){if(t===null||t===undefined)return '—';const m=Math.floor(t/60),s=Math.floor(t%60),ms=Math.floor(t%1*1000);return `${m}:${String(s).padStart(2,'0')}.${String(ms).padStart(3,'0')}`;},
-  panel(x,y,w,h){ctx.fillStyle='rgba(6,18,31,.82)';roundRect(ctx,x,y,w,h,15);ctx.fill();ctx.strokeStyle='rgba(179,228,239,.16)';ctx.lineWidth=1;ctx.stroke();},
+  panel(x,y,w,h,edge=null){ctx.fillStyle='rgba(6,18,31,.82)';roundRect(ctx,x,y,w,h,15);ctx.fill();ctx.strokeStyle=edge||'rgba(179,228,239,.16)';ctx.lineWidth=edge?2:1;ctx.stroke();},
   viewports(n){
     if(n<=1)return [{x:0,y:0,w:W,h:H}];
     if(n===2)return [{x:0,y:0,w:W/2,h:H},{x:W/2,y:0,w:W/2,h:H}];

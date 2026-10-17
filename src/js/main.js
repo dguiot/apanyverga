@@ -35,10 +35,11 @@ function step() {
   if (AV.on && keyEdge('kb1', 'KeyM') && APP.screen!=='kartRace') { AV.setMic(!AV.mic); Toasts.push(AV.mic ? '🎤 Micrófono abierto' : '🔇 Micrófono silenciado'); }
   try { AV.tick(); } catch (e) { console.error(e); }
   // con la ventanita de invitar abierta el juego espera; B o Esc la cierran
-  if (InviteBox.isOpen()) { for (const d of Devices.list) { const n = Devices.nav(d); if (n.back || n.start) InviteBox.close(); } }
+  if (InviteBox.isOpen()) InviteBox.update();
   else try { APP.update(); } catch (e) { console.error(e); }
   Audio8.tick();
   KartMusic.tick();
+  AudioStatus.update();
   endFrameKeys();
   Pointer.clicked = false;
 }
