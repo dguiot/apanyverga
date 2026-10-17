@@ -328,11 +328,41 @@ En FPS, mantener **C / Ctrl** o **B / ○** permite agacharse. La postura reduce
 velocidad, la altura física, la cámara, el origen de disparo y las zonas de impacto;
 un techo bajo impide levantarse hasta tener espacio. Los sacos de arena, gaviones,
 cajas de suministros y troncos del campo bloquean balas y movimiento.
-Los impactos en cabeza hacen **×1.65** de daño, también contra jugadores agachados.
+Los impactos en cabeza hacen **×1.65** de daño, también contra jugadores agachados;
+Horizonte usa **×2.2** y premia el tiro preciso con una baja de cabeza.
 La vida se recupera a **15 puntos por segundo tras 5 segundos sin daño**. Un impacto
 al escudo también reinicia la espera; el escudo se obtiene en las recogidas del mapa.
 En online, el anfitrión resuelve daño y recuperación; cada persona conserva su vista.
 Las manos, mangas y detalles del vestuario mantienen el diseño único de Esmash.
+
+El campo contiene **8 cajas de munición, 4 escudos, 7 armas de los cinco tipos y
+6 recogidas de granadas**. La munición, el escudo y las granadas se recogen al pasar;
+con el inventario lleno se conservan para otro jugador. La munición añade dos
+cargadores por arma, sin exceder su reserva máxima. **F / R3** recoge y equipa el
+arma cercana, carga su depósito y repone reserva. Las recogidas reaparecen entre
+15 y 20 segundos después y requieren estar en el mismo piso, con paso libre.
+**G / LB (L1)** lanza una granada; **X / RB sigue recargando**. Se empieza con una
+granada y se pueden llevar dos. La granada rebota y explota tras 2,6 segundos, con
+daño por distancia hasta 8 metros: una pared bloquea el daño y un parapeto puede
+reducirlo. La explosión no mata de un solo impacto a un jugador con 100 de vida y
+50 de escudo; una granada propia puede hacer daño al lanzador.
+
+Referencia de balance con impactos seguidos a 20 m, vida y escudo completos
+(escopeta a 6 m). Incluye viaje del proyectil; no incluye fallos de puntería.
+
+| Arma | Impactos al cuerpo | Tiempo orientativo |
+| --- | --- | --- |
+| Cobalto 9 | 7 | 1,50 s |
+| Avispa | 13 | 1,07 s |
+| Sierra M4 | 8 | 0,86 s |
+| Trueno 12 | 2 disparos | 0,92 s |
+| Horizonte | 2 | 1,22 s |
+
+`node src/test/tfps-supplies.cjs` comprueba ubicaciones, recogidas, reservas,
+controles, granadas con colisión y caída, daño protegido por cobertura, temporizador,
+vida/escudo, balance con balística real, validación de paquetes y modelos/efectos.
+Las pruebas online incluyen recoger un arma, reponer munición, recoger/lanzar una
+granada y recibir su explosión y daño resueltos por el anfitrión.
 
 `node src/test/tfps-cover.cjs` comprueba cobertura real, postura bajo techos, cámaras
 y cabezas alineadas, tiros de cabeza de pie/agachado, recuperación interrumpida,
