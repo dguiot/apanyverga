@@ -6,7 +6,7 @@ const KartModels = {
   geo(type) {
     if(!this.geometry.has(type)) {
       const T=KartGL;
-      const g=type==='box'?new T.BoxGeometry(1,1,1):type==='plane'?new T.PlaneGeometry(1,1):type==='sphere'?new T.SphereGeometry(1,18,12):
+      const g=type==='box'?new T.BoxGeometry(1,1,1):type==='plane'?new T.PlaneGeometry(1,1):type==='bud'?new T.SphereGeometry(1,6,4):type==='sphere'?new T.SphereGeometry(1,18,12):
         type==='cylinder'?new T.CylinderGeometry(1,1,1,18):type==='cone'?new T.ConeGeometry(1,1,14):
         type==='torus'?new T.TorusGeometry(1,.12,8,28):type==='leaf'?new T.SphereGeometry(1,8,6):type==='branch'?new T.CylinderGeometry(.75,1,1,7):type==='hill'?new T.DodecahedronGeometry(1,1):type==='rock'?new T.DodecahedronGeometry(1,0):new T.OctahedronGeometry(1,0);
       this.geometry.set(type,g);

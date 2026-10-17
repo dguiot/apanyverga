@@ -74,8 +74,7 @@ const KartRender={
     if(r.drift){const col=r.charge>2?'#d989ff':r.charge>1.3?GOLD:TEAL;ctx.fillStyle='#24354c';ctx.fillRect(b.w/2-95,b.h-69,190,8);ctx.fillStyle=col;ctx.fillRect(b.w/2-95,b.h-69,190*r.charge/2.7,8);}
     if(race.phase==='grid'){sfText(Math.ceil(race.countdown)>3?'PREPÁRATE':Math.ceil(race.countdown),b.w/2,b.h*.5,short?74:106,GOLD);}
     if(r.finish!==null){sfText('¡META!',b.w/2,b.h*.52,short?53:77,GOLD);text('Esperando a los demás pilotos',b.w/2,b.h*.52+49,16,PAPER,{body:true,stroke:'#102335',strokeW:3});}
-    if(r.rescue)sfText('RESCATE',b.w/2,b.h*.6,39,GOLD);
-    const curve=race.course.sample(r.s+r.v*.8+40).curve;if(Math.abs(curve)>.0035&&race.phase==='race'){text((curve>0?'↰':'↱')+' '+(Math.abs(curve)>.007?'HORQUILLA':'CURVA'),b.w/2,94,17,'#ffdd99',{body:true,weight:700,stroke:'#102335',strokeW:3});}
+    if(r.rescue)text('Regresando a la pista',b.w/2,short?151:169,13,'#c6e4eb',{body:true,stroke:'#102335',strokeW:3});
     if(mine&&Net.role==='guest'&&performance.now()-KartOnline.lastStateAt>1500){text('Reconectando con la carrera…',b.w/2,b.h-88,18,GOLD,{body:true,stroke:'#102335',strokeW:3});}
     ctx.restore();
   },
@@ -94,19 +93,16 @@ const KartRender={
     ctx.fillStyle=item?'#15374c':rolling?'#8ee9ee':'#284356';roundRect(ctx,34,149,60,60,12);ctx.fill();if(item){ctx.drawImage(this.itemIcon(r.item).img,34,149,60,60);}else text(rolling?'?':'—',64,180,29,'#092334',{weight:700});
     text(rolling?'SORTEANDO…':item?'ÍTEM LISTO':'BUSCA UNA CAJA',163,163,12,'#b8cbd4',{body:true,weight:700});
     text(item?item.name:'Vacío',163,190,item?15:19,item?item.color:'#f3f5eb',{body:true,weight:700});
-    if(item&&!TouchPad.active){text(item.desc,26,242,12,'#f2f5ec',{body:true,align:'left',weight:600,stroke:'#102335',strokeW:3});}
-    if(!TouchPad.active){text('W / ↑ acelerar   S / ↓ frenar   A D / ← → girar',26,666,13,'#f5f6ef',{body:true,align:'left',stroke:'#071725',strokeW:3});text('Espacio: derrape / acrobacia   E / J: ítem   Q: atrás   Esc: pausa   M: música',26,691,13,'#d4e3e9',{body:true,align:'left',stroke:'#071725',strokeW:3});}
+    if(item&&!TouchPad.active){text('E / J / LB: lanzar  ·  Q / B: lanzar atrás',26,243,12,'#f2f5ec',{body:true,align:'left',weight:600,stroke:'#102335',strokeW:3});}
     if(r.drift){this.panel(464,642,352,46);const col=r.charge>2?'#d989ff':r.charge>1.3?'#ffc53d':'#69e9ee';ctx.fillStyle='#294255';roundRect(ctx,480,660,210,10,5);ctx.fill();ctx.fillStyle=col;roundRect(ctx,480,660,Math.max(1,210*r.charge/2.7),10,5);ctx.fill();text('SUELTA → TURBO',750,666,13,col,{body:true,weight:700});}
-    const curve=race.course.sample(r.s+r.v*.8+40).curve;
-    if(Math.abs(curve)>.0035&&race.phase==='race'){this.panel(554,106,172,47);text(`${curve>0?'↰':'↱'} ${Math.abs(curve)>.007?'HORQUILLA':'CURVA'}`,640,131,23,'#ffdd99',{weight:700});}
-    let y=245;for(const m of race.messages){const a=clamp(m.life*2,0,1);ctx.globalAlpha=a;sfText(m.msg,W/2,y,37,m.color);ctx.globalAlpha=1;y+=44;}
+    for(const m of race.messages){ctx.save();ctx.globalAlpha=clamp(m.life*3,0,1);this.panel(500,103,280,35);text(m.msg,640,121,18,m.color,{body:true,weight:700});ctx.restore();}
     if(race.phase==='grid'){
       const n=Math.ceil(race.countdown);ctx.fillStyle='rgba(6,14,27,.25)';ctx.fillRect(0,0,W,H);
       sfText(n>3?'PREPÁRATE':String(n),640,320,n>3?64:142,n===1?'#6dffe1':'#fff3c6');
       text('Acelera al final del 2 para una salida turbo',640,420,20,'#fff7e6',{body:true,weight:600,stroke:'#112232',strokeW:4});
       text(`${CHARS[r.id].name}  ·  ${race.cc.name}  ·  3 vueltas`,640,462,19,'#d1edec',{body:true,weight:600,stroke:'#112232',strokeW:4});
     }
-    if(r.rescue){sfText('RESCATE',640,420,64,'#ffcf9c');text('R / Y también te devuelve al centro',640,475,18,'#fff',{body:true});}
+    if(r.rescue){this.panel(1088,552,168,30);text('Regresando a pista',1172,568,12,'#c6e4eb',{body:true});}
     if(race.phase==='finish'&&race.resultTime<2.5){sfText('¡META!',640,350,132,'#fff0a9');text(`${pos}.º lugar  ·  ${this.time(r.finish)}`,640,435,30,'#fff',{body:true,weight:700});}
   },
 };

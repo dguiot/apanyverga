@@ -62,10 +62,11 @@ const KartOnline={
   },
   sendInput(input){
     if(APP.kartRace.spectator)return;
-    ['itemPressed','driftPressed','rescuePressed'].forEach((k,i)=>{if(input[k])this.counters[i]++;});
+    ['itemPressed','driftPressed'].forEach((k,i)=>{if(input[k])this.counters[i]++;});
     const bits=(input.gas?1:0)|(input.brake?2:0)|(input.drift?4:0)|(input.rear?8:0);
     // Send edges immediately, held controls at 30 Hz. Counters survive lost packets.
-    if(this.sendTick++%2===0||input.itemPressed||input.driftPressed||input.rescuePressed)Net.set({inp:{k:1,e:this.ep,q:++this.seq,a:[Math.round(clamp(input.steer||0,-1,1)*100),bits,...this.counters]}});
+    // The third counter stays reserved for packet compatibility. No manual rescue.
+    if(this.sendTick++%2===0||input.itemPressed||input.driftPressed)Net.set({inp:{k:1,e:this.ep,q:++this.seq,a:[Math.round(clamp(input.steer||0,-1,1)*100),bits,...this.counters]}});
   },
   inputFor(r){
     const pr=Net.presOf(r.peer),packet=pr?.inp,now=performance.now();let rec=this.remote.get(r.peer);
@@ -73,11 +74,11 @@ const KartOnline={
     const a=packet?.a;
     if(pr?.role==='guest'&&pr.join===Net.myPeer()&&packet?.k===1&&packet.e===this.ep&&Number.isSafeInteger(packet.q)&&packet.q>rec.q&&Array.isArray(a)&&a.length===5&&a.every(Number.isFinite)&&Math.abs(a[0])<=100&&Number.isInteger(a[1])&&a[1]>=0&&a[1]<=15&&a.slice(2).every(n=>Number.isSafeInteger(n)&&n>=0)){
       rec.q=packet.q;rec.at=now;rec.input={steer:a[0]/100,gas:!!(a[1]&1),brake:!!(a[1]&2),drift:!!(a[1]&4),rear:!!(a[1]&8)};
-      ['itemPressed','driftPressed','rescuePressed'].forEach((key,i)=>{rec.input[key]=a[i+2]>rec.c[i];rec.c[i]=a[i+2];});
+      ['itemPressed','driftPressed'].forEach((key,i)=>{rec.input[key]=a[i+2]>rec.c[i];rec.c[i]=a[i+2];});rec.c[2]=a[4];
     }
     r.disconnected=!pr||pr.role!=='guest'||pr.join!==Net.myPeer()||now-rec.at>3000;
     const out=now-rec.at>600?{}:{...rec.input};
-    rec.input.itemPressed=rec.input.driftPressed=rec.input.rescuePressed=false;return out;
+    rec.input.itemPressed=rec.input.driftPressed=false;return out;
   },
   snapshot(){
     const r=APP.kartRace,q=n=>typeof n==='number'?Math.round(n*100)/100:n;
@@ -136,7 +137,7 @@ const KartOnline={
   raceUpdate(){
     const race=APP.kartRace,raw=KartControls.read();
     if(raw.musicPressed)Audio8.setSound(Audio8.musicOn?'fx':'all');
-    if(raw.pausePressed){race.paused=!race.paused;race.pauseSel=0;TouchPad.release();}
+    if(raw.pausePressed&&!ShellUI.active){race.paused=!race.paused;race.pauseSel=0;TouchPad.release();}
     const input=race.paused||race.spectator?{}:raw;
     if(Net.role==='host'){
       const inputs=race.racers.map(r=>!r.human?{}:r.peer===Net.myPeer()?input:this.inputFor(r));

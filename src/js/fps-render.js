@@ -79,6 +79,7 @@ const FPSView={
   if(!small)text('WASD · Shift: correr · Espacio: saltar · R: recargar · 1–5 / Q / rueda: arma · clic der.: mira · clic izq.: disparar',640,706,13,'#d9e4e3',{body:true,stroke:'#132a35',strokeW:3});
   let y=105;for(const f of match.feed){text(CHARS[match.players[f.from].id].name+'  ›  '+CHARS[match.players[f.to].id].name,1235,y,14,'#fae6b3',{align:'right',body:true,stroke:'#132a35',strokeW:3});y+=25;}
   if(p.hurt){const vignette=ctx.createRadialGradient(640,360,140,640,360,710);vignette.addColorStop(0,'rgba(150,28,26,0)');vignette.addColorStop(1,'rgba(167,36,30,'+p.hurt*1.6+')');ctx.fillStyle=vignette;ctx.fillRect(0,0,W,H);}
+  if(!p.reloading&&!p.dead)text('R / X / □ / RB: recargar',1230,706,13,'#b9d4dc',{align:'right',body:true,stroke:'#172b33',strokeW:3});
   if(p.dead){ctx.fillStyle='rgba(12,25,33,.55)';ctx.fillRect(0,0,W,H);sfText('REAPARECES EN '+Math.ceil(p.dead),640,300,52,GOLD);}
   if(match.online){let y=120;for(const q of match.players.filter(q=>q.peer&&q!==p)){const cam=AV.videoFor(q.peer);if(cam){drawVideoCover(ctx,cam.v,24,y,112,70,cam.mirror);text(Net.nameOf(q.peer),80,y+82,12,PAPER,{body:true});y+=97;}}}
   ctx.restore();

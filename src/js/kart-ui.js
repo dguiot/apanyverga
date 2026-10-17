@@ -161,7 +161,7 @@ APP.kartRaceDraw=function(){
     for(let i=0;i<3;i++)KartMenu.button((race.online?['SEGUIR CORRIENDO',Net.role==='host'?'VOLVER A LA SALA':'MICRÓFONO: '+(AV.mic?'SÍ':'NO'),'SALIR DE LA SALA']:['SEGUIR CORRIENDO','REINICIAR CARRERA','SALIR AL MENÚ'])[i],{x:440,y:318+i*72,w:400,h:58},i===race.pauseSel);
     if(race.online)text('La carrera sigue mientras tienes abierto este menú.',640,274,18,TEAL,{body:true});
     text('RT / A: acelerar  ·  LT: frenar  ·  X / RB: derrape  ·  LB: ítem  ·  B: lanzar atrás',640,586,16,'#d4e7e9',{body:true});
-    text('R / Y: rescate  ·  ☰ / Esc: continuar  ·  X / M: música '+(Audio8.musicOn?'sí':'no'),640,620,15,'#a2bacb',{body:true});
+    text('Rescate automático al caer  ·  ☰ / Esc: continuar  ·  X / M: música '+(Audio8.musicOn?'sí':'no'),640,620,15,'#a2bacb',{body:true});
     KartMenu.button('MÚSICA: '+(Audio8.musicOn?'SÍ':'NO'),{x:470,y:654,w:340,h:38});
   }
 };
