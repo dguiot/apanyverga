@@ -59,7 +59,6 @@ function frame(now) {
   render();
   requestAnimationFrame(frame);
 }
-loadFaces();
 Net.init();
 Fame.init();
 if (document.fonts && document.fonts.load) {

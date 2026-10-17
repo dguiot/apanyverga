@@ -7,7 +7,7 @@ pantalla táctil) o en línea, cada quien desde su casa, con cámara y voz.
 
 La portada tipo póster presenta los tres juegos y dos entradas: **Juego local** y
 **Juego online**. Online crea una sala inmediatamente; el mismo enlace sirve para
-Esmash, Kart y Aurora, con voz/cámara y participantes visibles aunque apaguen el video.
+Esmash, Kart y FPS, con voz/cámara y participantes visibles aunque apaguen el video.
 El anfitrión confirma el juego; los invitados pueden proponerlo. Cambiar de juego o
 volver a preparar una partida conserva la sala y las conexiones de voz/cámara.
 
@@ -26,9 +26,33 @@ La ilustración original de portada está en `src/assets/cover-three-games.webp`
 con ImageGen a partir de los personajes existentes. El compilador la incluye en el HTML;
 no depende de un CDN ni de descargar imágenes al abrir el juego.
 
-## Aurora FPS
+## Un solo diseño de personajes
 
-Cuenca Aurora es un mundo de unos 500 × 500 metros: valle, bosque, río con puentes,
+Esmash conserva su dibujo, siluetas, proporciones y animaciones. Las fotos se sustituyen
+por las caras dibujadas de ese mismo estilo. No se introduce otro renderer para las peleas.
+
+`src/js/character-design.js` es la única definición de los 15 personajes: piel, pelo,
+vestuario, accesorios y proporciones. El registro es inmutable y `CharacterDesign.get(id)`
+devuelve el mismo objeto para los tres modos. `LOOKS` es un alias del mismo registro.
+
+`character-art.js` llama al **renderer original de Esmash** (`drawHead` / `drawTorso`)
+para generar las texturas de cara y vestuario que usan los modelos de Kart y FPS.
+No hay una segunda ilustración de la cara ni una paleta distinta por juego.
+Las texturas se colocan en superficies delanteras; la cabeza mantiene volumen, cabello
+y accesorios por detrás. La cámara de Kart no muestra una cara mirando al conductor.
+`character-models.js` comparte la construcción sentada y de pie y deriva las proporciones
+del esqueleto de Esmash. También comparte manos, guantes y garras con las armas de FPS.
+
+La cámara de voz/video sigue siendo opcional y se conserva. El póster es una referencia
+artística: esta unificación no presenta los escenarios ni la jugabilidad de Kart/FPS como
+terminados o con la calidad de la ilustración. Las mejoras gráficas continúan un juego a la vez.
+
+`node src/test/tcharacters.cjs` comprueba el renderer conservado, las texturas compartidas,
+los 15 personajes en ambos modelos, las superficies delanteras y la ausencia de fotos.
+
+## FPS
+
+FPS es un mundo de unos 500 × 500 metros: valle, bosque, río con puentes,
 patio central, almacenes accesibles, escaleras y azoteas. Conserva los 15 personajes.
 El combate libre termina a las 12 bajas o a los siete minutos, con escudos, munición,
 coberturas que bloquean disparos, reaparición y CPU para completar cuatro plazas.
@@ -59,7 +83,7 @@ munición y puntuación; los invitados predicen su movimiento y reciben correcci
 El tema del lobby se conserva. Hay doce composiciones originales de la misma familia
 disco/funk electrónico, con bajo sincopado, teclas cálidas, pulsaciones de guitarra,
 percusión y secciones de 32 compases. Cada arena y circuito tiene su propia armonía,
-melodía y patrón; los tempos van de 103 a 130 BPM. También hay un tema para Cuenca Aurora.
+melodía y patrón; los tempos van de 103 a 130 BPM. También hay un tema para FPS.
 Se respetan los ajustes de música/efectos, volumen general y atenuación de la voz.
 
 | Escenario | Tema | BPM |
@@ -75,7 +99,7 @@ Se respetan los ajustes de música/efectos, volumen general y atenuación de la 
 | Mercado del Sol | Domingo de groove | 119 |
 | Cañón de Fuego | Fuego de medianoche | 130 |
 | Cumbre Neón | Lluvia cromada | 123 |
-| Cuenca Aurora | Horizonte eléctrico | 112 |
+| FPS | Horizonte eléctrico | 112 |
 
 ## Respuesta y movimiento
 
@@ -105,7 +129,7 @@ con el anfitrión como autoridad; recarga todos los jugadores para activar la ve
 Carreras locales para **un jugador contra siete CPU**, y **salas online para hasta cuatro pilotos**,
 con los **15 personajes originales**,
 pilotos y karts modelados en **3D**, con sus colores, sombreros, cuernos, branquias y siluetas propias.
-La cámara sigue al piloto desde atrás; las fotos se usan en la selección, no durante la conducción.
+La cámara sigue al piloto desde atrás; selección, retratos y conducción usan el mismo diseño estilizado.
 Las carreras online reutilizan las salas, enlaces de invitación, cámara, voz y conexión WebRTC de las peleas.
 Los puestos restantes hasta ocho se completan con CPU.
 En online cada dispositivo sigue únicamente a su piloto; las cámaras de voz/vídeo aparecen
@@ -218,7 +242,7 @@ pixeles; se cambia en *Ajustes*), y si aun así no alcanza los 60 cuadros por se
 
 ## Código
 
-`src/` tiene el código del juego, con las fotos de las caras (`src/js/faces.js`). `WEB_FACES=0` genera una versión con caras dibujadas.
+`src/` contiene el código, el registro de personajes y los modelos compartidos. El build no incluye fotos de caras.
 Para regenerar el sitio desde la raíz del repositorio:
 
 ```sh

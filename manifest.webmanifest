@@ -1,7 +1,7 @@
 {
   "name": "Esmash Bros",
   "short_name": "Esmash Bros",
-  "description": "Peleas, carreras y Aurora FPS: 15 personajes, tres circuitos y un mundo abierto. Local y online con voz y cámara.",
+  "description": "Peleas, carreras y FPS: 15 personajes, tres circuitos y un mundo abierto. Local y online con voz y cámara.",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",

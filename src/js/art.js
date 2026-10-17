@@ -208,7 +208,7 @@ const ART = {
   // ---------------- luz sobre los peleadores ----------------
   // El personaje se dibuja en su propio lienzo; ahí se le agrega la luz de borde
   // del lado de la luz, una sombra de forma del otro lado y el tinte del ambiente.
-  // Así las caras con foto y los cuerpos quedan iluminados por el mismo sol.
+  // Así las caras dibujadas y los cuerpos quedan iluminados por el mismo sol.
   litCanvases: [],
   drawLit(c, slot, box, draw) {
     const L = this.light;

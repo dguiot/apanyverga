@@ -3,19 +3,7 @@
 //  DIBUJO DE LOS PERSONAJES NO HUMANOS: cabezas, colas, trajes
 //  y los proyectiles nuevos
 // ============================================================
-Object.assign(LOOKS, {
-  torito: { species: 'bull', skin: '#6b4226', fur: '#7d5030', horn: '#efe6d2', snout: '#c9a27e', ring: '#ffd166', eye: '#b3261e',
-    top: '#6b4226', top2: '#4a2c17', garment: 'fur', sleeve: 'none', pants: '#9d0208', sash: '#ffd166', shoe: '#2b1d14', sole: '#140d08', wrap: '#c9a27e', accent: '#e63946',
-    tail: { col: '#4a2c17', tip: '#1e140e', kind: 'bull' }, build: { chest: 23, waist: 16, arm: 1.3, leg: 1.18 } },
-  chispa: { species: 'robot', skin: '#aeb8c4', top: '#d9dee5', top2: '#8d99ae', garment: 'armor', sleeve: 'none', pants: '#5c677d', shoe: '#2b2d42', sole: '#ffd166',
-    glove: '#5c677d', eye: '#48cae4', accent: '#2ec4b6', build: { chest: 19, waist: 12, arm: 1.1, leg: 1.05 } },
-  michi: { species: 'cat', skin: '#e39b4a', belly: '#f6e1c3', stripe: '#b86b2a', eye: '#9bd94a', mask: '#1d2230', top: '#1d2230', top2: '#12151e', garment: 'gi', sleeve: 'short',
-    sash: '#2ec4b6', pants: '#1d2230', shoe: '#e39b4a', sole: '#f6e1c3', wrap: '#1d2230', accent: '#2ec4b6',
-    tail: { col: '#e39b4a', tip: '#f6e1c3', stripe: '#b86b2a', kind: 'cat' }, build: { chest: 13.5, waist: 9.5, arm: 0.85, leg: 0.9 } },
-  chilazo: { species: 'chile', skin: '#d62828', top: '#d62828', top2: '#9d0208', garment: 'chile', sleeve: 'none', stem: '#2d6a4f', stem2: '#52b788',
-    maskCol: '#ffd166', maskTrim: '#2ec4b6', pants: '#2ec4b6', shoe: '#ffd166', sole: '#9d0208', wrap: '#f1f5f9', accent: '#ff9f1c', eye: '#10131a', lips: '#7a0a0a',
-    belt: '#ffd166', build: { chest: 17.5, waist: 15, arm: 1, leg: 0.95 } },
-});
+
 
 // ---------- colas ----------
 function drawTail(c, L, hx, hy, pose, OUT) {

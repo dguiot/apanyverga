@@ -51,20 +51,14 @@ const FPSView={
   // Arrival plaza and an observation tower give the world readable landmarks.
   for(const x of [-9,9])for(let z=-22;z<26;z+=8)batch.add('box','#bac0b3',[x,FPSWorld.height(x,z)+.025,z],[.22,.04,3]);
   for(const side of [-1,1]){batch.add('branch','#5a6971',[-6+side*5,FPSWorld.height(-6,0)+4,0],[.12,8,.12],null,.7);}
-  const sign=this.sign('CUENCA AURORA  //  01');sign.position.set(-6,FPSWorld.height(-6,0)+7.5,0);this.scene.add(sign);
+  const sign=this.sign('FPS  //  01');sign.position.set(-6,FPSWorld.height(-6,0)+7.5,0);this.scene.add(sign);
   batch.finish(this.scene);this.models=match.players.map(p=>this.character(p.id));this.models.forEach(m=>this.scene.add(m));
   this.pickupModels=match.pickups.map(p=>{const root=new T.Group(),b=KartModels.batch(),col=p.type==='ammo'?'#e5be75':'#77dce6';b.add('box',col,[0,.3,0],[.65,.6,.65],null,.45,.3,col);b.add('torus',col,[0,0,0],[.8,.8,.8],[Math.PI/2,0,0]);b.finish(root,false);root.position.set(p.x,FPSWorld.height(p.x,p.z)+.7,p.z);this.scene.add(root);return root;});
   this.tracePool=Array.from({length:32},()=>{const line=new T.Mesh(new T.CylinderGeometry(1,1,1,4),new T.MeshBasicMaterial({color:'#ffe5a5',transparent:true,opacity:.65,depthWrite:false}));line.frustumCulled=false;line.visible=false;this.scene.add(line);return line;});
   this.weaponScene=new T.Scene();this.weaponScene.add(new T.HemisphereLight('#eff7ff','#4c555a',2.5));const light=new T.DirectionalLight('#ffe4bb',2.5);light.position.set(-1,2,1);this.weaponScene.add(light);
  },
  sign(label){const T=KartGL,cv=mkCanvas(1024,128),c=cv.getContext('2d');c.fillStyle='#183b46';c.fillRect(0,0,1024,128);c.fillStyle='#f4e6be';c.font='bold 54px sans-serif';c.textAlign='center';c.fillText(label,512,83);const tex=new T.CanvasTexture(cv);tex.colorSpace=T.SRGBColorSpace;return new T.Mesh(new T.PlaneGeometry(12,1.5),new T.MeshBasicMaterial({map:tex,side:T.DoubleSide}));},
- character(id){
-  const T=KartGL,root=new T.Group(),b=KartModels.batch(),L=LOOKS[id]||{},source=KartModels.kart(id),head=source.userData.head;head.removeFromParent();source.traverse(m=>m.geometry?.dispose());head.position.set(0,1.6,0);head.scale.setScalar(.67);root.add(head);
-  b.add('box',L.top||'#7a8e91',[0,1.05,0],[.58,.65,.35]);b.add('box','#33444a',[0,1.08,.19],[.48,.42,.12]);for(const side of [-1,1]){
-   const leg=new T.Group(),l=KartModels.batch();l.add('box',L.pants||'#34414a',[0,-.31,0],[.22,.62,.24]);l.add('box',L.shoe||'#283238',[0,-.65,.09],[.23,.18,.39]);l.finish(leg);leg.position.set(side*.18,.75,0);root.add(leg);root.userData[side<0?'legL':'legR']=leg;
-   KartModels.link(b,[side*.34,1.25,0],[side*.22,1.03,.51],.095,L.top||'#7a8e91');b.add('sphere',L.skin||'#d6b398',[side*.22,1.03,.51],[.1,.09,.13]);}
-  b.add('box','#29363e',[.16,1.13,.6],[.12,.18,.65]);b.finish(root);return root;
- },
+ character(id){return CharacterModels.standing(id);},
  weapon(id,character){
   const T=KartGL,root=new T.Group(),b=KartModels.batch(),g=FPS_GUNS[id],dark='#27343d',metal='#798a91',long=id===4?.97:id===3?.78:id===0?.33:.69;
   b.add('box',dark,[0,0,0],[.105,.14,long*.58],null,.7,.31);b.add('box',g.color,[0,.068,-.02],[.11,.03,long*.46],null,.55,.4);
@@ -74,8 +68,11 @@ const FPSView={
   for(let i=0;i<(id===0?3:9);i++)b.add('box',metal,[0,.088,-long*.26+i*.025],[.09,.013,.014],null,.75);
   if(id===4){b.add('cylinder','#253b46',[0,.16,-.02],[.055,.26,.055],[Math.PI/2,0,0],.6,.25);b.add('cylinder','#72b3c2',[0,.16,-.16],[.045,.012,.045],[Math.PI/2,0,0],.6,.15);}
   else {for(const z of [-long*.55,long*.15]){b.add('box','#263842',[0,.045,z],[.04,.09,.035]);b.add('box','#101f28',[0,.11,z],[.018,.06,.02]);}}
-  const skin=LOOKS[character]?.skin||'#d8b096';KartModels.link(b,[.11,-.22,.33],[.04,-.13,.12],.062,'#506570');b.add('sphere',skin,[.03,-.12,.075],[.059,.08,.075]);
-  KartModels.link(b,[-.2,-.24,.3],[-.055,-.08,-long*.26],.059,'#506570');b.add('sphere',skin,[-.052,-.075,-long*.26],[.06,.05,.09]);b.finish(root,false);
+  const design=CharacterDesign.get(character),sleeve=design.sleeve==='long'?design.top:design.skin;root.userData.design=design;KartModels.link(b,[.11,-.22,.33],[.04,-.13,.12],.062,sleeve);
+  KartModels.link(b,[-.2,-.24,.3],[-.055,-.08,-long*.26],.059,sleeve);b.finish(root,false);
+  for(const [name,pos,rot] of [['right',[.03,-.12,.075],[-.5,0,-.1]],['left',[-.052,-.075,-long*.26],[-.3,0,-1.3]]]){
+   const hand=CharacterModels.extremity(character);hand.name=character+':fps-'+name+'-hand';hand.position.set(...pos);hand.rotation.set(...rot);hand.scale.setScalar(.7);root.add(hand);
+  }
   const flash=new T.Mesh(new T.ConeGeometry(.08,.23,6),new T.MeshBasicMaterial({color:'#ffdb83',transparent:true,opacity:.9,depthWrite:false}));flash.rotation.x=-Math.PI/2;flash.position.set(0,.01,-long*.86);flash.visible=false;root.add(flash);root.userData.flash=flash;return root;
  },
  pose(p,alpha){const prev=p.prev||p,ang=(a,b)=>a+Math.atan2(Math.sin(b-a),Math.cos(b-a))*alpha;return {x:lerp(prev.x,p.x,alpha),y:lerp(prev.y,p.y,alpha),z:lerp(prev.z,p.z,alpha),yaw:ang(prev.yaw,p.yaw),pitch:lerp(prev.pitch,p.pitch,alpha)};},
@@ -104,7 +101,7 @@ const FPSView={
  },
  hud(match,p,box){
   ctx.save();ctx.translate(box.x,box.y);const small=box.w<800,scale=box.w/W;ctx.scale(scale,box.h/H);const g=FPS_GUNS[p.gun];
-  text('CUENCA AURORA',28,34,16,'#e3eee4',{align:'left',body:true,weight:700,stroke:'#172b33',strokeW:3});text(Math.max(0,Math.ceil(match.duration-match.time))+' s  ·  '+p.kills+' / '+match.target,28,60,15,GOLD,{align:'left',body:true,stroke:'#172b33',strokeW:3});
+  text('FPS',28,34,16,'#e3eee4',{align:'left',body:true,weight:700,stroke:'#172b33',strokeW:3});text(Math.max(0,Math.ceil(match.duration-match.time))+' s  ·  '+p.kills+' / '+match.target,28,60,15,GOLD,{align:'left',body:true,stroke:'#172b33',strokeW:3});
   if(p.gun===4&&p.ads>.85){ctx.fillStyle='rgba(6,14,21,.88)';ctx.beginPath();ctx.rect(0,0,W,H);ctx.arc(640,360,280,0,TAU,true);ctx.fill('evenodd');ctx.strokeStyle='rgba(12,24,30,.85)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(360,360);ctx.lineTo(920,360);ctx.moveTo(640,80);ctx.lineTo(640,640);ctx.stroke();}
   const bearing=((Math.round(p.yaw*180/Math.PI)%360)+360)%360;text(['N','NE','E','SE','S','SO','O','NO'][Math.round(bearing/45)%8]+'  '+bearing+'°',640,35,16,'#eef4e9',{body:true,weight:700,stroke:'#172b33',strokeW:3});
   const radius=4+(1-p.ads)*Math.hypot(p.vx,p.vz)*1.2+p.recoil*90;ctx.strokeStyle=p.hit?'#ffdd87':'#eaf5ef';ctx.lineWidth=2;ctx.beginPath();for(const [x,y] of [[1,0],[-1,0],[0,1],[0,-1]]){ctx.moveTo(640+x*radius,360+y*radius);ctx.lineTo(640+x*(radius+7),360+y*(radius+7));}ctx.stroke();

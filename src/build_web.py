@@ -1,14 +1,12 @@
 # Versión web (GitHub Pages): el mismo juego + Supabase (salas, salón de la fama) + adaptador js/webshim.js
 # Salida: web/index.html y web/config.js (este último solo se crea si no existe: ahí va la anon key)
-# Lleva las fotos de las caras (Daniel autorizó que sean públicas). WEB_FACES=0 las quita y quedan caras dibujadas.
+# Personajes estilizados: el build nunca incluye fotografías de caras.
 import re, pathlib, os, base64
 root = pathlib.Path(__file__).parent
 out = pathlib.Path(os.environ.get('OUT') or (root / 'web')); out.mkdir(parents=True, exist_ok=True)
 html = (root / 'index.html').read_text(encoding='utf-8')
 block = re.search(r'<!--SCRIPTS-->(.*?)<!--/SCRIPTS-->', html, re.S).group(1)
 srcs = re.findall(r'src="([^"]+)"', block)
-faces = os.environ.get('WEB_FACES') != '0'
-if not faces: srcs = [s for s in srcs if s != 'js/faces.js']
 js = []
 for s in ['js/webshim.js'] + srcs:
     code = (root / s).read_text(encoding='utf-8')
@@ -24,7 +22,7 @@ html = html.replace('<link rel="stylesheet" href="fonts/inline.css">', '<style>\
 icon = "data:image/svg+xml," + "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23e63946'/%3E%3Ctext x='32' y='47' font-size='40' text-anchor='middle' font-family='Impact,Arial Black,sans-serif' fill='%23ffc53d'%3EV%3C/text%3E%3C/svg%3E"
 head = ('<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'
         '<meta name="theme-color" content="#060d18">\n'
-        '<meta name="description" content="Esmash Bros: peleas, Esmash Kart y Aurora FPS. 15 personajes, carreras en tres circuitos y un mundo abierto en primera persona. Local y online con voz y cámara.">\n'
+        '<meta name="description" content="Esmash Bros: peleas, Esmash Kart y FPS. 15 personajes, carreras en tres circuitos y un mundo abierto en primera persona. Local y online con voz y cámara.">\n'
         f'<link rel="icon" href="{icon}">\n'
         # "Agregar a inicio": desde el ícono abre a pantalla completa y de lado (en iPhone es la única forma)
         '<link rel="manifest" href="manifest.webmanifest">\n'
@@ -42,7 +40,7 @@ for n in (180, 192, 512): (out / 'icons' / f'icon-{n}.png').write_bytes((root / 
 (out / 'manifest.webmanifest').write_text('''{
   "name": "Esmash Bros",
   "short_name": "Esmash Bros",
-  "description": "Peleas, carreras y Aurora FPS: 15 personajes, tres circuitos y un mundo abierto. Local y online con voz y cámara.",
+  "description": "Peleas, carreras y FPS: 15 personajes, tres circuitos y un mundo abierto. Local y online con voz y cámara.",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",
@@ -69,4 +67,4 @@ window.APYV_CONFIG = {
   ice: null,
 };
 """)
-print('web built', len(page), 'bytes ·', 'con fotos' if faces else 'sin fotos (caras dibujadas)')
+print('web built', len(page), 'bytes ·', 'personajes estilizados sin fotos')

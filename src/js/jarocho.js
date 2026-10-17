@@ -6,13 +6,7 @@
 //  paliacate rojo al cuello, camisa blanca con alforzas, pantalón blanco y
 //  botines de tacón para el zapateado. Pelea igual que antes.
 // ============================================================
-Object.assign(LOOKS.chilazo, {
-  jarocho: 1, skin: '#3f9142', pepper: '#3f9142', pepper2: '#1f5e2a',
-  top: '#f4efe8', top2: '#d9d2c4', sleeve: 'long', pants: '#f4efe8',
-  feet: 'boot', shoe: '#f7f2e8', sole: '#5a3a22', heel: 1, bootH: 0, wrap: null,
-  hat: '#e9d6a4', hat2: '#b99a5c', hatBand: '#18181c', scarf: '#c1121f',
-  stem: '#4d7f2c', stem2: '#86b94f', accent: '#c1121f', lips: '#5a1010',
-});
+
 
 // el mismo cuerpo de chile (tronco y cabeza en una pieza), ahora verde y vestido
 function pepperPath(c, W, H, wob, p) {
