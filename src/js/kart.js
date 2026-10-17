@@ -24,6 +24,10 @@ const kartStats=(id,vehicle=0)=>{
   return {speed:(108+heavy*7)*V.speed,accel:(39-heavy*9)*V.accel,grip:(1.09-heavy*.18)*V.grip,weight:(.75+heavy*.6)*V.weight,
     bars:[clamp(Math.round(3+heavy*2+(V.speed-1)*45),1,5),clamp(Math.round(5-heavy*2+(V.accel-1)*12),1,5),clamp(Math.round(5-heavy*2+(V.grip-1)*18),1,5)]};
 };
+const KartHandling={
+  driftTurn:1.08,
+  axis(v){const a=Math.abs(v||0);if(a<=.18)return 0;const n=clamp((a-.18)/.82,0,1);return sign(v)*(.42*n+.58*n*n*n);},
+};
 const KartControls = {
   prev:{},tapped:new Set(),
   read(dev=null) {
@@ -40,7 +44,7 @@ const KartControls = {
     }
     if(p) {
       const b=p.buttons,a=p.axes;
-      if(Math.abs(a[0]||0)>.16){const analog=Math.abs(a[0])>.98?sign(a[0]):(a[0]-sign(a[0])*.16)/.84;if(Math.abs(analog)>Math.abs(steer))steer=analog;}
+      const analog=KartHandling.axis(a[0]);if(Math.abs(analog)>Math.abs(steer))steer=analog;
       if(b[14]) steer=-1;if(b[15]) steer=1;
     }
     const t=Devices.ctrls.touch;
@@ -74,7 +78,7 @@ class KartRace {
     if(!/VUELTA|META|A CORRER/.test(msg))return;
     this.messages=[{msg,color,life:1.8}];
   }
-  feedback(r,sfx,force=.3){if(r.human&&(!this.online||r===this.player)){KartSound.effect(sfx);Rumble.play('local',force,.5,110);}}
+  feedback(r,sfx,force=.3){if(r.human&&(!this.online||r===this.player)){KartSound.effect(sfx);Rumble.play(KartHaptics.device(this,r),force,.15+force*.4,110);}}
   startBoost(r,seconds,label) {r.turbo=Math.max(r.turbo,seconds);if(r.human&&label)this.say(label,'#69e9ee');}
   update(input,dt=1/60) {
     if(this.paused)return;
@@ -117,7 +121,7 @@ class KartRace {
     const ratio=r.v/(r.stats.speed*this.cc.speed),maxTurn=(1.62-.42*Math.min(1.4,ratio))*r.stats.grip;
     const desiredVelocity=Math.atan2((lane-r.x)*p.width*1.8,Math.max(30,r.v));
     const desiredBody=desiredVelocity+(r.drift?r.driftDir*.2:0);
-    const steer=clamp((p.curve*r.v+(desiredBody-r.yaw)*5)/(maxTurn*(r.drift?1.18:1)),-1,1);
+    const steer=clamp((p.curve*r.v+(desiredBody-r.yaw)*5)/(maxTurn*(r.drift?KartHandling.driftTurn:1)),-1,1);
     const target=Math.min(r.stats.speed*this.cc.speed*this.cc.ai*r.skill*clamp(1.1-curve*46,.48,1),curve>.001?1.15/curve:999);
     const use=r.item&&this.time>r.aiUse;r.aiUse=use?this.time+2+this.random()*3:r.aiUse;
     return {steer,gas:r.v<target,brake:r.v>target+8,drift:curve>.0028&&curve<.007&&r.v>55&&Math.abs(r.x)<.72,itemPressed:!!use,rear:false};
@@ -127,7 +131,7 @@ class KartRace {
     for(const k of ['turbo','shield','stun','invuln','air','hitCd','boostCd'])r[k]=Math.max(0,r[k]-dt);
     if(r.rescue>0){r.rescue-=dt;r.v=0;r.x=lerp(r.x,0,dt*7);r.lat=0;r.bumpLat=0;r.yaw=0;r.velocityYaw=0;r.turnRate=0;r.drift=0;r.charge=0;r.height=0;r.vy=0;return;}
     if(r.roulette>0){r.roulette-=dt;if(r.roulette<=0&&!this.predicting){r.item=this.rollItem(r);this.feedback(r,'confirm',.15);}}
-    r.steer=approach(r.steer,input.steer||0,dt*(input.steer?11:15));
+    r.steer=approach(r.steer,input.steer||0,dt*(input.steer?5.5:7.5));
     for(const k of ['star','magnet','slow','slipCd','rampCd'])r[k]=Math.max(0,r[k]-dt);
     const wasFlying=r.height>0||r.vy>0;
     if(wasFlying){r.airTime+=dt;r.height=Math.max(0,r.height+r.vy*dt);r.vy-=24*dt;
@@ -141,23 +145,27 @@ class KartRace {
       else {
         // Countersteering adjusts the racing line without instantly cancelling a drift.
         const into=r.steer*r.driftDir;
-        r.charge=Math.min(2.7,r.charge+dt*(.72+Math.max(0,into)*.42)*V.charge);
+        r.charge=Math.min(2.7,r.charge+dt*(.6+Math.max(0,into)*.3)*V.charge);
       }
     }
     if(r.stun){r.v=approach(r.v,max*.25,dt*max*1.8);r.drift=0;r.charge=0;}
     else if(input.brake){r.v=approach(r.v,0,dt*max*1.12*V.brake);}
-    else if(input.gas||r.turbo||r.star){r.v=approach(r.v,max*(r.turbo?1.32:r.star?1.2:1)*(1+r.coins*.005)*(r.slow?.58:1),dt*r.stats.accel*(r.turbo||r.star?2.3:1));}
+    else if(input.gas||r.turbo||r.star){
+      const scrub=clamp((r.drift?.07:0)+Math.abs(r.yaw-r.velocityYaw)*.33+Math.abs(r.turnRate)*.025,0,.22);
+      r.v=approach(r.v,max*(1-scrub)*(r.turbo?1.32:r.star?1.2:1)*(1+r.coins*.005)*(r.slow?.58:1),dt*r.stats.accel*(r.turbo||r.star?2.3:1));
+    }
     else r.v=approach(r.v,0,dt*18);
     // Integrate heading and tyre velocity separately. With no steering the kart
     // keeps its world heading instead of automatically following the track.
     const grip=p.zone==='wet'?.73:1;
     const maxTurn=(1.62-.42*Math.min(1.4,ratio))*r.stats.grip;
     const steer=r.steer+(this.assist&&r.human?clamp(p.curve*r.v/maxTurn-r.x*.25,-.55,.55):0);
-    r.turnRate=approach(r.turnRate,clamp(steer,-1,1)*maxTurn*(r.drift?1.18:1)*Math.min(1,ratio*3),dt*7*V.response);
+    r.turnRate=lerp(r.turnRate,clamp(steer,-1,1)*maxTurn*(r.drift?KartHandling.driftTurn:1)*Math.min(1,ratio*3),1-Math.exp(-dt*12*V.response));
     const rotation=p.curve*r.v*Math.cos(r.velocityYaw)*dt;
     r.yaw=clamp(r.yaw+r.turnRate*dt-rotation,-1.23,1.23);r.velocityYaw-=rotation;
-    const tyreTarget=r.yaw-(r.drift?r.driftDir*.2:0);
-    r.velocityYaw=approach(r.velocityYaw,tyreTarget,dt*(r.drift?1.4:5.5)*grip*(r.height>.3?.35:1));
+    const tyreTarget=r.yaw-(r.drift?r.driftDir*.14:0);
+    r.velocityYaw=lerp(r.velocityYaw,tyreTarget,1-Math.exp(-dt*(r.drift?7.5:14)*grip*(r.height>.3?.35:1)));
+    if(r.height<.3){const slip=Math.abs(r.yaw-r.velocityYaw);r.v=Math.max(0,r.v-r.v*(.012+slip*.38+(r.drift?.065:0))*dt);}
     r.lat=Math.sin(r.velocityYaw)*r.v/p.width+r.bumpLat;r.bumpLat=approach(r.bumpLat,0,dt*2.8);
     if(r.stun){r.lat*=.7;r.yaw*=.99;}
     r.x+=r.lat*dt;

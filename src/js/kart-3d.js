@@ -7,16 +7,20 @@ const Kart3D={
       const T=KartGL,r=this.renderer=new T.WebGLRenderer({antialias:!IS_XBOX,alpha:true,powerPreference:'high-performance'});
       r.outputColorSpace=T.SRGBColorSpace;r.toneMapping=T.ACESFilmicToneMapping;r.toneMappingExposure=1.22;
       r.shadowMap.enabled=!IS_XBOX;r.shadowMap.type=T.PCFSoftShadowMap;
-      const pmrem=new T.PMREMGenerator(r),room=new T.RoomEnvironment();this.environment=pmrem.fromScene(room,.04).texture;room.dispose();pmrem.dispose();
+      this.rebuildEnvironment();
       r.domElement.id='kart-world';r.domElement.setAttribute('aria-hidden','true');
       // Render offscreen, then copy into the same visible canvas as the HUD.
       // Opaque 2D surfaces and browser compositor layers cannot cover the track.
       r.domElement.style.cssText='display:none;pointer-events:none';
       document.body.insertBefore(r.domElement,canvas);
       r.domElement.addEventListener('webglcontextlost',e=>{e.preventDefault();this.contextLost=true;if(APP.kartRace){this.wasPaused=APP.kartRace.paused;APP.kartRace.paused=true;}});
-      r.domElement.addEventListener('webglcontextrestored',()=>{this.contextLost=false;this.race=null;if(APP.kartRace)APP.kartRace.paused=!!this.wasPaused;});
+      r.domElement.addEventListener('webglcontextrestored',()=>{this.rebuildEnvironment();this.contextLost=false;this.race=null;if(typeof FPSView!=='undefined')FPSView.match=null;if(APP.kartRace)APP.kartRace.paused=!!this.wasPaused;});
       return true;
     }catch(e){this.error=e.message;return false;}
+  },
+  rebuildEnvironment(){
+    this.environmentTarget?.dispose();const T=KartGL,pmrem=new T.PMREMGenerator(this.renderer),room=new T.RoomEnvironment();
+    this.environmentTarget=pmrem.fromScene(room,.04);this.environment=this.environmentTarget.texture;room.dispose();pmrem.dispose();
   },
   hide(){if(this.renderer)this.renderer.domElement.style.display='none';canvas.style.background='';},
   present(){ctx.save();ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.drawImage(this.renderer.domElement,0,0,W,H);ctx.restore();},
@@ -258,6 +262,7 @@ const Kart3D={
     b.finish(root,false);return root;
   },
   animate(race,alpha){
+    KartHaptics.tick(race);
     KartMotion.animate(race);
     const T=KartGL,C=race.course,p=race.player,pv=KartMotion.view(p,alpha),s=pv.s,x=pv.x,tick=race.tick!==this.particleTick;
     const centre=C.world(s,x),local=(!race.online&&race.localPlayers?.length>1)?race.localPlayers.map(r=>C.world(r.s,r.x)):[centre];

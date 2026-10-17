@@ -42,6 +42,13 @@ La invulnerabilidad se muestra con un halo constante: el piloto nunca se oculta 
 Los avisos de vuelta y meta son discretos; los objetos y efectos activos se consultan en el HUD.
 Los mismos controles de objetos se usan en solitario, pantalla dividida y online.
 
+La palanca tiene zona muerta y respuesta progresiva: se puede corregir la trazada cerca
+del centro sin llegar de golpe al giro máximo. El derrape pierde velocidad por fricción
+de neumáticos incluso acelerando, y recupera agarre de forma gradual al soltarlo.
+La vibración combina velocidad, carga de curva, deslizamiento y tipo de firme; solo se
+envía al mando de ese jugador y respeta los impactos más fuertes. Depende de que el
+mando/navegador exponga un actuador háptico, y se apaga desde Sonido e imagen.
+
 ## Un solo diseño de personajes
 
 Esmash conserva su dibujo, siluetas, proporciones y animaciones. Las fotos se sustituyen
@@ -304,6 +311,8 @@ conectado antes, ausencia de rescate por Y/R, lanzamiento delantero/trasero, res
 protección sin parpadeo, recarga de las cinco armas con X y RB, WASD con mando conectado,
 separación local, acciones de Esmash y pausa con Menu independiente de las asignaciones de pelea.
 El panel de controles muestra los botones detectados para diagnosticar mandos inalámbricos.
+`node src/test/tkart-handling.cjs` verifica la respuesta de palanca, fricción y recuperación
+de los seis vehículos, vibración proporcional y las llamadas al actuador inalámbrico.
 
 `node src/test/tkart-steering.cjs` comprueba izquierda/derecha en coordenadas de pantalla
 con palanca, cruceta, WASD, flechas y controles táctiles, y verifica desplazamiento,

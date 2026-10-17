@@ -19496,6 +19496,10 @@ const kartStats=(id,vehicle=0)=>{
   return {speed:(108+heavy*7)*V.speed,accel:(39-heavy*9)*V.accel,grip:(1.09-heavy*.18)*V.grip,weight:(.75+heavy*.6)*V.weight,
     bars:[clamp(Math.round(3+heavy*2+(V.speed-1)*45),1,5),clamp(Math.round(5-heavy*2+(V.accel-1)*12),1,5),clamp(Math.round(5-heavy*2+(V.grip-1)*18),1,5)]};
 };
+const KartHandling={
+  driftTurn:1.08,
+  axis(v){const a=Math.abs(v||0);if(a<=.18)return 0;const n=clamp((a-.18)/.82,0,1);return sign(v)*(.42*n+.58*n*n*n);},
+};
 const KartControls = {
   prev:{},tapped:new Set(),
   read(dev=null) {
@@ -19512,7 +19516,7 @@ const KartControls = {
     }
     if(p) {
       const b=p.buttons,a=p.axes;
-      if(Math.abs(a[0]||0)>.16){const analog=Math.abs(a[0])>.98?sign(a[0]):(a[0]-sign(a[0])*.16)/.84;if(Math.abs(analog)>Math.abs(steer))steer=analog;}
+      const analog=KartHandling.axis(a[0]);if(Math.abs(analog)>Math.abs(steer))steer=analog;
       if(b[14]) steer=-1;if(b[15]) steer=1;
     }
     const t=Devices.ctrls.touch;
@@ -19546,7 +19550,7 @@ class KartRace {
     if(!/VUELTA|META|A CORRER/.test(msg))return;
     this.messages=[{msg,color,life:1.8}];
   }
-  feedback(r,sfx,force=.3){if(r.human&&(!this.online||r===this.player)){KartSound.effect(sfx);Rumble.play('local',force,.5,110);}}
+  feedback(r,sfx,force=.3){if(r.human&&(!this.online||r===this.player)){KartSound.effect(sfx);Rumble.play(KartHaptics.device(this,r),force,.15+force*.4,110);}}
   startBoost(r,seconds,label) {r.turbo=Math.max(r.turbo,seconds);if(r.human&&label)this.say(label,'#69e9ee');}
   update(input,dt=1/60) {
     if(this.paused)return;
@@ -19589,7 +19593,7 @@ class KartRace {
     const ratio=r.v/(r.stats.speed*this.cc.speed),maxTurn=(1.62-.42*Math.min(1.4,ratio))*r.stats.grip;
     const desiredVelocity=Math.atan2((lane-r.x)*p.width*1.8,Math.max(30,r.v));
     const desiredBody=desiredVelocity+(r.drift?r.driftDir*.2:0);
-    const steer=clamp((p.curve*r.v+(desiredBody-r.yaw)*5)/(maxTurn*(r.drift?1.18:1)),-1,1);
+    const steer=clamp((p.curve*r.v+(desiredBody-r.yaw)*5)/(maxTurn*(r.drift?KartHandling.driftTurn:1)),-1,1);
     const target=Math.min(r.stats.speed*this.cc.speed*this.cc.ai*r.skill*clamp(1.1-curve*46,.48,1),curve>.001?1.15/curve:999);
     const use=r.item&&this.time>r.aiUse;r.aiUse=use?this.time+2+this.random()*3:r.aiUse;
     return {steer,gas:r.v<target,brake:r.v>target+8,drift:curve>.0028&&curve<.007&&r.v>55&&Math.abs(r.x)<.72,itemPressed:!!use,rear:false};
@@ -19599,7 +19603,7 @@ class KartRace {
     for(const k of ['turbo','shield','stun','invuln','air','hitCd','boostCd'])r[k]=Math.max(0,r[k]-dt);
     if(r.rescue>0){r.rescue-=dt;r.v=0;r.x=lerp(r.x,0,dt*7);r.lat=0;r.bumpLat=0;r.yaw=0;r.velocityYaw=0;r.turnRate=0;r.drift=0;r.charge=0;r.height=0;r.vy=0;return;}
     if(r.roulette>0){r.roulette-=dt;if(r.roulette<=0&&!this.predicting){r.item=this.rollItem(r);this.feedback(r,'confirm',.15);}}
-    r.steer=approach(r.steer,input.steer||0,dt*(input.steer?11:15));
+    r.steer=approach(r.steer,input.steer||0,dt*(input.steer?5.5:7.5));
     for(const k of ['star','magnet','slow','slipCd','rampCd'])r[k]=Math.max(0,r[k]-dt);
     const wasFlying=r.height>0||r.vy>0;
     if(wasFlying){r.airTime+=dt;r.height=Math.max(0,r.height+r.vy*dt);r.vy-=24*dt;
@@ -19613,23 +19617,27 @@ class KartRace {
       else {
         // Countersteering adjusts the racing line without instantly cancelling a drift.
         const into=r.steer*r.driftDir;
-        r.charge=Math.min(2.7,r.charge+dt*(.72+Math.max(0,into)*.42)*V.charge);
+        r.charge=Math.min(2.7,r.charge+dt*(.6+Math.max(0,into)*.3)*V.charge);
       }
     }
     if(r.stun){r.v=approach(r.v,max*.25,dt*max*1.8);r.drift=0;r.charge=0;}
     else if(input.brake){r.v=approach(r.v,0,dt*max*1.12*V.brake);}
-    else if(input.gas||r.turbo||r.star){r.v=approach(r.v,max*(r.turbo?1.32:r.star?1.2:1)*(1+r.coins*.005)*(r.slow?.58:1),dt*r.stats.accel*(r.turbo||r.star?2.3:1));}
+    else if(input.gas||r.turbo||r.star){
+      const scrub=clamp((r.drift?.07:0)+Math.abs(r.yaw-r.velocityYaw)*.33+Math.abs(r.turnRate)*.025,0,.22);
+      r.v=approach(r.v,max*(1-scrub)*(r.turbo?1.32:r.star?1.2:1)*(1+r.coins*.005)*(r.slow?.58:1),dt*r.stats.accel*(r.turbo||r.star?2.3:1));
+    }
     else r.v=approach(r.v,0,dt*18);
     // Integrate heading and tyre velocity separately. With no steering the kart
     // keeps its world heading instead of automatically following the track.
     const grip=p.zone==='wet'?.73:1;
     const maxTurn=(1.62-.42*Math.min(1.4,ratio))*r.stats.grip;
     const steer=r.steer+(this.assist&&r.human?clamp(p.curve*r.v/maxTurn-r.x*.25,-.55,.55):0);
-    r.turnRate=approach(r.turnRate,clamp(steer,-1,1)*maxTurn*(r.drift?1.18:1)*Math.min(1,ratio*3),dt*7*V.response);
+    r.turnRate=lerp(r.turnRate,clamp(steer,-1,1)*maxTurn*(r.drift?KartHandling.driftTurn:1)*Math.min(1,ratio*3),1-Math.exp(-dt*12*V.response));
     const rotation=p.curve*r.v*Math.cos(r.velocityYaw)*dt;
     r.yaw=clamp(r.yaw+r.turnRate*dt-rotation,-1.23,1.23);r.velocityYaw-=rotation;
-    const tyreTarget=r.yaw-(r.drift?r.driftDir*.2:0);
-    r.velocityYaw=approach(r.velocityYaw,tyreTarget,dt*(r.drift?1.4:5.5)*grip*(r.height>.3?.35:1));
+    const tyreTarget=r.yaw-(r.drift?r.driftDir*.14:0);
+    r.velocityYaw=lerp(r.velocityYaw,tyreTarget,1-Math.exp(-dt*(r.drift?7.5:14)*grip*(r.height>.3?.35:1)));
+    if(r.height<.3){const slip=Math.abs(r.yaw-r.velocityYaw);r.v=Math.max(0,r.v-r.v*(.012+slip*.38+(r.drift?.065:0))*dt);}
     r.lat=Math.sin(r.velocityYaw)*r.v/p.width+r.bumpLat;r.bumpLat=approach(r.bumpLat,0,dt*2.8);
     if(r.stun){r.lat*=.7;r.yaw*=.99;}
     r.x+=r.lat*dt;
@@ -19744,6 +19752,30 @@ const KartSound={
 window.addEventListener('blur',()=>{if(typeof APP!=='undefined'&&APP.screen==='kartRace'&&APP.kartRace){APP.kartRace.paused=true;KartSound.stop();}});
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&typeof APP!=='undefined'&&APP.screen==='kartRace'&&APP.kartRace){APP.kartRace.paused=true;KartSound.stop();}});
 window.addEventListener('keydown',e=>{if(!e.repeat&&typeof APP!=='undefined'&&APP.screen==='kartRace')KartControls.tapped.add(e.code);});
+
+// ---- js/kart-haptics.js ----
+const KartHaptics={
+  last:new Map(),
+  device(race,r){
+    if(race.online&&r!==race.player)return null;
+    const locals=race.localPlayers||[race.player];if(!locals.includes(r))return null;
+    if(locals.length>1){const dev=race.localDevices?.[locals.indexOf(r)];return dev?.startsWith('pad')?dev:null;}
+    const index=ModeControls.primary.get('kart');return index!==undefined&&padInfo.some(p=>p.index===index)?'pad'+index:TouchPad.active?'touch':null;
+  },
+  feel(race,r){
+    if(race.paused||race.phase!=='race'||r.rescue||r.stun||r.finish!==null||r.height>.3||r.v<5)return {strong:0,weak:0};
+    const speed=clamp(r.v/(r.stats.speed*race.cc.speed),0,1.3),p=race.course.sample(r.s),bend=clamp(Math.abs(p.curve)*r.v,0,1.3),load=clamp(Math.max(Math.abs(r.turnRate||0),bend)*speed,0,1),slip=clamp(Math.abs(r.yaw-r.velocityYaw)/.32,0,1),rough=p.zone==='gravel'?.07:p.zone==='cobbles'?.04:0;
+    return {strong:clamp(.012*speed+.2*load*speed+.13*slip*speed,0,.38),weak:clamp(.035*speed*speed+.11*load+.09*slip*speed+(r.drift?.045:0)+rough*speed+(r.turbo?.035:0),0,.36)};
+  },
+  tick(race){
+    if(!Rumble.on)return;const now=performance.now(),locals=race.online?[race.player]:race.localPlayers||[race.player];
+    for(const r of locals){const dev=this.device(race,r);if(!r.human||!dev?.startsWith('pad')||!Rumble.canRumble(dev)||now-(this.last.get(dev)||-1000)<80)continue;
+      const f=this.feel(race,r);if(f.strong+f.weak<.012)continue;
+      // Rumble keeps a stronger impact alive; road texture cannot cancel it.
+      if(Rumble.play(dev,f.strong,f.weak,100))this.last.set(dev,now);
+    }
+  },
+};
 
 // ---- js/kart-render.js ----
 const KartRender={
@@ -20149,16 +20181,20 @@ const Kart3D={
       const T=KartGL,r=this.renderer=new T.WebGLRenderer({antialias:!IS_XBOX,alpha:true,powerPreference:'high-performance'});
       r.outputColorSpace=T.SRGBColorSpace;r.toneMapping=T.ACESFilmicToneMapping;r.toneMappingExposure=1.22;
       r.shadowMap.enabled=!IS_XBOX;r.shadowMap.type=T.PCFSoftShadowMap;
-      const pmrem=new T.PMREMGenerator(r),room=new T.RoomEnvironment();this.environment=pmrem.fromScene(room,.04).texture;room.dispose();pmrem.dispose();
+      this.rebuildEnvironment();
       r.domElement.id='kart-world';r.domElement.setAttribute('aria-hidden','true');
       // Render offscreen, then copy into the same visible canvas as the HUD.
       // Opaque 2D surfaces and browser compositor layers cannot cover the track.
       r.domElement.style.cssText='display:none;pointer-events:none';
       document.body.insertBefore(r.domElement,canvas);
       r.domElement.addEventListener('webglcontextlost',e=>{e.preventDefault();this.contextLost=true;if(APP.kartRace){this.wasPaused=APP.kartRace.paused;APP.kartRace.paused=true;}});
-      r.domElement.addEventListener('webglcontextrestored',()=>{this.contextLost=false;this.race=null;if(APP.kartRace)APP.kartRace.paused=!!this.wasPaused;});
+      r.domElement.addEventListener('webglcontextrestored',()=>{this.rebuildEnvironment();this.contextLost=false;this.race=null;if(typeof FPSView!=='undefined')FPSView.match=null;if(APP.kartRace)APP.kartRace.paused=!!this.wasPaused;});
       return true;
     }catch(e){this.error=e.message;return false;}
+  },
+  rebuildEnvironment(){
+    this.environmentTarget?.dispose();const T=KartGL,pmrem=new T.PMREMGenerator(this.renderer),room=new T.RoomEnvironment();
+    this.environmentTarget=pmrem.fromScene(room,.04);this.environment=this.environmentTarget.texture;room.dispose();pmrem.dispose();
   },
   hide(){if(this.renderer)this.renderer.domElement.style.display='none';canvas.style.background='';},
   present(){ctx.save();ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.drawImage(this.renderer.domElement,0,0,W,H);ctx.restore();},
@@ -20400,6 +20436,7 @@ const Kart3D={
     b.finish(root,false);return root;
   },
   animate(race,alpha){
+    KartHaptics.tick(race);
     KartMotion.animate(race);
     const T=KartGL,C=race.course,p=race.player,pv=KartMotion.view(p,alpha),s=pv.s,x=pv.x,tick=race.tick!==this.particleTick;
     const centre=C.world(s,x),local=(!race.online&&race.localPlayers?.length>1)?race.localPlayers.map(r=>C.world(r.s,r.x)):[centre];
@@ -22270,7 +22307,7 @@ const ShellUI={
   ['ACCIÓN','TECLADO Y RATÓN','MANDO · XBOX / PLAYSTATION'].forEach((s,i)=>text(s,65+i*390,223,12,TEAL,{align:'left',body:true,weight:800}));
   rows.forEach((r,i)=>{ctx.fillStyle=i%2?'#142936':'#1b303d';roundRect(ctx,44,243+i*43,1190,37,7);ctx.fill();r.forEach((s,j)=>text(s,65+j*390,264+i*43,fitSize(s,365,16),PAPER,{align:'left',body:true}));});
   text(ModeControls.diagnostic(),48,521,fitSize(ModeControls.diagnostic(),1180,13),TEAL,{align:'left',body:true});
-  text(this.game==='kart'?'LB / E / J lanza delante. B / Q lanza atrás. El rescate solo es automático al caer.':this.game==='fps'?'Recarga: R en teclado · X / □ o RB / R1 en mando. También funciona con conexión inalámbrica.':'Esmash usa tus asignaciones guardadas.',48,550,13,'#b3cdd5',{align:'left',body:true});
+  text(this.game==='kart'?'Palanca progresiva · derrape con fricción · vibración según velocidad y curva · rescate automático.':this.game==='fps'?'Recarga: R en teclado · X / □ o RB / R1 en mando. También funciona con conexión inalámbrica.':'Esmash usa tus asignaciones guardadas.',48,550,13,'#b3cdd5',{align:'left',body:true});
   text('Local: un jugador admite teclado o mando. En multijugador: P1 teclado, P2–P4 un mando por jugador.',48,576,12,'#93aeba',{align:'left',body:true});
  },
  playersItems(){const items=[{x:44,y:143,w:220,h:42,tab:0}];if(this.game==='kart')items.push({x:278,y:143,w:240,h:42,tab:1});if(!this.online)for(let i=0;i<this.config.locals;i++)items.push({x:700+i*134,y:144,w:122,h:40,edit:i});

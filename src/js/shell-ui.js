@@ -178,7 +178,7 @@ const ShellUI={
   ['ACCIÓN','TECLADO Y RATÓN','MANDO · XBOX / PLAYSTATION'].forEach((s,i)=>text(s,65+i*390,223,12,TEAL,{align:'left',body:true,weight:800}));
   rows.forEach((r,i)=>{ctx.fillStyle=i%2?'#142936':'#1b303d';roundRect(ctx,44,243+i*43,1190,37,7);ctx.fill();r.forEach((s,j)=>text(s,65+j*390,264+i*43,fitSize(s,365,16),PAPER,{align:'left',body:true}));});
   text(ModeControls.diagnostic(),48,521,fitSize(ModeControls.diagnostic(),1180,13),TEAL,{align:'left',body:true});
-  text(this.game==='kart'?'LB / E / J lanza delante. B / Q lanza atrás. El rescate solo es automático al caer.':this.game==='fps'?'Recarga: R en teclado · X / □ o RB / R1 en mando. También funciona con conexión inalámbrica.':'Esmash usa tus asignaciones guardadas.',48,550,13,'#b3cdd5',{align:'left',body:true});
+  text(this.game==='kart'?'Palanca progresiva · derrape con fricción · vibración según velocidad y curva · rescate automático.':this.game==='fps'?'Recarga: R en teclado · X / □ o RB / R1 en mando. También funciona con conexión inalámbrica.':'Esmash usa tus asignaciones guardadas.',48,550,13,'#b3cdd5',{align:'left',body:true});
   text('Local: un jugador admite teclado o mando. En multijugador: P1 teclado, P2–P4 un mando por jugador.',48,576,12,'#93aeba',{align:'left',body:true});
  },
  playersItems(){const items=[{x:44,y:143,w:220,h:42,tab:0}];if(this.game==='kart')items.push({x:278,y:143,w:240,h:42,tab:1});if(!this.online)for(let i=0;i<this.config.locals;i++)items.push({x:700+i*134,y:144,w:122,h:40,edit:i});
