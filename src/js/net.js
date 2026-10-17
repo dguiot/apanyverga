@@ -417,6 +417,16 @@ function copyText(text) {
 const InviteBox = {
   el: null,
   isOpen() { return !!this.el; },
+  move(direction) {
+    const buttons=[...this.el.querySelectorAll('[data-a]')],i=buttons.indexOf(document.activeElement);
+    buttons[(Math.max(0,i)+direction+buttons.length)%buttons.length]?.focus({preventScroll:true});
+  },
+  update() {
+    for(const dev of Devices.list){const n=Devices.nav(dev);if(n.back||n.start)return this.close();
+      if(n.left||n.up)this.move(-1);else if(n.right||n.down)this.move(1);
+      if(n.confirm){const b=document.activeElement;if(this.el.contains(b)&&b.matches('[data-a]'))b.click();return;}
+    }
+  },
   open(copied) {
     this.close();
     const url = Net.inviteURL(), el = this.el = document.createElement('div');
@@ -443,7 +453,7 @@ const InviteBox = {
       if (b.dataset.a === 'close') this.close();
     });
     // las teclas se quedan en la ventanita (el juego no reacciona detrás); Esc la cierra
-    el.addEventListener('keydown', e => { if (e.key === 'Escape') this.close(); e.stopPropagation(); });
+    el.addEventListener('keydown', e => { if (e.key === 'Escape'){e.preventDefault();this.close();}else if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)){e.preventDefault();this.move(e.key==='ArrowLeft'||e.key==='ArrowUp'?-1:1);}e.stopPropagation(); });
     el.addEventListener('keyup', e => e.stopPropagation());
     document.body.appendChild(el);
     const first = el.querySelector('[data-a=close]'); try { first.focus({ preventScroll: true }); } catch (e) { /* nada */ }

@@ -5,28 +5,55 @@
 const Audio8 = {
   ctx: null, master: null, sfxGain: null, musGain: null, noiseBuf: null,
   muted: false, musicOn: true, song: null, nextStep: 0, step: 0,
+  error: null, resumeTask: null, hadPlayback: false,
+  loadState() {
+    try {
+      const saved=JSON.parse(localStorage.getItem('golpazo-audio-v2')||'null');
+      if(saved&&typeof saved.muted==='boolean'&&typeof saved.musicOn==='boolean'){this.muted=saved.muted;this.musicOn=saved.musicOn;}
+      else {const old=localStorage.getItem('golpazo-muted');this.muted=old==='1';this.musicOn=old!=='fx';}
+    } catch(e) { /* storage can be unavailable */ }
+  },
+  saveState() {
+    try {localStorage.setItem('golpazo-audio-v2',JSON.stringify({muted:this.muted,musicOn:this.musicOn}));localStorage.setItem('golpazo-muted',this.muted?'1':this.musicOn?'0':'fx');}catch(e){}
+    if(typeof AudioStatus!=='undefined')AudioStatus.update();
+  },
+  applyMaster(smooth=false) {
+    if(!this.master||!this.ctx||this.ctx.state==='closed')return;
+    const gain=this.master.gain,t=this.ctx.currentTime;gain.cancelScheduledValues(t);
+    if(smooth)gain.setTargetAtTime(this.masterLevel(),t,.15);else gain.setValueAtTime(this.masterLevel(),t);
+  },
   unlock() {
     try {
+      if(this.ctx?.state==='closed'){if(typeof KartSound!=='undefined')KartSound.stop();this.ctx=null;this._bus=null;this.primed=false;this.resumeTask=null;}
       if (!this.ctx) {
         const AC = window.AudioContext || window.webkitAudioContext;
         if (!AC) return;
         this.ctx = new AC();
-        this.master = this.ctx.createGain(); this.master.gain.value = 0.7; this.buildOut();
+        this.master = this.ctx.createGain(); this.master.gain.value = this.masterLevel(); this.buildOut();
         this.sfxGain = this.ctx.createGain(); this.sfxGain.gain.value = 0.55; this.sfxGain.connect(this.master);
         this.musGain = this.ctx.createGain(); this.musGain.gain.value = this.musicOn ? this.MUS_GAIN : 0; this.musGain.connect(this.master);
         const len = this.ctx.sampleRate;
         this.noiseBuf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
         const d = this.noiseBuf.getChannelData(0);
         for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-        try { const m = localStorage.getItem('golpazo-muted'); if (m === '1') this.setMuted(true); if (m === 'fx') this.setSound('fx'); } catch (e) {}
+        const context=this.ctx;context.addEventListener('statechange',()=>{if(this.ctx===context&&typeof AudioStatus!=='undefined')AudioStatus.update();});
       }
       // 'suspended' (sin gesto todavía) o 'interrupted' (Safari al prender el micrófono o una llamada)
-      if (this.ctx.state !== 'running' && this.ctx.state !== 'closed') { const p = this.ctx.resume(); if (p && p.catch) p.catch(() => {}); }
+      if (this.ctx.state !== 'running' && (!this.resumeTask||navigator.userActivation?.isActive)) {
+        const context=this.ctx;
+        const task=Promise.resolve(context.resume()).then(()=>{
+          if(this.ctx!==context)return false;this.hadPlayback=this.ready;this.error=null;
+          if(this.ready){this.tick();if(typeof KartMusic!=='undefined')KartMusic.tick();}return this.ready;
+        }).catch(e=>{if(!this.ready)this.error=e.message;return false;}).finally(()=>{if(this.resumeTask===task)this.resumeTask=null;if(typeof AudioStatus!=='undefined')AudioStatus.update();});
+        this.resumeTask=task;
+      }
       // iPhone: que suene aunque el interruptor de silencio esté puesto (con videollamada lo decide el micrófono)
       try { if (navigator.audioSession && !(typeof AV !== 'undefined' && AV.on) && navigator.audioSession.type !== 'playback') navigator.audioSession.type = 'playback'; } catch (e) { /* sin sesión */ }
       // iOS: un búfer mudo dentro del gesto termina de abrir el audio
       if (!this.primed && this.ctx.state !== 'closed') { const b = this.ctx.createBuffer(1, 1, 22050), s = this.ctx.createBufferSource(); s.buffer = b; s.connect(this.ctx.destination); s.start(0); this.primed = true; }
-    } catch (e) { /* sin audio */ }
+      if(this.ready){this.hadPlayback=true;this.error=null;}
+      return this.resumeTask||Promise.resolve(this.ready);
+    } catch (e) { this.error=e.message;return Promise.resolve(false); }
   },
   get ready() { return this.ctx && this.ctx.state === 'running'; },
   sfxBus() { return { input: this.sfxGain, send: null, rev: null }; },
@@ -40,17 +67,14 @@ const Audio8 = {
   duckK: 1,
   masterLevel() { return this.muted ? 0 : 0.7 * this.duckK; },
   setMuted(m) {
-    this.muted = m; if (!m) this.setMusic(true);
-    if (this.master) this.master.gain.value = this.masterLevel();
-    try { localStorage.setItem('golpazo-muted', m ? '1' : '0'); } catch (e) {}
+    this.muted = !!m;this.applyMaster();this.saveState();
   },
-  setMusic(on) { this.musicOn = on; if (this.musGain && this.ctx) this.musGain.gain.setTargetAtTime(on ? this.MUS_GAIN : 0, this.ctx.currentTime, 0.1); },
+  setMusic(on) { this.musicOn = !!on; if (this.musGain && this.ctx&&this.ctx.state!=='closed') this.musGain.gain.setTargetAtTime(on ? this.MUS_GAIN : 0, this.ctx.currentTime, 0.1);this.saveState(); },
   // Sonido: todo → solo efectos (sin música) → nada
   soundMode() { return this.muted ? 'off' : this.musicOn ? 'all' : 'fx'; },
   setSound(mode) {
     this.muted = mode === 'off'; this.setMusic(mode === 'all');
-    if (this.master) this.master.gain.value = this.masterLevel();
-    try { localStorage.setItem('golpazo-muted', mode === 'off' ? '1' : mode === 'fx' ? 'fx' : '0'); } catch (e) {}
+    this.applyMaster();this.saveState();
   },
   cycleSound() { const m = this.soundMode(); this.setSound(m === 'all' ? 'fx' : m === 'fx' ? 'off' : 'all'); },
   // con chat de voz en vivo todo el juego baja 75% para que se oigan entre ustedes
@@ -58,7 +82,7 @@ const Audio8 = {
     const live = typeof AV !== 'undefined' && AV.on && AV.count() > 0, k = live ? 0.25 : 1;
     if (k === this.duckK) return;
     this.duckK = k;
-    if (this.master && this.ctx) this.master.gain.setTargetAtTime(this.masterLevel(), this.ctx.currentTime, 0.15);
+    this.applyMaster(true);
     if (typeof Toasts !== 'undefined') Toasts.push(live ? '🎙️ Chat de voz: el juego baja 75% su volumen' : '🔊 Volumen normal');
   },
   tone(type, f0, f1, dur, vol = 0.3, when = 0, dest) {
@@ -569,6 +593,7 @@ const Audio8 = {
   },
 };
 
+Audio8.loadState();
 // Los navegadores solo dejan sonar después de un gesto: tecla, clic o SOLTAR el dedo (apoyarlo no cuenta).
 // Los botones de un control de juego no cuentan: con control hace falta un clic, toque o tecla (ver el aviso del menú).
 for (const ev of ['keydown', 'mousedown', 'pointerdown', 'pointerup', 'touchend', 'click']) window.addEventListener(ev, () => Audio8.unlock(), { capture: true, passive: true });

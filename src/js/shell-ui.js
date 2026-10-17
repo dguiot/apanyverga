@@ -112,14 +112,20 @@ const ShellUI={
  nav(items,activate,change=null){
   if(!items.length)return;this.focus=clamp(this.focus,0,items.length-1);
   for(const d of Devices.list){const n=Devices.nav(d);if(n.back)return this.back();
+   if(n.left||n.right||n.up||n.down||n.confirm||n.start)this.inputMode='keys';
    if(change&&(n.left||n.right)&&items[this.focus].row!==undefined){change(items[this.focus].row,n.left?-1:1);Audio8.sfx('menu');continue;}
    const dir=n.left?[-1,0]:n.right?[1,0]:n.up?[0,-1]:n.down?[0,1]:null;
-   if(dir){const a=items[this.focus],ax=a.x+a.w/2,ay=a.y+a.h/2;let best=-1,score=Infinity;items.forEach((b,i)=>{const dx=b.x+b.w/2-ax,dy=b.y+b.h/2-ay,along=dx*dir[0]+dy*dir[1],cross=Math.abs(dx*dir[1]-dy*dir[0]);if(along>4){const s=along+cross*2.5;if(s<score){score=s;best=i;}}});if(best>=0){this.focus=best;Audio8.sfx('menu');}}
+   if(dir){const a=items[this.focus];let best;
+    // Settings are a list: vertical navigation reaches every row in reading
+    // order, while left/right changes its value without losing the cursor.
+    if(change&&a.row!==undefined&&dir[1]){best=items.find(b=>b.row===a.row+dir[1]);if(!best)best=dir[1]<0?items.find(b=>b.tab===this.tab):items.find(b=>b.next);}
+    else best=UIFocus.best(a,dir[0],dir[1],items.filter(b=>b!==a));
+    if(best){this.focus=items.indexOf(best);Audio8.sfx('menu');}}
    if(n.confirm||n.start){APP.firstDev=d;return activate(this.focus);}
   }
-  for(let i=0;i<items.length;i++){const b=items[i];if(clickIn(b.x,b.y,b.w,b.h)){this.focus=i;return activate(i);}}
+  for(let i=0;i<items.length;i++){const b=items[i];if(clickIn(b.x,b.y,b.w,b.h)){this.inputMode='pointer';this.focus=i;return activate(i);}}
  },
- button(label,b,on=false,sub=null){const selected=on||hover(b.x,b.y,b.w,b.h);slab(b.x,b.y,b.w,b.h,{skew:.035,top:selected?'#e4ba66':'#172c3b',bottom:selected?'#bc8e44':'#10212d',edge:selected?'#fff1bb':'#405767',lw:selected?3:1});text(label,b.x+b.w/2,b.y+b.h*(sub?.38:.5),fitSize(label,b.w-26,Math.min(24,b.h*.43)),selected?'#11222b':PAPER,{body:true,weight:750});if(sub)text(sub,b.x+b.w/2,b.y+b.h*.73,13,selected?'#24333b':'#9eb5c0',{body:true});},
+ button(label,b,on=false,sub=null,active=false){const selected=on||this.inputMode==='pointer'&&hover(b.x,b.y,b.w,b.h);slab(b.x,b.y,b.w,b.h,{skew:.035,top:selected?'#e4ba66':active?'#214954':'#172c3b',bottom:selected?'#bc8e44':'#10212d',edge:selected?'#fff1bb':active?'#6dd5cc':'#405767',lw:selected?3:active?2:1});text(label,b.x+b.w/2,b.y+b.h*(sub?.38:.5),fitSize(label,b.w-26,Math.min(24,b.h*.43)),selected?'#11222b':PAPER,{body:true,weight:750});if(sub)text(sub,b.x+b.w/2,b.y+b.h*.73,13,selected?'#24333b':'#9eb5c0',{body:true});},
  notices(){for(const it of Toasts.items)it.t++;const it=Toasts.items.at(-1);if(it&&it.t<240){ctx.save();ctx.globalAlpha=clamp(Math.min(it.t/10,(240-it.t)/20),0,1);text(it.msg.slice(0,125),APP.screen==='title'?640:44,APP.screen==='title'?542:132,12,GOLD,{align:APP.screen==='title'?'center':'left',body:true,weight:650,stroke:'#0b1c27',strokeW:2});ctx.restore();}Toasts.items=Toasts.items.filter(it=>it.t<240);},
  header(title,subtitle,stage=null){
   drawMenuBG(4);text(this.online?'SALA '+(Net.role==='host'?Net.code:Net.hostPres()?.code||'…'):'JUEGO LOCAL',44,30,12,'#8faebb',{align:'left',body:true,weight:700});text(title,44,69,35,PAPER,{align:'left',body:true,weight:800});text(subtitle,1236,40,14,'#a6bdc7',{align:'right',body:true});
@@ -140,8 +146,9 @@ const ShellUI={
   const r=APP.rules,cycle=(a,value,d)=>a[(a.indexOf(value)+d+a.length)%a.length],rule=(label,value,change,locked=false)=>({label,value,change,locked});
   if(this.tab===2)return [];
   if(this.tab===1)return [
-   rule('Música',Audio8.musicOn?'Activada':'Desactivada',()=>Audio8.setSound(Audio8.musicOn?'fx':'all')),
-   rule('Audio general',Audio8.muted?'Silenciado':'Activado',()=>Audio8.setMuted(!Audio8.muted)),
+   rule('Música',Audio8.musicOn?'Activada':'Desactivada',()=>Audio8.setMusic(!Audio8.musicOn)),
+   rule('Audio general',Audio8.muted?'Silenciado':Audio8.ready?'Activado':'Pendiente de activación',()=>{Audio8.setMuted(!Audio8.muted);if(!Audio8.muted)Audio8.unlock();}),
+   rule('Probar sonido','Reproducir',()=>AudioStatus.test()),
    rule('Vibración',Rumble.on?'Activada':'Desactivada',()=>Rumble.set(!Rumble.on)),
    ...Prefs.rows().map(([label,value],i)=>rule(label,value,d=>Prefs.change(i,d))),
    ...(this.online?[rule('Voz',AV.on?AV.mic?'Micrófono abierto':'Micrófono apagado':'Activar voz y cámara',()=>AV.on?AV.setMic(!AV.mic):AV.start()),rule('Cámara',AV.on&&AV.cam?'Encendida':'Apagada',()=>AV.on?AV.setCam(!AV.cam):AV.start())]:[]),
@@ -152,34 +159,34 @@ const ShellUI={
   if(this.game==='kart')return [rule('Cilindrada',KART_CLASSES[KartMenu.cc].name,d=>KartMenu.cc=(KartMenu.cc+d+3)%3,locked),rule('Ayuda de dirección',KartMenu.assist?'Activada':'Desactivada',()=>KartMenu.assist=!KartMenu.assist,locked),rule('Tipo de carrera',KartMenu.cup?'Copa de tres pistas':'Carrera individual',()=>KartMenu.cup=!KartMenu.cup,locked||this.online||this.config.locals>1),...common,rule('Vueltas / participantes','3 vueltas · 8 pilotos',()=>{},true)];
   return [rule('Tipo de partida','Combate libre',()=>{},true),rule('Bajas para ganar',String(this.config.target),d=>this.config.target=clamp(this.config.target+d*5,5,30),locked),rule('Tiempo límite',this.config.minutes+' min',d=>this.config.minutes=clamp(this.config.minutes+d,3,15),locked),...common,rule('Rivales CPU','Completan cuatro plazas',()=>{},true)];
  },
- settingsItems(){const rows=this.rows(),items=[0,1,2].map(i=>({x:44+i*244,y:146,w:230,h:43,tab:i}));rows.forEach((r,i)=>items.push({x:44+(i>=5?610:0),y:211+(i%5)*68,w:580,h:57,row:i}));if(this.tab===2&&this.game==='fight')items.push({x:834,y:540,w:400,h:46,bind:true});items.push({x:44,y:641,w:220,h:49,back:true});items.push({x:864,y:631,w:370,h:59,next:true});if(this.returnScreen)items.push({x:340,y:641,w:460,h:49,room:true});return items;},
+ settingsItems(){const rows=this.rows(),perColumn=Math.max(5,Math.ceil(rows.length/2)),pitch=340/perColumn,items=[0,1,2].map(i=>({x:44+i*244,y:146,w:230,h:43,tab:i}));rows.forEach((r,i)=>items.push({x:44+Math.floor(i/perColumn)*610,y:211+(i%perColumn)*pitch,w:580,h:pitch-11,row:i}));if(this.tab===2&&this.game==='fight')items.push({x:834,y:540,w:400,h:46,bind:true});items.push({x:44,y:641,w:220,h:49,back:true});items.push({x:864,y:631,w:370,h:59,next:true});if(this.returnScreen)items.push({x:340,y:641,w:460,h:49,room:true});return items;},
  settingsChange(i,d){const row=this.rows()[i];if(!row||row.locked)return;row.change(d);this.publish({ru:Net.encRules(APP.rules),cc:KartMenu.cc,assist:KartMenu.assist});},
  settingsUpdate(){const items=this.settingsItems();this.nav(items,i=>{const b=items[i];if(b.tab!==undefined){this.tab=b.tab;this.focus=b.tab;}else if(b.row!==undefined)this.settingsChange(b.row,1);else if(b.back)this.back();else if(b.bind){this.inBindings=true;APP.bind.col=0;APP.bind.dev=0;APP.go('binds');}else if(b.room){if(this.host())this.room();else this.guestRoom();}else if(b.next){if(this.returnScreen)this.resume();else this.next();}},(i,d)=>this.settingsChange(i,d));},
  settingsDraw(){
   this.header(this.returnScreen?'PAUSA Y AJUSTES':this.gameInfo().name+' · AJUSTES','Todo lo de este juego, en un solo lugar',1);const items=this.settingsItems(),rows=this.rows();
-  items.forEach((b,i)=>{if(b.tab!==undefined)this.button(['PARTIDA','SONIDO E IMAGEN','CONTROLES'][b.tab],b,this.focus===i||this.tab===b.tab);else if(b.row!==undefined){const row=rows[b.row];KartRender.panel(b.x,b.y,b.w,b.h,this.focus===i?GOLD:'#334c59');text(row.label,b.x+19,b.y+29,16,row.locked?'#859da8':PAPER,{align:'left',body:true,weight:650});text((row.locked?'':'‹  ')+row.value+(row.locked?'':'  ›'),b.x+b.w-20,b.y+29,16,row.locked?'#91aebc':GOLD,{align:'right',body:true,weight:650});}else this.button(b.back?this.returnScreen?'VOLVER AL JUEGO':'← VOLVER':b.next?this.returnScreen?'REANUDAR':this.host()?'PERSONAJES →':'ESPERANDO AL ANFITRIÓN':b.room?'VOLVER A '+(this.online?'LA SALA':'ELEGIR JUEGO'):'PERSONALIZAR ASIGNACIÓN',b,this.focus===i);});
+  items.forEach((b,i)=>{if(b.tab!==undefined)this.button(['PARTIDA','SONIDO E IMAGEN','CONTROLES'][b.tab],b,this.focus===i,null,this.tab===b.tab);else if(b.row!==undefined){const row=rows[b.row];KartRender.panel(b.x,b.y,b.w,b.h,this.focus===i?GOLD:'#334c59');text(row.label,b.x+19,b.y+29,16,row.locked?'#859da8':PAPER,{align:'left',body:true,weight:650});text((row.locked?'':'‹  ')+row.value+(row.locked?'':'  ›'),b.x+b.w-20,b.y+29,16,row.locked?'#91aebc':GOLD,{align:'right',body:true,weight:650});}else this.button(b.back?this.returnScreen?'VOLVER AL JUEGO':'← VOLVER':b.next?this.returnScreen?'REANUDAR':this.host()?'PERSONAJES →':'ESPERANDO AL ANFITRIÓN':b.room?'VOLVER A '+(this.online?'LA SALA':'ELEGIR JUEGO'):'PERSONALIZAR ASIGNACIÓN',b,this.focus===i);});
   if(this.tab===2)this.drawControls();text(this.returnScreen?'Las reglas de la ronda se cambian al preparar otra partida. Sonido, imagen y controles se ajustan aquí.':!this.host()?'El anfitrión configura la partida. Puedes ajustar tu sonido, imagen y controles.':'Cruceta / ↑ ↓: navegar · ← →: cambiar · A / Enter: elegir · B / Esc: volver',46,601,14,'#96afbb',{align:'left',body:true});
  },
  drawControls(){
   const rows=this.game==='kart'?[['Acelerar / frenar','W / S o ↑ / ↓','RT / LT'],['Dirección','A D o ← →','Palanca izquierda'],['Derrapar / acrobacia','Espacio','X / RB'],['Objeto / atrás','E / Q','LB / B'],['Rescate / pausa','R / Esc','Y / Menu']]:this.game==='fps'?[['Mover / mirar','WASD / ratón','Palancas izq. / der.'],['Correr','Shift','Pulsar L3'],['Apuntar / disparar','Clic der. / izq.','LT / RT'],['Recargar / saltar','R / Espacio','X / A'],['Cambiar arma / pausa','1–5 / Q / Esc','Y / Menu']]:[['Mover / saltar','WASD / Espacio','Palanca izq. / X'],['Ataque / especial','J / K','A / B'],['Escudo / agarre','L / U','LT / LB'],['Smash','Dirección + ataque','Palanca derecha'],['Pausa','Enter / Esc','Menu']];
   ['ACCIÓN','TECLADO Y RATÓN','MANDO'].forEach((s,i)=>text(s,65+i*390,223,12,TEAL,{align:'left',body:true,weight:800}));rows.forEach((r,i)=>{ctx.fillStyle=i%2?'#142936':'#1b303d';roundRect(ctx,44,247+i*55,1190,47,7);ctx.fill();r.forEach((s,j)=>text(s,65+j*390,272+i*55,17,PAPER,{align:'left',body:true}));});
-  text('En local: P1 teclado; cada jugador adicional usa su mando. En Esmash también hay teclado 2.',48,552,13,'#93aeba',{align:'left',body:true});
+  text('En local: P1 teclado; cada jugador adicional usa su mando. En Esmash también hay teclado 2.',48,529,13,'#93aeba',{align:'left',body:true});
  },
  playersItems(){const items=[{x:44,y:143,w:220,h:42,tab:0}];if(this.game==='kart')items.push({x:278,y:143,w:240,h:42,tab:1});if(!this.online)for(let i=0;i<this.config.locals;i++)items.push({x:700+i*134,y:144,w:122,h:40,edit:i});
   const count=this.game==='kart'&&this.playerTab===1?6:15;for(let i=0;i<count;i++)items.push(count===6?{x:44+i%3*246,y:211+Math.floor(i/3)*180,w:230,h:165,vh:i}:{x:44+i%5*147,y:211+Math.floor(i/5)*117,w:136,h:105,ch:i});
   if(this.game==='fps')for(let i=0;i<5;i++)items.push({x:817,y:251+i*55,w:417,h:46,fg:i});
   items.push({x:44,y:642,w:218,h:47,back:true},{x:817,y:623,w:417,h:66,next:true});return items;
  },
- playersUpdate(){const items=this.playersItems();for(const p of padInfo){const prev=this.padPrev.get(p.index)||[];if(p.buttons[3]&&!prev[3]&&this.game==='kart'){this.playerTab=1-this.playerTab;this.focus=0;}if(!this.online&&this.config.locals>1&&(p.buttons[4]&&!prev[4]||p.buttons[5]&&!prev[5])){this.edit=(this.edit+(p.buttons[4]?this.config.locals-1:1))%this.config.locals;this.focus=0;}this.padPrev.set(p.index,p.buttons.slice());}
-  this.nav(items,i=>{const b=items[i];if(b.tab!==undefined){this.playerTab=b.tab;this.focus=0;}else if(b.edit!==undefined){this.edit=b.edit;this.focus=0;}else if(b.ch!==undefined)this.setPlayer('ch',b.ch);else if(b.vh!==undefined)this.setPlayer('vh',b.vh);else if(b.fg!==undefined)this.setPlayer('fg',b.fg);else if(b.back)this.back();else if(b.next){if(this.online&&!this.host()){this.ready=!this.ready;Net.guest.rdy=this.ready?1:0;Net.set({rdy:Net.guest.rdy});}else this.next();}});
+ playersUpdate(){for(const p of padInfo){const prev=this.padPrev.get(p.index)||[];if(p.buttons[3]&&!prev[3]&&this.game==='kart'){this.playerTab=1-this.playerTab;this.focus=this.playerTab===1?1:0;}if(!this.online&&this.config.locals>1&&(p.buttons[4]&&!prev[4]||p.buttons[5]&&!prev[5])){this.edit=(this.edit+(p.buttons[4]?this.config.locals-1:1))%this.config.locals;this.focus=0;}this.padPrev.set(p.index,p.buttons.slice());}
+  const items=this.playersItems();this.nav(items,i=>{const b=items[i];if(b.tab!==undefined){this.playerTab=b.tab;this.focus=i;}else if(b.edit!==undefined){this.edit=b.edit;this.focus=i;}else if(b.ch!==undefined)this.setPlayer('ch',b.ch);else if(b.vh!==undefined)this.setPlayer('vh',b.vh);else if(b.fg!==undefined)this.setPlayer('fg',b.fg);else if(b.back)this.back();else if(b.next){if(this.online&&!this.host()){this.ready=!this.ready;Net.guest.rdy=this.ready?1:0;Net.set({rdy:Net.guest.rdy});}else this.next();}});
  },
  playersDraw(){
   const p=this.player();this.header(this.gameInfo().name+' · PERSONAJES',this.online?'Cada quien elige su personaje y confirma LISTO':'Configura a cada jugador antes de elegir escenario',2);const items=this.playersItems();
   for(const [i,b] of items.entries()){
-   if(b.tab!==undefined)this.button(b.tab?'VEHÍCULOS · Y':'PERSONAJES',b,this.playerTab===b.tab||this.focus===i);else if(b.edit!==undefined)this.button('JUGADOR '+(b.edit+1),b,b.edit===this.edit||this.focus===i);
+   if(b.tab!==undefined)this.button(b.tab?'VEHÍCULOS · Y':'PERSONAJES',b,this.focus===i,null,this.playerTab===b.tab);else if(b.edit!==undefined)this.button('JUGADOR '+(b.edit+1),b,this.focus===i,null,b.edit===this.edit);
    else if(b.ch!==undefined){KartRender.panel(b.x,b.y,b.w,b.h,this.focus===i?GOLD:p.ch===b.ch?TEAL:'#334c59');ctx.save();ctx.beginPath();ctx.rect(b.x+5,b.y+4,b.w-10,72);ctx.clip();drawPortrait(ctx,CHAR_ORDER[b.ch],b.x+b.w/2,b.y+41,27);ctx.restore();text(CHARS[CHAR_ORDER[b.ch]].name,b.x+b.w/2,b.y+87,14,PAPER,{body:true,weight:700});}
    else if(b.vh!==undefined){KartRender.panel(b.x,b.y,b.w,b.h,this.focus===i?GOLD:p.vh===b.vh?TEAL:'#334c59');const sp=KartRender.kartSprite(CHAR_ORDER[p.ch],b.vh);ctx.drawImage(sp.img,b.x+45,b.y-12,140,140);text(kartVehicle(b.vh).name,b.x+b.w/2,b.y+130,19,PAPER,{body:true,weight:700});text(kartVehicle(b.vh).tag,b.x+b.w/2,b.y+151,11,'#a0b9c4',{body:true});}
-   else if(b.fg!==undefined)this.button(FPS_GUNS[b.fg].name,b,p.fg===b.fg||this.focus===i);else this.button(b.back?'← AJUSTES':this.online&&!this.host()?this.ready?'LISTO ✓ · CAMBIAR':'CONFIRMAR · LISTO':this.online?'TODOS LISTOS → ESCENARIO':'ELEGIR ESCENARIO →',b,this.focus===i||b.next&&this.ready);
+   else if(b.fg!==undefined)this.button(FPS_GUNS[b.fg].name,b,this.focus===i,null,p.fg===b.fg);else this.button(b.back?'← AJUSTES':this.online&&!this.host()?this.ready?'LISTO ✓ · CAMBIAR':'CONFIRMAR · LISTO':this.online?'TODOS LISTOS → ESCENARIO':'ELEGIR ESCENARIO →',b,this.focus===i,null,!!b.next&&this.ready);
   }
   if(this.game!=='fps'){KartRender.panel(817,211,417,366);const sp=KartRender.kartSprite(CHAR_ORDER[p.ch],this.game==='kart'?p.vh:0);if(this.game==='kart')ctx.drawImage(sp.img,896,220,260,249);else{ctx.save();ctx.translate(1025,460);ctx.scale(1.35,1.35);drawCharacter(ctx,CHAR_ORDER[p.ch],mkPose(POSES.idle));ctx.restore();}text(CHARS[CHAR_ORDER[p.ch]].name,1025,494,27,GOLD,{body:true,weight:800});wrapText(this.game==='kart'?kartVehicle(p.vh).desc:'Tu personaje, tus golpes y especiales.',1025,529,375,13,19,'#b1c6d0');}
   else{text('ARMA INICIAL',822,224,13,TEAL,{align:'left',body:true,weight:700});text('También puedes cambiarla dentro del juego.',822,550,13,'#9ab4c0',{align:'left',body:true});}
@@ -211,7 +218,7 @@ const shellGo=APP.go;APP.go=function(s){
   if(ShellUI.active){if(ShellUI.inBindings&&s!=='binds'){ShellUI.inBindings=false;return shellGo.call(this,'uiSettings');}if(s==='main')return ShellUI.room();if(['controls','settings'].includes(s)){ShellUI.tab=s==='controls'?2:1;return shellGo.call(this,'uiSettings');}if(s==='online')return ShellUI.begin(true);}
  return shellGo.call(this,s);
 };
-const shellFocus=APP.focusNative;APP.focusNative=function(d){if(this.screen==='title'||ShellUI.active&&(ShellUI.screens.has(this.screen)||ShellUI.paused))return false;return shellFocus.call(this,d);};
+const shellFocus=APP.focusNative;APP.focusNative=function(d){if(this.screen!=='binds'&&ShellUI.ownsNavigation?.())return false;return shellFocus.call(this,d);};
 const shellUpdate=APP.update;APP.update=function(){
  if(this.screen==='title'&&Net.wantCode&&!ShellUI.active){ShellUI.begin(true);return;}
  if(ShellUI.active&&ShellUI.inBindings&&!Capture.active&&Devices.list.some(d=>Devices.nav(d).back)){APP.go('uiSettings');return;}
