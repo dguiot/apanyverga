@@ -56,7 +56,7 @@ APP.mainDraw=function(){
     slab(b.x,b.y,b.w,b.h,{skew:.07,edge:on?GOLD:'rgba(131,168,190,.4)',lw:on?4:2,top:i===0?'#572035':'#123a50',bottom:'#0b1829'});
     sfText(i===0?'PELEAS':'ESMASH KART',b.x+34,b.y+47,52,on?GOLD:PAPER,{align:'left'});
     text(i===0?'Golpes, especiales y Smash.':'Derrapa, lanza ítems y conquista la pista.',b.x+36,b.y+94,17,'#d0e3e9',{body:true,align:'left',weight:500});
-    text(i===0?'1–4 JUGADORES  ·  LOCAL Y ONLINE':'1–4 ONLINE  ·  PANTALLA DIVIDIDA  ·  3 CIRCUITOS',b.x+36,b.y+174,13,i===0?'#ffada6':'#7bf0e6',{body:true,align:'left',weight:700});
+    text(i===0?'1–4 JUGADORES  ·  LOCAL Y ONLINE':'1–4 ONLINE  ·  TU PROPIA VISTA  ·  3 CIRCUITOS',b.x+36,b.y+174,13,i===0?'#ffada6':'#7bf0e6',{body:true,align:'left',weight:700});
     if(i===9){const sp=KartRender.kartSprite(CHAR_ORDER[KartMenu.char],KartMenu.vehicle);ctx.drawImage(sp.img,b.x+395,b.y+80,150,147);}
     else{const sp=ART.sprite('kart-hub-fight',170,170,c=>{c.translate(87,162);c.scale(.95,.95);drawCharacter(c,'torito',mkPose(POSES.idle));});ctx.drawImage(sp.img,b.x+385,b.y+35,170,170);}
   }

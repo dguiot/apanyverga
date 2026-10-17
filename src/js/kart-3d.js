@@ -9,19 +9,22 @@ const Kart3D={
       r.shadowMap.enabled=!IS_XBOX;r.shadowMap.type=T.PCFSoftShadowMap;
       const pmrem=new T.PMREMGenerator(r),room=new T.RoomEnvironment();this.environment=pmrem.fromScene(room,.04).texture;room.dispose();pmrem.dispose();
       r.domElement.id='kart-world';r.domElement.setAttribute('aria-hidden','true');
-      r.domElement.style.cssText='position:fixed;pointer-events:none;display:none;z-index:0;background:transparent;max-width:none';
-      document.body.insertBefore(r.domElement,canvas);canvas.style.zIndex='1';
-      r.domElement.addEventListener('webglcontextlost',e=>{e.preventDefault();if(APP.kartRace)APP.kartRace.paused=true;});
-      r.domElement.addEventListener('webglcontextrestored',()=>{this.race=null;});
+      // Render offscreen, then copy into the same visible canvas as the HUD.
+      // Opaque 2D surfaces and browser compositor layers cannot cover the track.
+      r.domElement.style.cssText='display:none;pointer-events:none';
+      document.body.insertBefore(r.domElement,canvas);
+      r.domElement.addEventListener('webglcontextlost',e=>{e.preventDefault();this.contextLost=true;if(APP.kartRace){this.wasPaused=APP.kartRace.paused;APP.kartRace.paused=true;}});
+      r.domElement.addEventListener('webglcontextrestored',()=>{this.contextLost=false;this.race=null;if(APP.kartRace)APP.kartRace.paused=!!this.wasPaused;});
       return true;
     }catch(e){this.error=e.message;return false;}
   },
   hide(){if(this.renderer)this.renderer.domElement.style.display='none';canvas.style.background='';},
+  present(){ctx.save();ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.drawImage(this.renderer.domElement,0,0,W,H);ctx.restore();},
   syncSize(){
-    const r=canvas.getBoundingClientRect(),el=this.renderer.domElement,k=Math.min(VIEW.k||1,IS_XBOX?.85:1.5);
-    el.style.left=r.left+'px';el.style.top=r.top+'px';el.style.width=r.width+'px';el.style.height=r.height+'px';el.style.display='block';
+    const el=this.renderer.domElement,k=Math.min(VIEW.k||1,IS_XBOX?.85:1.5);
+    el.style.display='none';
     const w=Math.round(W*k),h=Math.round(H*k);if(el.width!==w||el.height!==h)this.renderer.setSize(w,h,false);
-    canvas.style.background='transparent';
+    canvas.style.background='';
   },
   disposeScene(){
     if(!this.scene)return;
@@ -295,14 +298,15 @@ const Kart3D={
       ctx.fillStyle='#0c1829';ctx.fillRect(0,0,W,H);sfText('EL MODO 3D NECESITA WEBGL',640,270,52,GOLD);
       wrapText('Abre el juego en Chrome, Edge o Safari con aceleración gráfica. Esc: volver al menú.',640,350,850,21,32,PAPER);if(keyEdge('kb1','Escape'))KartMenu.exit();return;
     }
+    if(this.contextLost){ctx.fillStyle='#0c1829';ctx.fillRect(0,0,W,H);sfText('RECUPERANDO LA PISTA 3D',640,295,48,GOLD);text('La carrera se reanudará cuando el navegador recupere los gráficos.',640,360,20,PAPER,{body:true});text('Esc: salir de la carrera',640,415,18,TEAL,{body:true});if(keyEdge('kb1','Escape')){if(race.online)KartOnline.leave();else KartMenu.exit();}return;}
     if(this.race!==race)this.build(race);this.syncSize();this.animate(race,alpha);
-    const players=race.online?race.racers.filter(r=>r.human).sort((a,b)=>(b===race.player?1:0)-(a===race.player?1:0)):[race.player],rects=KartRender.viewports(players.length),renderer=this.renderer;
+    const players=race.online?[race.player]:race.localPlayers||[race.player],rects=KartRender.viewports(players.length),renderer=this.renderer;
     this.lastViewports=rects;
     // Four cameras share the same world transforms. Recompute the scene graph
     // once per frame; only the sky follows each individual camera afterward.
-    this.scene.matrixWorldAutoUpdate=players.length===1&&!race.online;
+    this.scene.matrixWorldAutoUpdate=players.length===1;
     if(!this.scene.matrixWorldAutoUpdate)this.scene.updateMatrixWorld();
-    if(players.length===1&&!race.online){renderer.setScissorTest(false);renderer.setViewport(0,0,renderer.domElement.width,renderer.domElement.height);renderer.render(this.scene,this.camera);KartRender.hud(race);return;}
+    if(players.length===1){renderer.setScissorTest(false);renderer.setViewport(0,0,renderer.domElement.width,renderer.domElement.height);this.camera.aspect=W/H;this.camera.updateProjectionMatrix();renderer.render(this.scene,this.camera);this.present();KartRender.hud(race);return;}
     const k=renderer.domElement.width/W;renderer.setScissorTest(true);
     // One world and one GL context; only cameras and viewports multiply.
     renderer.shadowMap.enabled=false;
@@ -310,8 +314,9 @@ const Kart3D={
       this.followCamera(race,p,alpha,v);v.camera.aspect=b.w/b.h;v.camera.updateProjectionMatrix();
       const left=Math.round(b.x*k),bottom=Math.round((H-b.y-b.h)*k),right=Math.round((b.x+b.w)*k),top=Math.round((H-b.y)*k);
       renderer.setViewport(left,bottom,right-left,top-bottom);renderer.setScissor(left,bottom,right-left,top-bottom);renderer.render(this.scene,v.camera);
-      KartRender.splitHud(race,p,b);
     });
+    this.present();
+    players.forEach((p,i)=>KartRender.splitHud(race,p,rects[i]));
     renderer.setScissorTest(false);renderer.setViewport(0,0,renderer.domElement.width,renderer.domElement.height);
   },
   thumbnail(id,vehicle=0){

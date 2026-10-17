@@ -16,8 +16,8 @@ conservan durante la pausa de impacto. Los golpes y aterrizajes combinan reacci�
 sonido y vibración según su intensidad.
 
 Los karts tienen inclinación de carrocería y motos, suspensión al aterrizar y acrobacias que
-terminan su giro con continuidad. La cámara responde por tiempo transcurrido, también en
-pantalla dividida. Los niveles del derrape y la salida del turbo tienen señales sonoras y hápticas.
+terminan su giro con continuidad. La cámara responde por tiempo transcurrido. En online cada
+jugador tiene una sola vista propia a pantalla completa. Los niveles del derrape y la salida del turbo tienen señales sonoras y hápticas.
 Las correcciones pequeñas del anfitrión se absorben visualmente, y los objetos y efectos
 conservan su identidad entre paquetes para reutilizar geometría y evitar repetir explosiones.
 
@@ -38,6 +38,10 @@ pilotos y karts modelados en **3D**, con sus colores, sombreros, cuernos, branqu
 La cámara sigue al piloto desde atrás; las fotos se usan en la selección, no durante la conducción.
 Las carreras online reutilizan las salas, enlaces de invitación, cámara, voz y conexión WebRTC de las peleas.
 Los puestos restantes hasta ocho se completan con CPU.
+En online cada dispositivo sigue únicamente a su piloto; las cámaras de voz/vídeo aparecen
+como miniaturas. La pista y el HUD se componen en el mismo lienzo para que una superficie 2D
+opaca o las capas del navegador no oculten el mundo 3D. La pantalla dividida se reserva para
+participantes locales. Una pérdida del contexto gráfico muestra recuperación y reconstruye la pista.
 
 Cada piloto puede elegir **seis vehículos**, incluidos **dos modelos de moto**, desde el botón
 **Vehículo** del garaje o la sala online (**V / Y**). La elección se guarda en este navegador y viaja
@@ -163,7 +167,7 @@ La segunda cubre control estándar, pantalla táctil, copa, récords, pérdida d
 contravolante, acrobacias, rebufo, monedas, los seis objetos nuevos y una renderización de audio sin saturación.
 `node src/test/tkart-online.cjs` abre cuatro navegadores con el adaptador de Supabase existente
 (solo el servicio de señalización se simula) y conexiones WebRTC reales. Comprueba invitaciones,
-voz y cámara, conducción independiente, ítems remotos, vistas de dos/tres/cuatro jugadores, entrada
+voz y cámara, conducción independiente, ítems remotos, vista individual con dos/tres/cuatro jugadores, entrada
 como espectador, paquetes atrasados, desconexiones, resultados y regreso a la sala.
 
 El motor 3D (Three.js 0.180.0) se incluye dentro de la versión web; no necesita un CDN ni instalar paquetes
@@ -179,3 +183,11 @@ suspensión a 30/60/120/144 Hz, pausa, corrección online y continuidad de las e
 `node src/test/trollback.js` compara dos navegadores con WebRTC real, latencia y pérdidas,
 incluyendo dibujo durante la partida y comparación de estados confirmados. Estas pruebas
 no sustituyen la medición de FPS ni las pruebas de tacto en el dispositivo final.
+
+`node src/test/tkart-screen.cjs` reproduce un lienzo de PC opaco, comprueba píxeles reales
+de las tres pistas, redimensionado, pausa, miniaturas, vista individual online y pérdida/restauración
+del contexto WebGL.
+
+`node src/test/tkart-steering.cjs` comprueba izquierda/derecha en coordenadas de pantalla
+con palanca, cruceta, WASD, flechas y controles táctiles, y verifica desplazamiento,
+orientación y ruedas delanteras en los seis vehículos de las tres pistas.

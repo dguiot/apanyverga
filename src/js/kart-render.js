@@ -75,12 +75,13 @@ const KartRender={
     if(race.phase==='grid'){sfText(Math.ceil(race.countdown)>3?'PREPÁRATE':Math.ceil(race.countdown),b.w/2,b.h*.5,short?74:106,GOLD);}
     if(r.finish!==null){sfText('¡META!',b.w/2,b.h*.52,short?53:77,GOLD);text('Esperando a los demás pilotos',b.w/2,b.h*.52+49,16,PAPER,{body:true,stroke:'#102335',strokeW:3});}
     if(r.rescue)sfText('RESCATE',b.w/2,b.h*.6,39,GOLD);
-    const curve=race.course.sample(r.s+r.v*.8+40).curve;if(Math.abs(curve)>.0035&&race.phase==='race'){text((curve>0?'↱':'↰')+' '+(Math.abs(curve)>.007?'HORQUILLA':'CURVA'),b.w/2,94,17,'#ffdd99',{body:true,weight:700,stroke:'#102335',strokeW:3});}
+    const curve=race.course.sample(r.s+r.v*.8+40).curve;if(Math.abs(curve)>.0035&&race.phase==='race'){text((curve>0?'↰':'↱')+' '+(Math.abs(curve)>.007?'HORQUILLA':'CURVA'),b.w/2,94,17,'#ffdd99',{body:true,weight:700,stroke:'#102335',strokeW:3});}
     if(mine&&Net.role==='guest'&&performance.now()-KartOnline.lastStateAt>1500){text('Reconectando con la carrera…',b.w/2,b.h-88,18,GOLD,{body:true,stroke:'#102335',strokeW:3});}
     ctx.restore();
   },
   hud(race){
     const r=race.player,pos=race.order.indexOf(r)+1,info=race.course.info;
+    if(race.online){let y=306;for(const p of race.racers.filter(p=>p.human&&p!==r).slice(0,3)){const cam=AV.videoFor(p.peer);if(!cam)continue;this.panel(22,y,140,91);ctx.save();roundRect(ctx,28,y+6,128,66,6);ctx.clip();drawVideoCover(ctx,cam.v,28,y+6,128,66,cam.mirror);ctx.restore();text((p.label||CHARS[p.id].name).slice(0,17),92,y+80,12,PAPER,{body:true,weight:700});y+=98;}}
     this.panel(22,20,224,99);text(String(pos),57,69,70,'#ffc53d',{weight:700});text('/ 8',99,83,23,'#a8becd',{body:true,weight:700});
     text('VUELTA',169,43,13,'#a8becd',{body:true,weight:700});text(`${Math.min(3,r.completedLaps+1)} / 3`,169,78,39,'#f5f7ef',{weight:700});
     this.panel(476,20,328,66);text(info.name,640,41,16,'#d0e5e7',{body:true,weight:600});text(this.time(r.finish===null?race.time:r.finish),640,66,28,'#fff6d8',{weight:700});
@@ -97,7 +98,7 @@ const KartRender={
     if(!TouchPad.active){text('W / ↑ acelerar   S / ↓ frenar   A D / ← → girar',26,666,13,'#f5f6ef',{body:true,align:'left',stroke:'#071725',strokeW:3});text('Espacio: derrape / acrobacia   E / J: ítem   Q: atrás   Esc: pausa   M: música',26,691,13,'#d4e3e9',{body:true,align:'left',stroke:'#071725',strokeW:3});}
     if(r.drift){this.panel(464,642,352,46);const col=r.charge>2?'#d989ff':r.charge>1.3?'#ffc53d':'#69e9ee';ctx.fillStyle='#294255';roundRect(ctx,480,660,210,10,5);ctx.fill();ctx.fillStyle=col;roundRect(ctx,480,660,Math.max(1,210*r.charge/2.7),10,5);ctx.fill();text('SUELTA → TURBO',750,666,13,col,{body:true,weight:700});}
     const curve=race.course.sample(r.s+r.v*.8+40).curve;
-    if(Math.abs(curve)>.0035&&race.phase==='race'){this.panel(554,106,172,47);text(`${curve>0?'↱':'↰'} ${Math.abs(curve)>.007?'HORQUILLA':'CURVA'}`,640,131,23,'#ffdd99',{weight:700});}
+    if(Math.abs(curve)>.0035&&race.phase==='race'){this.panel(554,106,172,47);text(`${curve>0?'↰':'↱'} ${Math.abs(curve)>.007?'HORQUILLA':'CURVA'}`,640,131,23,'#ffdd99',{weight:700});}
     let y=245;for(const m of race.messages){const a=clamp(m.life*2,0,1);ctx.globalAlpha=a;sfText(m.msg,W/2,y,37,m.color);ctx.globalAlpha=1;y+=44;}
     if(race.phase==='grid'){
       const n=Math.ceil(race.countdown);ctx.fillStyle='rgba(6,14,27,.25)';ctx.fillRect(0,0,W,H);

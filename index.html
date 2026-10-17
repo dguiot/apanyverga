@@ -19025,7 +19025,9 @@ const KartControls = {
     }
     const t=Devices.ctrls.touch;
     if(TouchPad.active&&t){const c=t.cur;if(Math.abs(c.x)>.08)steer=c.x;gas=gas||c.attack;brake=brake||c.special;drift=drift||c.jump;item=item||c.shield;rear=rear||c.grab;pause=pause||c.start;}
-    const now={steer,gas:!!gas,brake:!!brake,drift:!!drift,item:!!item,rear:!!rear,pause:!!pause,rescue:!!rescue,music:has('KeyM')};
+    // Course lateral +x is screen-left from the chase camera. Convert human
+    // screen-right input here once; AI, physics and network packets use course space.
+    const now={steer:-steer,gas:!!gas,brake:!!brake,drift:!!drift,item:!!item,rear:!!rear,pause:!!pause,rescue:!!rescue,music:has('KeyM')};
     const out={...now,itemPressed:(now.item&&!this.prev.item)||(now.rear&&!this.prev.rear),driftPressed:now.drift&&!this.prev.drift,pausePressed:now.pause&&!this.prev.pause,rescuePressed:now.rescue&&!this.prev.rescue,musicPressed:now.music&&!this.prev.music};
     this.prev=now;this.tapped.clear();return out;
   },
@@ -19323,12 +19325,13 @@ const KartRender={
     if(race.phase==='grid'){sfText(Math.ceil(race.countdown)>3?'PREPÁRATE':Math.ceil(race.countdown),b.w/2,b.h*.5,short?74:106,GOLD);}
     if(r.finish!==null){sfText('¡META!',b.w/2,b.h*.52,short?53:77,GOLD);text('Esperando a los demás pilotos',b.w/2,b.h*.52+49,16,PAPER,{body:true,stroke:'#102335',strokeW:3});}
     if(r.rescue)sfText('RESCATE',b.w/2,b.h*.6,39,GOLD);
-    const curve=race.course.sample(r.s+r.v*.8+40).curve;if(Math.abs(curve)>.0035&&race.phase==='race'){text((curve>0?'↱':'↰')+' '+(Math.abs(curve)>.007?'HORQUILLA':'CURVA'),b.w/2,94,17,'#ffdd99',{body:true,weight:700,stroke:'#102335',strokeW:3});}
+    const curve=race.course.sample(r.s+r.v*.8+40).curve;if(Math.abs(curve)>.0035&&race.phase==='race'){text((curve>0?'↰':'↱')+' '+(Math.abs(curve)>.007?'HORQUILLA':'CURVA'),b.w/2,94,17,'#ffdd99',{body:true,weight:700,stroke:'#102335',strokeW:3});}
     if(mine&&Net.role==='guest'&&performance.now()-KartOnline.lastStateAt>1500){text('Reconectando con la carrera…',b.w/2,b.h-88,18,GOLD,{body:true,stroke:'#102335',strokeW:3});}
     ctx.restore();
   },
   hud(race){
     const r=race.player,pos=race.order.indexOf(r)+1,info=race.course.info;
+    if(race.online){let y=306;for(const p of race.racers.filter(p=>p.human&&p!==r).slice(0,3)){const cam=AV.videoFor(p.peer);if(!cam)continue;this.panel(22,y,140,91);ctx.save();roundRect(ctx,28,y+6,128,66,6);ctx.clip();drawVideoCover(ctx,cam.v,28,y+6,128,66,cam.mirror);ctx.restore();text((p.label||CHARS[p.id].name).slice(0,17),92,y+80,12,PAPER,{body:true,weight:700});y+=98;}}
     this.panel(22,20,224,99);text(String(pos),57,69,70,'#ffc53d',{weight:700});text('/ 8',99,83,23,'#a8becd',{body:true,weight:700});
     text('VUELTA',169,43,13,'#a8becd',{body:true,weight:700});text(`${Math.min(3,r.completedLaps+1)} / 3`,169,78,39,'#f5f7ef',{weight:700});
     this.panel(476,20,328,66);text(info.name,640,41,16,'#d0e5e7',{body:true,weight:600});text(this.time(r.finish===null?race.time:r.finish),640,66,28,'#fff6d8',{weight:700});
@@ -19345,7 +19348,7 @@ const KartRender={
     if(!TouchPad.active){text('W / ↑ acelerar   S / ↓ frenar   A D / ← → girar',26,666,13,'#f5f6ef',{body:true,align:'left',stroke:'#071725',strokeW:3});text('Espacio: derrape / acrobacia   E / J: ítem   Q: atrás   Esc: pausa   M: música',26,691,13,'#d4e3e9',{body:true,align:'left',stroke:'#071725',strokeW:3});}
     if(r.drift){this.panel(464,642,352,46);const col=r.charge>2?'#d989ff':r.charge>1.3?'#ffc53d':'#69e9ee';ctx.fillStyle='#294255';roundRect(ctx,480,660,210,10,5);ctx.fill();ctx.fillStyle=col;roundRect(ctx,480,660,Math.max(1,210*r.charge/2.7),10,5);ctx.fill();text('SUELTA → TURBO',750,666,13,col,{body:true,weight:700});}
     const curve=race.course.sample(r.s+r.v*.8+40).curve;
-    if(Math.abs(curve)>.0035&&race.phase==='race'){this.panel(554,106,172,47);text(`${curve>0?'↱':'↰'} ${Math.abs(curve)>.007?'HORQUILLA':'CURVA'}`,640,131,23,'#ffdd99',{weight:700});}
+    if(Math.abs(curve)>.0035&&race.phase==='race'){this.panel(554,106,172,47);text(`${curve>0?'↰':'↱'} ${Math.abs(curve)>.007?'HORQUILLA':'CURVA'}`,640,131,23,'#ffdd99',{weight:700});}
     let y=245;for(const m of race.messages){const a=clamp(m.life*2,0,1);ctx.globalAlpha=a;sfText(m.msg,W/2,y,37,m.color);ctx.globalAlpha=1;y+=44;}
     if(race.phase==='grid'){
       const n=Math.ceil(race.countdown);ctx.fillStyle='rgba(6,14,27,.25)';ctx.fillRect(0,0,W,H);
@@ -19563,19 +19566,22 @@ const Kart3D={
       r.shadowMap.enabled=!IS_XBOX;r.shadowMap.type=T.PCFSoftShadowMap;
       const pmrem=new T.PMREMGenerator(r),room=new T.RoomEnvironment();this.environment=pmrem.fromScene(room,.04).texture;room.dispose();pmrem.dispose();
       r.domElement.id='kart-world';r.domElement.setAttribute('aria-hidden','true');
-      r.domElement.style.cssText='position:fixed;pointer-events:none;display:none;z-index:0;background:transparent;max-width:none';
-      document.body.insertBefore(r.domElement,canvas);canvas.style.zIndex='1';
-      r.domElement.addEventListener('webglcontextlost',e=>{e.preventDefault();if(APP.kartRace)APP.kartRace.paused=true;});
-      r.domElement.addEventListener('webglcontextrestored',()=>{this.race=null;});
+      // Render offscreen, then copy into the same visible canvas as the HUD.
+      // Opaque 2D surfaces and browser compositor layers cannot cover the track.
+      r.domElement.style.cssText='display:none;pointer-events:none';
+      document.body.insertBefore(r.domElement,canvas);
+      r.domElement.addEventListener('webglcontextlost',e=>{e.preventDefault();this.contextLost=true;if(APP.kartRace){this.wasPaused=APP.kartRace.paused;APP.kartRace.paused=true;}});
+      r.domElement.addEventListener('webglcontextrestored',()=>{this.contextLost=false;this.race=null;if(APP.kartRace)APP.kartRace.paused=!!this.wasPaused;});
       return true;
     }catch(e){this.error=e.message;return false;}
   },
   hide(){if(this.renderer)this.renderer.domElement.style.display='none';canvas.style.background='';},
+  present(){ctx.save();ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.drawImage(this.renderer.domElement,0,0,W,H);ctx.restore();},
   syncSize(){
-    const r=canvas.getBoundingClientRect(),el=this.renderer.domElement,k=Math.min(VIEW.k||1,IS_XBOX?.85:1.5);
-    el.style.left=r.left+'px';el.style.top=r.top+'px';el.style.width=r.width+'px';el.style.height=r.height+'px';el.style.display='block';
+    const el=this.renderer.domElement,k=Math.min(VIEW.k||1,IS_XBOX?.85:1.5);
+    el.style.display='none';
     const w=Math.round(W*k),h=Math.round(H*k);if(el.width!==w||el.height!==h)this.renderer.setSize(w,h,false);
-    canvas.style.background='transparent';
+    canvas.style.background='';
   },
   disposeScene(){
     if(!this.scene)return;
@@ -19849,14 +19855,15 @@ const Kart3D={
       ctx.fillStyle='#0c1829';ctx.fillRect(0,0,W,H);sfText('EL MODO 3D NECESITA WEBGL',640,270,52,GOLD);
       wrapText('Abre el juego en Chrome, Edge o Safari con aceleración gráfica. Esc: volver al menú.',640,350,850,21,32,PAPER);if(keyEdge('kb1','Escape'))KartMenu.exit();return;
     }
+    if(this.contextLost){ctx.fillStyle='#0c1829';ctx.fillRect(0,0,W,H);sfText('RECUPERANDO LA PISTA 3D',640,295,48,GOLD);text('La carrera se reanudará cuando el navegador recupere los gráficos.',640,360,20,PAPER,{body:true});text('Esc: salir de la carrera',640,415,18,TEAL,{body:true});if(keyEdge('kb1','Escape')){if(race.online)KartOnline.leave();else KartMenu.exit();}return;}
     if(this.race!==race)this.build(race);this.syncSize();this.animate(race,alpha);
-    const players=race.online?race.racers.filter(r=>r.human).sort((a,b)=>(b===race.player?1:0)-(a===race.player?1:0)):[race.player],rects=KartRender.viewports(players.length),renderer=this.renderer;
+    const players=race.online?[race.player]:race.localPlayers||[race.player],rects=KartRender.viewports(players.length),renderer=this.renderer;
     this.lastViewports=rects;
     // Four cameras share the same world transforms. Recompute the scene graph
     // once per frame; only the sky follows each individual camera afterward.
-    this.scene.matrixWorldAutoUpdate=players.length===1&&!race.online;
+    this.scene.matrixWorldAutoUpdate=players.length===1;
     if(!this.scene.matrixWorldAutoUpdate)this.scene.updateMatrixWorld();
-    if(players.length===1&&!race.online){renderer.setScissorTest(false);renderer.setViewport(0,0,renderer.domElement.width,renderer.domElement.height);renderer.render(this.scene,this.camera);KartRender.hud(race);return;}
+    if(players.length===1){renderer.setScissorTest(false);renderer.setViewport(0,0,renderer.domElement.width,renderer.domElement.height);this.camera.aspect=W/H;this.camera.updateProjectionMatrix();renderer.render(this.scene,this.camera);this.present();KartRender.hud(race);return;}
     const k=renderer.domElement.width/W;renderer.setScissorTest(true);
     // One world and one GL context; only cameras and viewports multiply.
     renderer.shadowMap.enabled=false;
@@ -19864,8 +19871,9 @@ const Kart3D={
       this.followCamera(race,p,alpha,v);v.camera.aspect=b.w/b.h;v.camera.updateProjectionMatrix();
       const left=Math.round(b.x*k),bottom=Math.round((H-b.y-b.h)*k),right=Math.round((b.x+b.w)*k),top=Math.round((H-b.y)*k);
       renderer.setViewport(left,bottom,right-left,top-bottom);renderer.setScissor(left,bottom,right-left,top-bottom);renderer.render(this.scene,v.camera);
-      KartRender.splitHud(race,p,b);
     });
+    this.present();
+    players.forEach((p,i)=>KartRender.splitHud(race,p,rects[i]));
     renderer.setScissorTest(false);renderer.setViewport(0,0,renderer.domElement.width,renderer.domElement.height);
   },
   thumbnail(id,vehicle=0){
@@ -20192,7 +20200,7 @@ APP.mainDraw=function(){
     slab(b.x,b.y,b.w,b.h,{skew:.07,edge:on?GOLD:'rgba(131,168,190,.4)',lw:on?4:2,top:i===0?'#572035':'#123a50',bottom:'#0b1829'});
     sfText(i===0?'PELEAS':'ESMASH KART',b.x+34,b.y+47,52,on?GOLD:PAPER,{align:'left'});
     text(i===0?'Golpes, especiales y Smash.':'Derrapa, lanza ítems y conquista la pista.',b.x+36,b.y+94,17,'#d0e3e9',{body:true,align:'left',weight:500});
-    text(i===0?'1–4 JUGADORES  ·  LOCAL Y ONLINE':'1–4 ONLINE  ·  PANTALLA DIVIDIDA  ·  3 CIRCUITOS',b.x+36,b.y+174,13,i===0?'#ffada6':'#7bf0e6',{body:true,align:'left',weight:700});
+    text(i===0?'1–4 JUGADORES  ·  LOCAL Y ONLINE':'1–4 ONLINE  ·  TU PROPIA VISTA  ·  3 CIRCUITOS',b.x+36,b.y+174,13,i===0?'#ffada6':'#7bf0e6',{body:true,align:'left',weight:700});
     if(i===9){const sp=KartRender.kartSprite(CHAR_ORDER[KartMenu.char],KartMenu.vehicle);ctx.drawImage(sp.img,b.x+395,b.y+80,150,147);}
     else{const sp=ART.sprite('kart-hub-fight',170,170,c=>{c.translate(87,162);c.scale(.95,.95);drawCharacter(c,'torito',mkPose(POSES.idle));});ctx.drawImage(sp.img,b.x+385,b.y+35,170,170);}
   }
@@ -20573,7 +20581,7 @@ APP.kartLobbyUpdate=function(){
 };
 APP.kartLobbyDraw=function(){
   const host=Net.role==='host',lob=host?Net.lob:Net.hostPres()?.lob||{},players=lob.players||[],M=KartMenu,cur=host?M.char:Net.guest.ch,mine=players.some(p=>p.peer===Net.myPeer());
-  M.header('SALA ESMASH KART','CÓDIGO '+(host?Net.code:Net.hostPres()?.code||'…')+'  ·  Hasta cuatro pilotos · voz, cámara y pantalla dividida');
+  M.header('SALA ESMASH KART','CÓDIGO '+(host?Net.code:Net.hostPres()?.code||'…')+'  ·  Hasta cuatro pilotos · voz, cámara y vista individual');
   for(let i=0;i<4;i++){const b={x:42+i*307,y:120,w:287,h:183},p=players[i];KartRender.panel(b.x,b.y,b.w,b.h);
     if(p){const id=CHAR_ORDER[p.ch]||CHAR_ORDER[0],cam=AV.videoFor(p.peer);if(cam)drawVideoCover(ctx,cam.v,b.x+12,b.y+12,94,80,cam.mirror);else ctx.drawImage(KartRender.kartSprite(id,p.vh).img,b.x+12,b.y+7,108,104);
       text(Net.nameOf(p.peer),b.x+125,b.y+38,17,PAPER,{align:'left',body:true,weight:700});text(CHARS[id].name,b.x+125,b.y+71,19,GOLD,{align:'left',weight:700});
@@ -20588,7 +20596,7 @@ APP.kartLobbyDraw=function(){
   M.button('VEHÍCULO: '+kartVehicle(M.vehicle).name+' · V / Y',{x:42,y:576,w:758,h:48});
   text('← → piloto · A: '+(host?'iniciar · LT / RT: pista · X: cilindrada':'listo')+' · U / LB: invitar',43,640,14,'#c3d7df',{align:'left',body:true});
   M.button('← SALIR',{x:42,y:652,w:196,h:42});M.button('INVITAR · U / LB',{x:253,y:652,w:256,h:42});
-  text('Cada quien conduce su piloto. Todos ven las cámaras de la carrera.',1235,682,14,TEAL,{align:'right',body:true});
+  text('Cada quien conduce y ve su propio piloto a pantalla completa.',1235,682,14,TEAL,{align:'right',body:true});
 };
 const kartOnlineFocus=APP.focusNative;APP.focusNative=function(d){
   if(this.screen==='kartLobby'){
