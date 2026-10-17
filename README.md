@@ -5,11 +5,62 @@
 Juego de peleas estilo Smash para hasta 4 jugadores: en la misma pantalla (teclado, controles o
 pantalla táctil) o en línea, cada quien desde su casa, con cámara y voz.
 
-Al entrar, elige **Peleas** o **Esmash Kart**. Las peleas conservan sus modos y su online.
+Al entrar, elige **Peleas**, **Esmash Kart** o **Aurora FPS**.
+
+## Aurora FPS
+
+Cuenca Aurora es un mundo de unos 500 × 500 metros: valle, bosque, río con puentes,
+patio central, almacenes accesibles, escaleras y azoteas. Conserva los 15 personajes.
+El combate libre termina a las 12 bajas o a los siete minutos, con escudos, munición,
+coberturas que bloquean disparos, reaparición y CPU para completar cuatro plazas.
+
+Las cinco armas tienen cargadores, cadencias, dispersión, retroceso y tiempos de recarga
+distintos: Cobalto 9 (pistola), Avispa (subfusil), Sierra M4 (fusil), Trueno 12 (escopeta)
+y Horizonte (francotirador). El arma y los brazos se dibujan en primera persona; apuntar,
+disparar, cambiar de arma y recargar tienen transiciones propias.
+
+| Acción | Teclado y ratón | Mando estándar |
+| --- | --- | --- |
+| Mover / mirar | WASD / ratón con cursor capturado | Palancas izquierda / derecha |
+| Correr | Shift | Pulsar L3; se cancela al parar o apuntar |
+| Mira / disparo | Clic derecho / izquierdo | LT / RT |
+| Recargar / saltar | R / Espacio | X / A |
+| Cambiar arma | 1–5, Q o rueda | Y |
+| Pausa | Esc | Menu / Start |
+
+En solitario funcionan teclado/ratón o mando. En local, P1 usa teclado/ratón y P2–P4
+usan un mando cada uno; selecciona la cantidad antes de entrar. Solo el multijugador
+local divide la pantalla. **Online cada persona tiene una única cámara propia a pantalla
+completa**, tanto en FPS como en Kart. El FPS reutiliza salas, invitaciones, DataChannels,
+alternativa por relay y la misma voz/cámara de Esmash. El anfitrión resuelve impactos,
+munición y puntuación; los invitados predicen su movimiento y reciben correcciones.
+
+## Música por escenario
+
+El tema del lobby se conserva. Hay doce composiciones originales de la misma familia
+disco/funk electrónico, con bajo sincopado, teclas cálidas, pulsaciones de guitarra,
+percusión y secciones de 32 compases. Cada arena y circuito tiene su propia armonía,
+melodía y patrón; los tempos van de 103 a 130 BPM. También hay un tema para Cuenca Aurora.
+Se respetan los ajustes de música/efectos, volumen general y atenuación de la voz.
+
+| Escenario | Tema | BPM |
+| --- | --- | --- |
+| Templo | Piedra y terciopelo | 110 |
+| Volcán (peleas) | Disco de magma | 128 |
+| Barco | Sal en el vinilo | 105 |
+| Espacio | Órbita de seda | 116 |
+| Ciudad | Semáforo ámbar | 121 |
+| Estadio | La última vuelta al sol | 125 |
+| Xochimilco | Canal de miel | 103 |
+| Pirámide | Cobre al amanecer | 113 |
+| Mercado del Sol | Domingo de groove | 119 |
+| Cañón de Fuego | Fuego de medianoche | 130 |
+| Cumbre Neón | Lluvia cromada | 123 |
+| Cuenca Aurora | Horizonte eléctrico | 112 |
 
 ## Respuesta y movimiento
 
-Ambos modos mantienen una simulación fija de 60 Hz. El dibujo interpola posiciones y cámaras
+Los tres modos mantienen una simulación fija de 60 Hz. El dibujo interpola posiciones y cámaras
 entre esos pasos; en las peleas, las poses activas de ataque y el contacto se muestran en su
 cuadro exacto. El salto despega tras tres cuadros de anticipación y los comandos nuevos se
 conservan durante la pausa de impacto. Los golpes y aterrizajes combinan reacción corporal,
@@ -191,3 +242,11 @@ del contexto WebGL.
 `node src/test/tkart-steering.cjs` comprueba izquierda/derecha en coordenadas de pantalla
 con palanca, cruceta, WASD, flechas y controles táctiles, y verifica desplazamiento,
 orientación y ruedas delanteras en los seis vehículos de las tres pistas.
+
+`node src/test/tfps.cjs` verifica movimiento, salto, colisión, acceso a azoteas, impactos,
+escudos, munición, cambio de arma, recarga, reaparición, controles de mando, vista en
+primera persona y división exclusivamente local. `node src/test/tfps-online.cjs` comprueba
+cuatro navegadores con WebRTC, AV, predicción, latencia/pérdida, autoridad del anfitrión,
+validación de paquetes, resultados, espectadores y revancha usando la señalización simulada.
+`node src/test/tstage-music.cjs` renderiza audio real, mide nivel/saturación, distingue
+las doce composiciones, comprueba la identidad del lobby y sus transiciones/ajustes.
