@@ -1,7 +1,7 @@
 # Versión web (GitHub Pages): el mismo juego + Supabase (salas, salón de la fama) + adaptador js/webshim.js
 # Salida: web/index.html y web/config.js (este último solo se crea si no existe: ahí va la anon key)
 # Lleva las fotos de las caras (Daniel autorizó que sean públicas). WEB_FACES=0 las quita y quedan caras dibujadas.
-import re, pathlib, os
+import re, pathlib, os, base64
 root = pathlib.Path(__file__).parent
 out = pathlib.Path(os.environ.get('OUT') or (root / 'web')); out.mkdir(parents=True, exist_ok=True)
 html = (root / 'index.html').read_text(encoding='utf-8')
@@ -12,6 +12,9 @@ if not faces: srcs = [s for s in srcs if s != 'js/faces.js']
 js = []
 for s in ['js/webshim.js'] + srcs:
     code = (root / s).read_text(encoding='utf-8')
+    if s == 'js/shell-ui.js':
+        poster = base64.b64encode((root / 'assets/cover-three-games.webp').read_bytes()).decode('ascii')
+        code = code.replace("'assets/cover-three-games.webp'", "'data:image/webp;base64," + poster + "'")
     assert '</script' not in code.lower(), s
     js.append(f'// ---- {s} ----\n' + code.replace("'use strict';\n", '', 1))
 vendor = (root / 'vendor/package/dist/umd/supabase.js').read_text(encoding='utf-8')

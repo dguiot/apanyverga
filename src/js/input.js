@@ -112,6 +112,7 @@ function announcePad(p, how) {
   const key = p.index + '|' + p.id;
   if (padsAnnounced.has(key)) return;
   padsAnnounced.add(key);
+  if(typeof ShellUI!=='undefined'&&(APP.screen==='title'||ShellUI.screens.has(APP.screen)))return;
   if (typeof Toasts !== 'undefined') Toasts.push(`🎮 Control conectado: ${shortPadName(p.id)} · pulsa A para unirte`);
 }
 function readPads() {

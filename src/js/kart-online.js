@@ -145,7 +145,7 @@ const KartOnline={
       if(race.phase==='finish'&&race.resultTime>=3){this.pushState();this.publish({ph:'kartResults'});race.stop();APP.go('kartResults');return;}
     }else {this.sendInput(input);this.predict(input);}
     KartSound.tick(race);
-    if(!race.paused)return;
+    if(!race.paused||ShellUI.active)return;
     const choose=i=>{if(i===0){race.paused=false;return;}if(i===1){if(Net.role==='host')this.lobby();else AV.setMic(!AV.mic);return;}this.leave();};
     for(const d of Devices.list){const n=Devices.nav(d);if(n.up||n.down)race.pauseSel=(race.pauseSel+(n.down?1:2))%3;if(n.confirm&&!raw.pausePressed)return choose(race.pauseSel);}
     for(let i=0;i<3;i++)if(KartMenu.hit({x:440,y:318+i*72,w:400,h:58}))return choose(i);

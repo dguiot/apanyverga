@@ -5,7 +5,26 @@
 Juego de peleas estilo Smash para hasta 4 jugadores: en la misma pantalla (teclado, controles o
 pantalla táctil) o en línea, cada quien desde su casa, con cámara y voz.
 
-Al entrar, elige **Peleas**, **Esmash Kart** o **Aurora FPS**.
+La portada tipo póster presenta los tres juegos y dos entradas: **Juego local** y
+**Juego online**. Online crea una sala inmediatamente; el mismo enlace sirve para
+Esmash, Kart y Aurora, con voz/cámara y participantes visibles aunque apaguen el video.
+El anfitrión confirma el juego; los invitados pueden proponerlo. Cambiar de juego o
+volver a preparar una partida conserva la sala y las conexiones de voz/cámara.
+
+Cada juego sigue el mismo recorrido: **Ajustes → Personajes y vehículos → Escenario**.
+Los ajustes reúnen reglas, sonido, imagen y controles. Se abre exactamente el mismo panel
+con **Esc / Menu** o **Pausa / Ajustes** durante la partida. Las reglas de una ronda en
+curso quedan bloqueadas; sonido, imagen y controles se pueden cambiar al momento. En online,
+el juego sigue para los demás mientras consultas tus ajustes.
+
+La selección de Kart tiene pestañas visibles **Personajes** y **Vehículos**: pulsa **Y**
+para alternar, recorre los seis vehículos con la cruceta y confirma con **A**. En local,
+**LB / RB** cambia el jugador que estás configurando; cada uno conserva su personaje y
+vehículo. Las cámaras se dividen únicamente para jugadores del mismo dispositivo.
+
+La ilustración original de portada está en `src/assets/cover-three-games.webp`, generada
+con ImageGen a partir de los personajes existentes. El compilador la incluye en el HTML;
+no depende de un CDN ni de descargar imágenes al abrir el juego.
 
 ## Aurora FPS
 
@@ -250,3 +269,9 @@ cuatro navegadores con WebRTC, AV, predicción, latencia/pérdida, autoridad del
 validación de paquetes, resultados, espectadores y revancha usando la señalización simulada.
 `node src/test/tstage-music.cjs` renderiza audio real, mide nivel/saturación, distingue
 las doce composiciones, comprueba la identidad del lobby y sus transiciones/ajustes.
+
+`node src/test/tshell-ui.cjs` recorre la portada, los tres pasos de cada juego, selección
+de moto con mando real simulado, dos pilotos locales independientes y ajustes/remapeo
+desde pausa. `node src/test/tshell-online.cjs` conecta cuatro navegadores y comprueba
+invitaciones, presencia sin cámara y el cambio Kart → FPS → Esmash sin recrear la sala
+ni cortar las conexiones WebRTC existentes. Solo se simula el directorio de salas.
