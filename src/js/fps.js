@@ -109,12 +109,12 @@ const FPSControls={
  prev:new Map(),mouse:{x:0,y:0,fire:false,aim:false,wheel:0},look:new Map(),
  reset(){this.prev.clear();this.mouse.x=this.mouse.y=this.mouse.wheel=0;this.mouse.fire=this.mouse.aim=false;},
  read(slot=0){
-  const online=APP.fps?.online,pads=padInfo,keyboard=slot===0,pm=online||APP.fps?.localCount===1?pads[0]:slot>0?pads.find(p=>p.index===APP.fps.devices[slot]):null;
+  const online=APP.fps?.online,pads=padInfo,keyboard=slot===0,pm=online||APP.fps?.localCount===1?ModeControls.pad('fps'):slot>0?pads.find(p=>p.index===APP.fps.devices[slot]):null;
   const b=pm?.buttons||[],a=pm?.axes||[],has=k=>keyboard&&keysDown.has(k),edge=k=>keyboard&&keyEdge('kb1',k);
   const dz=v=>Math.abs(v||0)<.16?0:(v-sign(v)*.16)/.84;
   let x=(has('KeyD')?1:0)-(has('KeyA')?1:0),z=(has('KeyW')?1:0)-(has('KeyS')?1:0);
-  if(pm){x=dz(a[0]);z=-dz(a[1]);}
-  const prev=this.prev.get(slot)||{},sprint=!!b[10],jump=!!b[0],reload=!!b[2],swap=!!b[3],pause=!!b[9];
+  if(pm){const px=dz(a[0]),pz=-dz(a[1]);if(Math.abs(px)>Math.abs(x))x=px;if(Math.abs(pz)>Math.abs(z))z=pz;}
+  const prev=this.prev.get(slot)||{},sprint=ModeControls.down('fps','sprint',pm,false),jump=ModeControls.down('fps','jump',pm,false),reload=ModeControls.down('fps','reload',pm,false),swap=ModeControls.down('fps','swap',pm,false),pause=ModeControls.down('fps','pause',pm,false);
   const out={x,z,lx:dz(a[2])*2.7/60+(keyboard?this.mouse.x*.0022:0),ly:dz(a[3])*2.05/60+(keyboard?this.mouse.y*.0022:0),fire:!!b[7]||keyboard&&this.mouse.fire,aim:!!b[6]||keyboard&&this.mouse.aim,
    sprint:has('ShiftLeft')||has('ShiftRight'),sprintTap:sprint&&!prev.sprint,jump:jump&&!prev.jump||edge('Space'),reload:reload&&!prev.reload||edge('KeyR'),swap:swap&&!prev.swap||edge('KeyQ')||keyboard&&this.mouse.wheel!==0,pause:pause&&!prev.pause||edge('Escape'),gun:-1};
   for(let i=1;i<=5;i++)if(edge('Digit'+i))out.gun=i-1;

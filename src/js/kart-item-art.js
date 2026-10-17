@@ -61,7 +61,7 @@ const kartItemAnimate=Kart3D.animate;Kart3D.animate=function(race,alpha){
 };
 const kartItemHud=KartRender.hud;KartRender.hud=function(race){kartItemHud.call(this,race);this.itemStatus(race.player,22,270);this.itemWarning(race,race.player,{x:0,y:0,w:W,h:H});};
 const kartItemSplitHud=KartRender.splitHud;KartRender.splitHud=function(race,r,b){kartItemSplitHud.call(this,race,r,b);this.itemStatus(r,b.x+12,b.y+144);this.itemWarning(race,r,b);};
-KartRender.itemStatus=function(r,x,y){for(const [key,label,col]of [['shield','BURBUJA','#8ce9ec'],['star','ESTRELLA','#ffde86'],['magnet','IMÁN','#f3a5c7'],['slow','RALENTIZADO','#c1b3f3']])if(r[key]>0){this.panel(x,y,174,23);text(label+'  '+r[key].toFixed(1)+' s',x+87,y+12,12,col,{body:true,weight:700});y+=27;}};
+KartRender.itemStatus=function(r,x,y){for(const [key,label,col]of [['shield','BURBUJA','#8ce9ec'],['star','ESTRELLA','#ffde86'],['magnet','IMÁN','#f3a5c7'],['slow','RALENTIZADO','#c1b3f3'],...(!r.star&&!r.shield?[['invuln','PROTECCIÓN','#b1d8ec']]:[])])if(r[key]>0){this.panel(x,y,174,23);text(label+'  '+r[key].toFixed(1)+' s',x+87,y+12,12,col,{body:true,weight:700});y+=27;}};
 KartRender.itemWarning=function(race,r,b){
   if(r.finish!==null||race.phase!=='race')return;const q=race.projectiles.find(q=>q.type==='chile'&&q.target===r.index&&Math.abs(KartMath.delta(q.s,r.s,race.course.length))<130);
   if(q){ctx.save();const y=b.y+b.h-92;this.panel(b.x+b.w/2-126,y-18,252,34);text('⚠ COHETE EN CAMINO',b.x+b.w/2,y,16,'#ffb69f',{body:true,weight:700});ctx.restore();}

@@ -26,6 +26,22 @@ La ilustración original de portada está en `src/assets/cover-three-games.webp`
 con ImageGen a partir de los personajes existentes. El compilador la incluye en el HTML;
 no depende de un CDN ni de descargar imágenes al abrir el juego.
 
+## Controles de Kart
+
+| Acción | Teclado | Mando Xbox / PlayStation |
+| --- | --- | --- |
+| Dirección | A D o ← → | Palanca izquierda o cruceta |
+| Acelerar / frenar | W S o ↑ ↓ | RT / LT (R2 / L2); A también acelera |
+| Derrape / acrobacia en el aire | Espacio o Shift | X / RB (□ / R1) |
+| Lanzar objeto adelante | E o J | LB / L1 |
+| Lanzar objeto atrás | Q | B / ○ |
+| Pausa y ajustes | Esc / Enter | Menu / Options |
+
+Y y R no rescatan ni reinician el kart. El rescate es automático al caer de un puente.
+La invulnerabilidad se muestra con un halo constante: el piloto nunca se oculta ni parpadea.
+Los avisos de vuelta y meta son discretos; los objetos y efectos activos se consultan en el HUD.
+Los mismos controles de objetos se usan en solitario, pantalla dividida y online.
+
 ## Un solo diseño de personajes
 
 Esmash conserva su dibujo, siluetas, proporciones y animaciones. Las fotos se sustituyen
@@ -67,7 +83,8 @@ disparar, cambiar de arma y recargar tienen transiciones propias.
 | Mover / mirar | WASD / ratón con cursor capturado | Palancas izquierda / derecha |
 | Correr | Shift | Pulsar L3; se cancela al parar o apuntar |
 | Mira / disparo | Clic derecho / izquierdo | LT / RT |
-| Recargar / saltar | R / Espacio | X / A |
+| Recargar | R | X / □; también RB / R1 |
+| Saltar | Espacio | A / ✕ |
 | Cambiar arma | 1–5, Q o rueda | Y |
 | Pausa | Esc | Menu / Start |
 
@@ -281,6 +298,12 @@ no sustituyen la medición de FPS ni las pruebas de tacto en el dispositivo fina
 `node src/test/tkart-screen.cjs` reproduce un lienzo de PC opaco, comprueba píxeles reales
 de las tres pistas, redimensionado, pausa, miniaturas, vista individual online y pérdida/restauración
 del contexto WebGL.
+
+`node src/test/tmode-controls.cjs` comprueba aceleración inalámbrica con un mando inactivo
+conectado antes, ausencia de rescate por Y/R, lanzamiento delantero/trasero, rescate automático,
+protección sin parpadeo, recarga de las cinco armas con X y RB, WASD con mando conectado,
+separación local, acciones de Esmash y pausa con Menu independiente de las asignaciones de pelea.
+El panel de controles muestra los botones detectados para diagnosticar mandos inalámbricos.
 
 `node src/test/tkart-steering.cjs` comprueba izquierda/derecha en coordenadas de pantalla
 con palanca, cruceta, WASD, flechas y controles táctiles, y verifica desplazamiento,

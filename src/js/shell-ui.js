@@ -159,7 +159,7 @@ const ShellUI={
   if(this.game==='kart')return [rule('Cilindrada',KART_CLASSES[KartMenu.cc].name,d=>KartMenu.cc=(KartMenu.cc+d+3)%3,locked),rule('Ayuda de dirección',KartMenu.assist?'Activada':'Desactivada',()=>KartMenu.assist=!KartMenu.assist,locked),rule('Tipo de carrera',KartMenu.cup?'Copa de tres pistas':'Carrera individual',()=>KartMenu.cup=!KartMenu.cup,locked||this.online||this.config.locals>1),...common,rule('Vueltas / participantes','3 vueltas · 8 pilotos',()=>{},true)];
   return [rule('Tipo de partida','Combate libre',()=>{},true),rule('Bajas para ganar',String(this.config.target),d=>this.config.target=clamp(this.config.target+d*5,5,30),locked),rule('Tiempo límite',this.config.minutes+' min',d=>this.config.minutes=clamp(this.config.minutes+d,3,15),locked),...common,rule('Rivales CPU','Completan cuatro plazas',()=>{},true)];
  },
- settingsItems(){const rows=this.rows(),perColumn=Math.max(5,Math.ceil(rows.length/2)),pitch=340/perColumn,items=[0,1,2].map(i=>({x:44+i*244,y:146,w:230,h:43,tab:i}));rows.forEach((r,i)=>items.push({x:44+Math.floor(i/perColumn)*610,y:211+(i%perColumn)*pitch,w:580,h:pitch-11,row:i}));if(this.tab===2&&this.game==='fight')items.push({x:834,y:540,w:400,h:46,bind:true});items.push({x:44,y:641,w:220,h:49,back:true});items.push({x:864,y:631,w:370,h:59,next:true});if(this.returnScreen)items.push({x:340,y:641,w:460,h:49,room:true});return items;},
+ settingsItems(){const rows=this.rows(),perColumn=Math.max(5,Math.ceil(rows.length/2)),pitch=340/perColumn,items=[0,1,2].map(i=>({x:44+i*244,y:146,w:230,h:43,tab:i}));rows.forEach((r,i)=>items.push({x:44+Math.floor(i/perColumn)*610,y:211+(i%perColumn)*pitch,w:580,h:pitch-11,row:i}));if(this.tab===2&&this.game==='fight')items.push({x:834,y:539,w:400,h:44,bind:true});items.push({x:44,y:641,w:220,h:49,back:true});items.push({x:864,y:631,w:370,h:59,next:true});if(this.returnScreen)items.push({x:340,y:641,w:460,h:49,room:true});return items;},
  settingsChange(i,d){const row=this.rows()[i];if(!row||row.locked)return;row.change(d);this.publish({ru:Net.encRules(APP.rules),cc:KartMenu.cc,assist:KartMenu.assist});},
  settingsUpdate(){const items=this.settingsItems();this.nav(items,i=>{const b=items[i];if(b.tab!==undefined){this.tab=b.tab;this.focus=b.tab;}else if(b.row!==undefined)this.settingsChange(b.row,1);else if(b.back)this.back();else if(b.bind){this.inBindings=true;APP.bind.col=0;APP.bind.dev=0;APP.go('binds');}else if(b.room){if(this.host())this.room();else this.guestRoom();}else if(b.next){if(this.returnScreen)this.resume();else this.next();}},(i,d)=>this.settingsChange(i,d));},
  settingsDraw(){
@@ -168,9 +168,18 @@ const ShellUI={
   if(this.tab===2)this.drawControls();text(this.returnScreen?'Las reglas de la ronda se cambian al preparar otra partida. Sonido, imagen y controles se ajustan aquí.':!this.host()?'El anfitrión configura la partida. Puedes ajustar tu sonido, imagen y controles.':'Cruceta / ↑ ↓: navegar · ← →: cambiar · A / Enter: elegir · B / Esc: volver',46,601,14,'#96afbb',{align:'left',body:true});
  },
  drawControls(){
-  const rows=this.game==='kart'?[['Acelerar / frenar','W / S o ↑ / ↓','RT / LT'],['Dirección','A D o ← →','Palanca izquierda'],['Derrapar / acrobacia','Espacio','X / RB'],['Objeto / atrás','E / Q','LB / B'],['Rescate / pausa','R / Esc','Y / Menu']]:this.game==='fps'?[['Mover / mirar','WASD / ratón','Palancas izq. / der.'],['Correr','Shift','Pulsar L3'],['Apuntar / disparar','Clic der. / izq.','LT / RT'],['Recargar / saltar','R / Espacio','X / A'],['Cambiar arma / pausa','1–5 / Q / Esc','Y / Menu']]:[['Mover / saltar','WASD / Espacio','Palanca izq. / X'],['Ataque / especial','J / K','A / B'],['Escudo / agarre','L / U','LT / LB'],['Smash','Dirección + ataque','Palanca derecha'],['Pausa','Enter / Esc','Menu']];
-  ['ACCIÓN','TECLADO Y RATÓN','MANDO'].forEach((s,i)=>text(s,65+i*390,223,12,TEAL,{align:'left',body:true,weight:800}));rows.forEach((r,i)=>{ctx.fillStyle=i%2?'#142936':'#1b303d';roundRect(ctx,44,247+i*55,1190,47,7);ctx.fill();r.forEach((s,j)=>text(s,65+j*390,272+i*55,17,PAPER,{align:'left',body:true}));});
-  text('En local: P1 teclado; cada jugador adicional usa su mando. En Esmash también hay teclado 2.',48,529,13,'#93aeba',{align:'left',body:true});
+  const pad=padInfo[0],dev=pad?'pad'+pad.index:'pad0',kb=a=>bindList('kb1',a),pb=a=>bindList(dev,a);
+  const rows=this.game==='fight'?[
+   ['Dirección',[kb('up'),kb('down'),kb('left'),kb('right')].join(' '),'Palanca izquierda / cruceta'],
+   ['Salto',kb('jump')+(Binds.kb.kb1.tapJump?' / '+kb('up'):''),pb('jump')],['Ataque / especial',kb('attack')+' / '+kb('special'),pb('attack')+' / '+pb('special')],
+   ['Escudo / agarre',kb('shield')+' / '+kb('grab'),pb('shield')+' / '+pb('grab')],
+   ['Smash',kb('smash')+' / dirección + ataque','Palanca derecha / dirección + ataque'],['Pausa / ajustes',kb('start'),pb('start')]
+  ]:ModeControls.help(this.game);
+  ['ACCIÓN','TECLADO Y RATÓN','MANDO · XBOX / PLAYSTATION'].forEach((s,i)=>text(s,65+i*390,223,12,TEAL,{align:'left',body:true,weight:800}));
+  rows.forEach((r,i)=>{ctx.fillStyle=i%2?'#142936':'#1b303d';roundRect(ctx,44,243+i*43,1190,37,7);ctx.fill();r.forEach((s,j)=>text(s,65+j*390,264+i*43,fitSize(s,365,16),PAPER,{align:'left',body:true}));});
+  text(ModeControls.diagnostic(),48,521,fitSize(ModeControls.diagnostic(),1180,13),TEAL,{align:'left',body:true});
+  text(this.game==='kart'?'LB / E / J lanza delante. B / Q lanza atrás. El rescate solo es automático al caer.':this.game==='fps'?'Recarga: R en teclado · X / □ o RB / R1 en mando. También funciona con conexión inalámbrica.':'Esmash usa tus asignaciones guardadas.',48,550,13,'#b3cdd5',{align:'left',body:true});
+  text('Local: un jugador admite teclado o mando. En multijugador: P1 teclado, P2–P4 un mando por jugador.',48,576,12,'#93aeba',{align:'left',body:true});
  },
  playersItems(){const items=[{x:44,y:143,w:220,h:42,tab:0}];if(this.game==='kart')items.push({x:278,y:143,w:240,h:42,tab:1});if(!this.online)for(let i=0;i<this.config.locals;i++)items.push({x:700+i*134,y:144,w:122,h:40,edit:i});
   const count=this.game==='kart'&&this.playerTab===1?6:15;for(let i=0;i<count;i++)items.push(count===6?{x:44+i%3*246,y:211+Math.floor(i/3)*180,w:230,h:165,vh:i}:{x:44+i%5*147,y:211+Math.floor(i/5)*117,w:136,h:105,ch:i});
@@ -220,11 +229,12 @@ const shellGo=APP.go;APP.go=function(s){
 };
 const shellFocus=APP.focusNative;APP.focusNative=function(d){if(this.screen!=='binds'&&ShellUI.ownsNavigation?.())return false;return shellFocus.call(this,d);};
 const shellUpdate=APP.update;APP.update=function(){
+ const heldMenu=new Set(padInfo.filter(p=>p.buttons[9]).map(p=>p.index)),padPause=[...heldMenu].some(i=>!ShellUI.menuHeld?.has(i));ShellUI.menuHeld=heldMenu;
  if(this.screen==='title'&&Net.wantCode&&!ShellUI.active){ShellUI.begin(true);return;}
  if(ShellUI.active&&ShellUI.inBindings&&!Capture.active&&Devices.list.some(d=>Devices.nav(d).back)){APP.go('uiSettings');return;}
   if(ShellUI.active&&['results','kartResults','fpsResults'].includes(this.screen))return ShellUI.resultsUpdate();
   if(ShellUI.active&&['battle','netview','kartRace','fpsGame'].includes(this.screen)){
-  const pause=keyEdge('kb1','Escape')||Devices.list.some(d=>Devices.nav(d).start);
+  const pause=keyEdge('kb1','Escape')||(ShellUI.game==='kart'&&keyEdge('kb1','Enter'))||padPause||(TouchPad.active&&Devices.nav('touch').start)||(ShellUI.game==='fight'&&Devices.list.some(d=>Devices.nav(d).start));
   if(pause){if(ShellUI.paused)ShellUI.resume();else ShellUI.pause();return;}
   if(Pointer.clicked&&clickIn(W-194,H-36,170,28)){ShellUI.pause();return;}
   if(!ShellUI.paused&&ShellUI.current()?.paused)ShellUI.pause();
@@ -240,10 +250,8 @@ const shellDraw=APP.draw;APP.draw=function(){
 };
 
 // Gamepads select vehicles directly; no dependency on the fighting button map.
-const ShellKartInput={prev:new Map(),read(dev){const keyboard=dev?.startsWith('kb'),keys=keysDown,pad=dev?.startsWith('pad')?padInfo.find(p=>'pad'+p.index===dev):null,b=pad?.buttons||[],a=pad?.axes||[];let steer=keyboard?((keys.has('KeyD')||keys.has('ArrowRight')?1:0)-(keys.has('KeyA')||keys.has('ArrowLeft')?1:0)):0;
- if(pad&&Math.abs(a[0]||0)>.16)steer=(a[0]-sign(a[0])*.16)/.84;if(b[14])steer=-1;if(b[15])steer=1;
- const raw={steer:-steer,gas:keyboard&&(keys.has('KeyW')||keys.has('ArrowUp'))||b[7]||b[0],brake:keyboard&&(keys.has('KeyS')||keys.has('ArrowDown'))||b[6],drift:keyboard&&(keys.has('Space')||keys.has('ShiftLeft'))||b[2]||b[5],item:keyboard&&(keys.has('KeyE')||keys.has('KeyJ'))||b[4],rear:keyboard&&keys.has('KeyQ')||b[1],rescue:keyboard&&keys.has('KeyR')||b[3]},prev=this.prev.get(dev)||{},out={...raw,itemPressed:!!raw.item&&!prev.item,driftPressed:!!raw.drift&&!prev.drift,rescuePressed:!!raw.rescue&&!prev.rescue};this.prev.set(dev,raw);return out;}};
-const shellKartUpdate=APP.kartRaceUpdate;APP.kartRaceUpdate=function(){const r=this.kartRace;if(!ShellUI.active||r?.online)return shellKartUpdate.call(this);if(!r||r.paused)return;const locals=r.localPlayers||[r.player],devs=r.localDevices||ShellUI.localDevices(),inputs={};locals.forEach((p,i)=>inputs[p.index]=locals.length===1&&TouchPad.active?KartControls.read():ShellKartInput.read(devs[i]));r.update({players:inputs});KartSound.tick(r);if(r.phase==='finish'&&r.resultTime>=3){KartMenu.record();r.stop();this.go('kartResults');}};
+const ShellKartInput={read:dev=>KartControls.read(dev)};
+const shellKartUpdate=APP.kartRaceUpdate;APP.kartRaceUpdate=function(){const r=this.kartRace;if(!ShellUI.active||r?.online)return shellKartUpdate.call(this);if(!r||r.paused)return;const locals=r.localPlayers||[r.player],devs=r.localDevices||ShellUI.localDevices(),inputs={};locals.forEach((p,i)=>inputs[p.index]=locals.length===1?KartControls.read():ShellKartInput.read(devs[i]));if(inputs[r.player.index]?.musicPressed)Audio8.setMusic(!Audio8.musicOn);r.update({players:inputs});KartSound.tick(r);if(r.phase==='finish'&&r.resultTime>=3){KartMenu.record();r.stop();this.go('kartResults');}};
 const shellAttachRollback=Net.attachRollback;Net.attachRollback=function(b){shellAttachRollback.call(this,b);const read=this.rollbackSession.read;this.rollbackSession.read=p=>ShellUI.active&&ShellUI.paused?blankState():read(p);};
 const shellSendInput=Net.sendInput;Net.sendInput=function(){if(!ShellUI.active||!ShellUI.paused)return shellSendInput.call(this);const c=Devices.ctrls[this.localDev],cur=c?.cur;if(c)c.cur=blankState();try{return shellSendInput.call(this);}finally{if(c)c.cur=cur;}};
 const shellInviteURL=Net.inviteURL;Net.inviteURL=function(){if(!ShellUI.active||this.role!=='guest')return shellInviteURL.call(this);const code=this.hostPres()?.code;return window.APYV_WEB&&code?location.origin+location.pathname+'?sala='+encodeURIComponent(code):null;};

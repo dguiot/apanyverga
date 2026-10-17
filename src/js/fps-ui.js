@@ -46,7 +46,7 @@ APP.fpsGarageDraw=function(){
 };
 APP.fpsGameUpdate=function(){
  const m=APP.fps;if(!m)return FPSMenu.exit();const raw=FPSControls.read(0);
- if(raw.pause){m.paused=!m.paused;FPSControls.reset();if(m.paused)document.exitPointerLock?.();}
+ if(raw.pause&&!ShellUI.active){m.paused=!m.paused;FPSControls.reset();if(m.paused)document.exitPointerLock?.();}
  if(m.paused){const resume=()=>{m.paused=false;FPSControls.reset();FPSControls.lock();},exit=()=>m.online?FPSOnline.leave():FPSMenu.exit();if(KartMenu.hit({x:430,y:310,w:420,h:60}))resume();if(KartMenu.hit({x:430,y:390,w:420,h:60}))return exit();for(const d of Devices.list){const n=Devices.nav(d);if(n.up||n.down)m.pauseSel=m.pauseSel?0:1;if(n.confirm&&!raw.pause){if(m.pauseSel)return exit();resume();}}}
  if(m.online)return FPSOnline.update(raw);if(m.paused)return;
  const inputs=m.players.map(p=>p.bot?{}:p.index===0?raw:FPSControls.read(p.index));m.update(inputs);if(m.phase==='done')APP.go('fpsResults');
