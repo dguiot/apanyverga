@@ -83,7 +83,22 @@ coberturas que bloquean disparos, reaparición y CPU para completar cuatro plaza
 Las cinco armas tienen cargadores, cadencias, dispersión, retroceso y tiempos de recarga
 distintos: Cobalto 9 (pistola), Avispa (subfusil), Sierra M4 (fusil), Trueno 12 (escopeta)
 y Horizonte (francotirador). El arma y los brazos se dibujan en primera persona; apuntar,
-disparar, cambiar de arma y recargar tienen transiciones propias.
+disparar, cambiar de arma y recargar tienen transiciones propias. Agacharse mientras corres
+hace una **barrida** de unos 0.7 s, más rápida que correr, que termina en cuclillas.
+
+La CPU apunta a quien ve (no a quien está más cerca detrás de una pared), tarda un instante
+en reaccionar, su puntería empieza con error y se afina mientras te sigue, dispara en ráfagas,
+pelea moviéndose de lado, rodea obstáculos, sale de los edificios por la puerta y se retira a
+recuperar vida. Cada CPU conserva el papel de su arma (distancia preferida y forma de disparar).
+En partidas de prueba de cuatro CPU el tiempo atorado bajó de ~400 s a ~6 s y la precisión de
+70 % a 44 %; antes, quien aparecía dentro de un almacén se quedaba ahí toda la partida.
+
+En pantalla hay marcador con tiempo, bajas y lugar; un arco rojo alrededor de la mira que
+señala de dónde vino el daño (también en línea); aviso al eliminar a alguien, con otro color
+para el tiro a la cabeza, y quién te eliminó mientras esperas reaparecer. La guía de controles
+solo aparece los primeros segundos. Con una sola vista y calidad completa, la imagen pasa por
+brillo, gradación de color y viñeta (`js/fps-post.js`); el pasto tiene manchas de color
+natural sin cuadrícula repetida y las montañas crestas con bosque, roca y nieve.
 
 | Acción | Teclado y ratón | Mando estándar |
 | --- | --- | --- |
@@ -92,6 +107,7 @@ disparar, cambiar de arma y recargar tienen transiciones propias.
 | Mira / disparo | Clic derecho / izquierdo | LT / RT |
 | Recargar | R | X / □; también RB / R1 |
 | Saltar | Espacio | A / ✕ |
+| Agacharse (mantener) / barrida corriendo | C o Ctrl | B / ○ |
 | Cambiar arma | 1–5, Q o rueda | Y |
 | Pausa | Esc | Menu / Start |
 
@@ -379,6 +395,10 @@ y cabezas alineadas, tiros de cabeza de pie/agachado, recuperación interrumpida
 pausa, reaparición, teclado/mando inalámbrico, recargas animadas y validación online.
 `node src/test/tfps-polish.cjs` comprueba las cinco miras sin oclusión, caída y viaje
 de las balas, impactos, límites gráficos y liberación de recursos al salir del FPS.
+`node src/test/tfps-feel.cjs` comprueba que la CPU sale de un edificio por la puerta, reacciona
+antes de disparar con un error de puntería acotado y que las cuatro CPU entran al combate; la
+barrida, que el posproceso solo corre con una vista a calidad completa, el arco de daño hacia
+quien disparó y el aviso de eliminación.
 `node src/test/tfps-architecture.cjs` recorre las entradas y escaleras de los cuatro
 edificios, comprueba el acceso a azoteas y la cobertura de sus ventanas empotradas,
 verifica que el terreno queda bajo los pisos y compara píxeles para detectar

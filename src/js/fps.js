@@ -86,6 +86,15 @@ const FPSWorld={
   return {distance:near,point,normal,surface:solid.type};
  },
  wallDistance(o,d,max){return this.wallHit(o,d,max)?.distance??max;},
+ // Ruta de la CPU: para salir de un edificio (o entrar) se pasa por la puerta del lado del destino,
+ // primero al punto de adentro y luego al de afuera; sin esto buscaba la pared más cercana y se quedaba ahí.
+ route(p,goal){
+  const inside=(q,b)=>Math.abs(q.x-b.x)<b.w/2&&Math.abs(q.z-b.z)<b.d/2&&q.y<b.y+2.5,houses=this.decor.filter(b=>b.type==='building');
+  const from=houses.find(b=>inside(p,b)),to=houses.find(b=>inside(goal,b));if(from===to)return goal;
+  const door=(b,q)=>{const side=q.z>b.z?1:-1;return {inner:{x:b.x,z:b.z+side*(b.d/2-1.3)},outer:{x:b.x,z:b.z+side*(b.d/2+2.5)}};};
+  if(from){const d=door(from,goal);return Math.abs(p.x-from.x)<1.1&&Math.abs(p.z-d.inner.z)<1.5?d.outer:d.inner;}
+  const d=door(to,p);return Math.hypot(p.x-d.outer.x,p.z-d.outer.z)<2?d.inner:d.outer;
+ },
  move(p,dx,dz,dt){
   const oldY=p.y,height=FPSBody.bodyHeight(p);
   const steps=Math.max(1,Math.ceil(Math.max(Math.abs(dx),Math.abs(dz))/.2));for(let j=0;j<steps;j++)for(const [axis,delta] of [['x',dx/steps],['z',dz/steps]]){
@@ -138,22 +147,65 @@ class FPSMatch{
   this.player=this.players[0];this.localCount=online?1:Math.max(1,this.players.filter(p=>!p.bot).length);this.devices=[null,...padInfo.slice(0,3).map(p=>p.index)];this.cameraAlpha=0;
  }
  sound(type,p,origin=p){if(type==='blast'){const listeners=this.online?[this.player]:this.players.filter(q=>!q.bot),distance=Math.min(...listeners.map(q=>Math.hypot(q.x-origin.x,q.y-origin.y,q.z-origin.z)));if(distance<85){FPSAudio.play(type,p,.8*clamp(1-distance/95,.08,1));if(distance<9)Rumble.play('local',.25,.3,120);}return;}if(p===this.player||!this.online&&!p.bot){FPSAudio.play(type,p);Rumble.play('local',type==='shot'?.1:.22,.3,type==='shot'?55:100);}else if(type==='shot'){const distance=Math.hypot(p.x-this.player.x,p.z-this.player.z);if(distance<95)FPSAudio.play(type,p,.55*clamp(1-distance/110,.08,1));}}
+ // CPU con criterio: apunta a quien VE (no al más cercano a través de una pared), tarda en reaccionar, su
+ // puntería empieza con error y se corrige mientras te sigue, dispara en ráfagas, pelea moviéndose de lado,
+ // rodea obstáculos con antenas, se destraba y se retira a recuperar vida. Sin Math.random: hash1 por bot y
+ // por tiempo, así la simulación del anfitrión sigue siendo determinista.
  inputAI(p){
-  const others=this.players.filter(q=>q!==p&&!q.dead),target=others.sort((a,b)=>Math.hypot(a.x-p.x,a.z-p.z)-Math.hypot(b.x-p.x,b.z-p.z))[0];if(!target)return {};
-  const dx=target.x-p.x,dz=target.z-p.z,distance=Math.hypot(dx,dz),g=FPS_GUNS[p.gun],flight=distance/g.velocity,yaw=Math.atan2(dx+target.vx*flight,-dz-target.vz*flight),delta=Math.atan2(Math.sin(yaw-p.yaw),Math.cos(yaw-p.yaw));
-  const eye={x:p.x,y:p.y+FPSBody.eyeHeight(p),z:p.z},dir={x:dx/distance,y:(target.y+FPSBody.eyeHeight(target)-.22-eye.y)/distance,z:dz/distance},clear=FPSWorld.wallDistance(eye,dir,distance)>=distance-.5;
-  const probe=FPSWorld.wallDistance({x:p.x,y:p.y+.7,z:p.z},{x:Math.sin(p.yaw),y:0,z:-Math.cos(p.yaw)},4);
-  const preferred=[24,24,40,13,70][p.gun];return {x:clear&&distance<preferred*1.4?Math.sin(this.time*.8+p.index)*.65:probe<3?Math.sin(this.time+p.index)>0?1:-1:0,z:distance>preferred?.8:distance<preferred*.55?-.35:0,lx:clamp(delta,-.035,.035),ly:clamp(Math.atan2(eye.y-target.y-FPSBody.eyeHeight(target)+.22,distance)-p.pitch,-.018,.018),aim:clear,fire:clear&&distance<g.range*.85&&Math.abs(delta)<.09&&Math.sin(this.time*1.8+p.index)>.05,grenade:p.grenades>0&&clear&&distance>17&&distance<30&&Math.abs(delta)<.15&&Math.sin(this.time*.45+p.index)>.996,reload:p.ammo[p.gun]===0,jump:probe<3&&p.grounded,sprint:!clear};
+  const t=this.time,ai=p.ai||(p.ai={target:-1,seen:-1,check:0,los:false,err:0,errP:0,side:p.index%2?1:-1,sideUntil:0,burst:0,rest:0,nav:p.yaw,navAt:0,stuckAt:0,sx:p.x,sz:p.z,unstick:0,life:-1});
+  const r=k=>hash1(p.index*97+k,Math.floor(t*3)+k*13),g=FPS_GUNS[p.gun],eye={x:p.x,y:p.y+FPSBody.eyeHeight(p),z:p.z};
+  if(ai.life!==p.deaths){ai.life=p.deaths;ai.target=-1;ai.seen=-1;ai.los=false;}
+  const sees=q=>{const dx=q.x-p.x,dz=q.z-p.z,dy=q.y+FPSBody.eyeHeight(q)-.25-eye.y,d=Math.hypot(dx,dy,dz);return d<1||FPSWorld.wallDistance(eye,{x:dx/d,y:dy/d,z:dz/d},d)>=d-.5;};
+  if(t>=ai.check){ai.check=t+.3;let best=null,score=Infinity,vis=false;
+   for(const q of this.players){if(q===p||q.dead)continue;const d=Math.hypot(q.x-p.x,q.z-p.z),v=d<FPS_GUNS[4].range&&sees(q),s=d*(v?1:2.4)*(q.index===ai.target?.8:1);if(s<score){score=s;best=q;vis=v;}}
+   const id=best?best.index:-1;
+   if(id!==ai.target||vis&&!ai.los){ai.target=id;ai.seen=vis?t:-1;ai.err=(r(1)-.5)*2*(.06+.05*r(2));ai.errP=(r(3)-.5)*.05;}
+   if(!vis)ai.seen=-1;ai.los=vis;
+  }
+  const target=this.players[ai.target];if(!target||target.dead)return {};
+  const dx=target.x-p.x,dz=target.z-p.z,distance=Math.max(.01,Math.hypot(dx,dz)),flight=distance/g.velocity,bearing=Math.atan2(dx,-dz);
+  const react=.3+.25*hash1(p.index,7),onTarget=ai.los&&ai.seen>=0?t-ai.seen:0,settle=Math.exp(-onTarget/.55);
+  // dónde queda bloqueado el paso: antenas a la altura de la rodilla
+  const clear=(a,len)=>FPSWorld.wallDistance({x:p.x,y:p.y+.7,z:p.z},{x:Math.sin(a),y:0,z:-Math.cos(a)},len);
+  let look=bearing,x=0,z=0,sprint=false,crouch=false,jump=false;
+  if(ai.los){
+   // pelea: mantiene la distancia de su arma y se mueve de lado; cambia de lado o si choca
+   const preferred=[22,24,38,11,70][p.gun],low=p.health<35;
+   if(t>=ai.sideUntil||clear(p.yaw+ai.side*Math.PI/2,1.6)<1.4){ai.side*=-1;ai.sideUntil=t+.7+r(5)*1.1;}
+   x=ai.side*(.55+.4*r(6));z=low?-.75:distance>preferred*1.25?.8:distance<preferred*.6?-.6:0;
+   crouch=p.gun===4&&distance>40&&!low&&r(8)>.35;if(crouch)x=0;
+   look=Math.atan2(dx+target.vx*flight,-dz-target.vz*flight)+ai.err*settle;
+  }else{
+   // sin línea de vista: rodea lo que estorba hacia donde está el rival (cada .35 s elige rumbo)
+   const way=FPSWorld.route(p,target),toward=Math.atan2(way.x-p.x,-(way.z-p.z));
+   if(t>=ai.navAt){ai.navAt=t+.35;let best=toward,top=-Infinity;
+    for(const o of [0,.45,-.45,.9,-.9,1.35,-1.35,1.8,-1.8]){const a=toward+o,s=Math.min(clear(a,7),7)/7+.55*Math.cos(o)+(Math.abs(Math.atan2(Math.sin(a-ai.nav),Math.cos(a-ai.nav)))<.5?.15:0);if(s>top){top=s;best=a;}}
+    ai.nav=best;}
+   // atorado: si en 1 s no avanzó medio metro, prueba otro rumbo un momento
+   if(t>=ai.stuckAt){if(Math.hypot(p.x-ai.sx,p.z-ai.sz)<.5)ai.unstick=t+.8;ai.stuckAt=t+1;ai.sx=p.x;ai.sz=p.z;}
+   const heading=ai.nav+(t<ai.unstick?(p.index%2?1.6:-1.6):0),rel=heading-p.yaw;look=heading;
+   x=Math.sin(rel);z=Math.cos(rel);sprint=distance>22&&z>.7;jump=p.grounded&&clear(heading,1.2)<1&&t<ai.unstick;
+  }
+  const delta=Math.atan2(Math.sin(look-p.yaw),Math.cos(look-p.yaw)),aimPitch=Math.atan2(eye.y-target.y-FPSBody.eyeHeight(target)+.22,distance)+ai.errP*settle;
+  // ráfagas: automáticas disparan .35-.8 s y descansan .2-.45 s; el francotirador espera a asentar la mira
+  if(t>=ai.rest&&t>=ai.burst){ai.burst=t+.35+.45*r(9);ai.rest=ai.burst+.2+.25*r(10);}
+  const auto=p.gun===1||p.gun===2,ready=onTarget>react+(p.gun===4?.45:0),aligned=Math.abs(delta)<Math.max(.025,.7/distance);
+  const fire=ai.los&&ready&&aligned&&distance<g.range*.85&&(!auto||t<ai.burst)&&(p.gun!==4||Math.hypot(p.vx,p.vz)<2);
+  return {x,z,lx:clamp(delta*.35,-.05,.05),ly:clamp(aimPitch-p.pitch,-.025,.025),aim:ai.los&&distance>12&&p.gun!==3,fire,crouch,sprint,jump,
+   grenade:p.grenades>0&&ai.los&&distance>17&&distance<30&&Math.abs(delta)<.15&&r(11)>.985,reload:p.ammo[p.gun]===0||!ai.los&&p.ammo[p.gun]<g.mag*.4&&p.reserve[p.gun]>0};
  }
  move(p,I,dt){
   if(p.dead)return;
   const look=I.absoluteLook?1:this.lookScale(p);p.yaw+=clamp(I.lx||0,-.3,.3)*look;p.yaw=Math.atan2(Math.sin(p.yaw),Math.cos(p.yaw));p.pitch=clamp(p.pitch+clamp(I.ly||0,-.3,.3)*look,-1.4,1.4);
   const desired=I.crouch&&p.grounded?1:0,next=approach(FPSBody.stance(p),desired,dt*7);
   if(next>=FPSBody.stance(p)||FPSWorld.fits(p,FPSBody.height-FPSBody.drop*next))p.stance=next;
+  // barrida: agacharse mientras corres te lanza ~0.7 s a ras de suelo (rápido al inicio, frena al final)
+  const pace=Math.hypot(p.vx,p.vz);if(I.crouch&&p.sprint&&p.grounded&&!(p.slide>0)&&pace>7){p.slide=.7;p.slideX=p.vx/pace;p.slideZ=p.vz/pace;this.sound('step',p);}
   if(I.sprintTap)p.sprint=!p.sprint;if(I.sprint)p.sprint=true;if(I.z<.15||I.aim||I.fire||p.stance>.05||I.crouch)p.sprint=false;
   p.ads=approach(p.ads,I.aim&&!p.sprint&&!p.reloading?1:0,dt*8);p.recoil=approach(p.recoil,0,dt*.22);
   const wading=Math.abs(p.x+115)<11&&p.y<FPSWorld.waterLevel(p.z)-.25,speed=(p.stance>.1?2.8:p.sprint?10.2:p.ads>.5?3.1:6.1)*(wading?.63:1),x=I.x||0,z=I.z||0,dx=(Math.cos(p.yaw)*x+Math.sin(p.yaw)*z)*speed,dz=(Math.sin(p.yaw)*x-Math.cos(p.yaw)*z)*speed;
-  p.vx=approach(p.vx,dx,dt*(p.grounded?48:13));p.vz=approach(p.vz,dz,dt*(p.grounded?48:13));
+  if(p.slide>0){p.slide=!I.crouch||!p.grounded?0:Math.max(0,p.slide-dt);const v=lerp(5.5,12.5,p.slide/.7);p.vx=p.slideX*v;p.vz=p.slideZ*v;}
+  else{p.vx=approach(p.vx,dx,dt*(p.grounded?48:13));p.vz=approach(p.vz,dz,dt*(p.grounded?48:13));}
   p.coyote=p.grounded?.09:Math.max(0,p.coyote-dt);p.jumpBuffer=I.jump?.12:Math.max(0,p.jumpBuffer-dt);
   if(p.jumpBuffer&&p.coyote&&p.stance<.15){p.vy=8.1;p.grounded=false;p.coyote=p.jumpBuffer=0;this.sound('jump',p);}
   FPSWorld.move(p,p.vx*dt,p.vz*dt,dt);p.bob+=Math.hypot(p.vx,p.vz)*dt;p.hurt=Math.max(0,p.hurt-dt);p.hit=Math.max(0,p.hit-dt);p.invuln=Math.max(0,p.invuln-dt);p.throwTimer=Math.max(0,(p.throwTimer||0)-dt);
@@ -204,6 +256,6 @@ class FPSMatch{
   if(p!==victim){p.hit=.24;p.hitKind=head?'head':shield?'shield':'body';this.sound('hit',p);}if(point)this.impact(point,normal,shield?'shield':'body',p.index,gun);
   if(!victim.health){victim.dead=3;victim.deaths++;if(p!==victim)p.kills++;this.feed.push({time:this.time,from:p.index,to:victim.index,head,kind});if(this.feed.length>4)this.feed.shift();}return true;
  }
- respawn(p){const spots=FPSWorld.spawns.map(([x,z])=>({x,z,safety:Math.min(...this.players.filter(q=>q!==p&&!q.dead).map(q=>Math.hypot(q.x-x,q.z-z)),999)})).sort((a,b)=>b.safety-a.safety),q=spots[0];Object.assign(p,{x:q.x,z:q.z,y:FPSWorld.height(q.x,q.z),vx:0,vz:0,vy:0,health:100,shield:50,dead:0,invuln:2,reloading:0,recoil:0,cool:.4,grounded:true,stance:0,grenades:1,throwTimer:0,lastDamage:this.time,regenerating:false,sprint:false,ads:0,hit:0,hurt:0,jumpBuffer:0,coyote:.1});p.ammo=FPS_GUNS.map(g=>g.mag);p.reserve=FPS_GUNS.map(g=>g.reserve);}
+ respawn(p){const spots=FPSWorld.spawns.map(([x,z])=>({x,z,safety:Math.min(...this.players.filter(q=>q!==p&&!q.dead).map(q=>Math.hypot(q.x-x,q.z-z)),999)})).sort((a,b)=>b.safety-a.safety),q=spots[0];Object.assign(p,{x:q.x,z:q.z,y:FPSWorld.height(q.x,q.z),vx:0,vz:0,vy:0,health:100,shield:50,dead:0,invuln:2,reloading:0,recoil:0,cool:.4,grounded:true,stance:0,grenades:1,throwTimer:0,lastDamage:this.time,regenerating:false,sprint:false,ads:0,hit:0,hurt:0,jumpBuffer:0,coyote:.1,slide:0});p.ammo=FPS_GUNS.map(g=>g.mag);p.reserve=FPS_GUNS.map(g=>g.reserve);}
 }
 const FPSAudio={play(type,p,gain=1){const source=Audio8;if(!source.ready)return;const a={noise:(d,v,...rest)=>source.noise(d,v*gain,...rest),tone:(w,f0,f1,d,v,...rest)=>source.tone(w,f0,f1,d,v*gain,...rest)},g=FPS_GUNS[p.gun];if(type==='shot'){const heavy=g.kind==='sniper'||g.kind==='shotgun';a.noise(heavy?.18:.065,heavy?.13:.085,heavy?950:g.kind==='smg'?2400:1750,.7,0,'bandpass');a.noise(.014,.085,4200,.7,0,'highpass');a.tone('sine',heavy?78:150,35,heavy?.19:.08,heavy?.1:.05);a.noise(heavy?.22:.13,.025,750,.5,.02,'lowpass');}else if(type==='throw'){a.noise(.09,.025,1400,.7);}else if(type==='blast'){a.noise(.52,.12,650,.6,0,'lowpass');a.tone('sine',64,25,.45,.1);}else if(type==='hit'){a.tone('sine',920,1250,.045,.035);}else if(type==='step')a.noise(.045,.012,280,.6);else if(type==='reload'){a.noise(.045,.035,2300,.8);a.noise(.08,.023,1000,.7,.12);}else if(type==='empty')a.tone('triangle',600,300,.025,.025);else if(type==='ready')a.tone('sine',790,990,.06,.025);}};
