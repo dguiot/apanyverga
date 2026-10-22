@@ -25,6 +25,10 @@ const KART_TRACKS = [
     boosts: [.1,.33,.6,.8], boxes: [.055,.19,.34,.48,.63,.77,.94] },
 ];
 
+// Escala de las pistas: con 1.45 cada vuelta medía 9–11 km y duraba 1.5–2.5 minutos (una carrera de 3
+// vueltas pasaba de 5 minutos). Con .76 la vuelta mide ~4.6–5.7 km y dura ~45–60 s, como en un juego de karts.
+// Todo lo que va sobre la pista (cajas, turbos, rampas, obstáculos, monedas) se coloca por fracción de vuelta.
+const KART_TRACK_SCALE = .76;
 const KartMath = {
   wrap(n, length) { return ((n % length) + length) % length; },
   delta(a, b, length) { return this.wrap(a - b + length / 2, length) - length / 2; },
@@ -37,7 +41,7 @@ class KartCourse {
     const pts = info.points, dense = [], n = pts.length;
     // A dense spline first, then uniform distance: no acceleration spikes at control points.
     for (let i=0;i<n;i++) for (let j=0;j<100;j++) {
-      const p = [0,1,2].map(k => KartMath.cat(pts[(i+n-1)%n][k],pts[i][k],pts[(i+1)%n][k],pts[(i+2)%n][k],j/100)*1.45);
+      const p = [0,1,2].map(k => KartMath.cat(pts[(i+n-1)%n][k],pts[i][k],pts[(i+1)%n][k],pts[(i+2)%n][k],j/100)*KART_TRACK_SCALE);
       dense.push({x:p[0],y:p[1],z:p[2]});
     }
     dense.push(dense[0]); let len=0;
@@ -65,7 +69,7 @@ class KartCourse {
     for(let row=0;row<18;row++)for(let j=0;j<4;j++)this.coins.push({s:len*(.035+row*.052)+j*6,x:(row%3-1)*.52,ready:0});
   }
   sample(s) {
-    const v=KartMath.wrap(s,this.length)/this.step,i=Math.floor(v),t=v-i;
+    const v=KartMath.wrap(s,this.length)/this.step,i=Math.floor(v+1e-9)%this.samples.length,t=v-Math.floor(v+1e-9); // s de una muestra = esa muestra (sin error de redondeo)
     const a=this.samples[i],b=this.samples[(i+1)%this.samples.length];
     return {x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t,z:a.z+(b.z-a.z)*t,
       tx:a.tx+(b.tx-a.tx)*t,tz:a.tz+(b.tz-a.tz)*t,curve:a.curve+(b.curve-a.curve)*t,width:a.width+(b.width-a.width)*t,zone:a.zone};

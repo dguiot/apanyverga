@@ -113,18 +113,39 @@ class KartRace {
     if(this.phase==='finish'){this.resultTime+=dt;}
   }
   ai(r) {
-    const p=this.course.sample(r.s),ahead=this.course.sample(r.s+55+r.v*.25),curve=Math.max(Math.abs(p.curve),Math.abs(ahead.curve));
+    const C=this.course,p=C.sample(r.s),look=55+r.v*.25,ahead=C.sample(r.s+look),mid=C.sample(r.s+look*.5),curve=Math.max(Math.abs(p.curve),Math.abs(mid.curve),Math.abs(ahead.curve));
     let lane=r.aiLane;
-    for(const h of this.course.hazards){const d=KartMath.delta(h.s,r.s,this.course.length);if(d>0&&d<70){const hx=this.course.hazardX(h,this.time);if(Math.abs(lane-hx)<.35)lane=hx>0?-.57:.57;}}
-    for(const q of this.projectiles){const d=KartMath.delta(q.s,r.s,this.course.length);if(d>0&&d<38&&Math.abs(q.x-lane)<.3)lane=q.x>0?-.65:.65;}
-    if(!r.item){const row=this.course.boxes.find(b=>b.ready<=this.time&&KartMath.delta(b.s,r.s,this.course.length)>0&&KartMath.delta(b.s,r.s,this.course.length)<75);if(row)lane=row.x;}
-    const ratio=r.v/(r.stats.speed*this.cc.speed),maxTurn=(1.62-.42*Math.min(1.4,ratio))*r.stats.grip;
+    // primero lo que conviene (una caja), al final lo que no se negocia (esquivar): antes la caja se decidía
+    // después y anulaba el esquive, y la CPU se metía al cajón por agarrar la caja
+    if(!r.item){const row=C.boxes.find(b=>b.ready<=this.time&&KartMath.delta(b.s,r.s,C.length)>0&&KartMath.delta(b.s,r.s,C.length)<75);if(row)lane=row.x;}
+    // puentes y tramos angostos (o la que viene): cerca del centro; caerse de un puente cuesta un rescate
+    const tight=['bridge','narrow'].includes(p.zone)||['bridge','narrow'].includes(mid.zone)||['bridge','narrow'].includes(ahead.zone);
+    if(tight)lane=clamp(lane,-.42,.42);
+    // obstáculos: dónde va a ESTAR la roca o la barrera cuando llegue (antes se esquivaba la posición
+    // de ahora y las que se mueven se los comían), y con más anticipación
+    let danger=false;
+    for(const h of C.hazards){const d=KartMath.delta(h.s,r.s,C.length);if(d>0&&d<120){const hx=C.hazardX(h,this.time+d/Math.max(25,r.v));if(Math.abs(r.x-hx)<.55)danger=true;if(Math.abs(lane-hx)<.45)lane=hx>0?Math.max(-.66,hx-.66):Math.min(.66,hx+.66);}}
+    for(const q of this.projectiles){const d=KartMath.delta(q.s,r.s,C.length);if(d>0&&d<38&&Math.abs(q.x-lane)<.3)lane=q.x>0?-.65:.65;}
+    const max=r.stats.speed*this.cc.speed,ratio=r.v/max,maxTurn=(1.62-.42*Math.min(1.4,ratio))*r.stats.grip;
     const desiredVelocity=Math.atan2((lane-r.x)*p.width*1.8,Math.max(30,r.v));
     const desiredBody=desiredVelocity+(r.drift?r.driftDir*.2:0);
     const steer=clamp((p.curve*r.v+(desiredBody-r.yaw)*5)/(maxTurn*(r.drift?KartHandling.driftTurn:1)),-1,1);
-    const target=Math.min(r.stats.speed*this.cc.speed*this.cc.ai*r.skill*clamp(1.1-curve*46,.48,1),curve>.001?1.15/curve:999);
+    // velocidad de curva con la física del kart (giro máximo × radio) y margen: la fórmula anterior
+    // frenaba de más en curvas que se pueden tomar a fondo
+    const turnAt=(1.62-.42*Math.min(1.4,.85))*r.stats.grip,corner=curve>1e-4?turnAt*.8/curve:999;
+    const edge=Math.abs(r.x)>.8?clamp(1-(Math.abs(r.x)-.8)*1.2,.7,1):1; // pegada a la orilla: afloja para volver
+    const target=Math.min(max*this.cc.ai*r.skill*this.pace(r)*(p.zone==='wet'?.93:1)*(tight?.94:1)*edge,corner*(tight?.9:1));
     const use=r.item&&this.time>r.aiUse;r.aiUse=use?this.time+2+this.random()*3:r.aiUse;
-    return {steer,gas:r.v<target,brake:r.v>target+8,drift:curve>.0028&&curve<.007&&r.v>55&&Math.abs(r.x)<.72,itemPressed:!!use,rear:false};
+    // sin derrapar con un obstáculo cerca de su línea ni en tramos angostos: el derrape la abre y no esquiva
+    return {steer,gas:r.v<target,brake:r.v>target+8,drift:!danger&&!tight&&curve>.0028&&curve<.012&&r.v>55&&Math.abs(r.x)<.72,itemPressed:!!use,rear:false};
+  }
+  // ritmo de la CPU respecto a las personas: la que va muy adelante afloja un poco y la que va muy atrás
+  // aprieta un poco (±5 %), así la carrera se pelea cerca de quien juega. Sin personas en pista, nada.
+  pace(r) {
+    const humans=this.racers.filter(q=>q.human&&!q.disconnected&&q.finish===null);if(!humans.length||r.human)return 1;
+    const L=this.course.length,lead=Math.max(...humans.map(q=>q.s+q.completedLaps*0)),last=Math.min(...humans.map(q=>q.s));
+    const gap=r.s>lead?r.s-lead:r.s<last?r.s-last:0;
+    return 1-clamp(gap/(L*.12),-1,1)*(this.ccIndex===2?.03:.05);
   }
   drive(r,input,dt) {
     const C=this.course,p=C.sample(r.s),max=r.stats.speed*this.cc.speed,ratio=r.v/max,V=kartVehicle(r.vehicle);

@@ -8,7 +8,7 @@ const {chromium}=require('playwright');const {pathToFileURL}=require('node:url')
       const checks=[],ok=(name,test,details)=>checks.push({name,pass:!!test,details}),fresh=()=>{const R=new KartRace(KART_TRACKS[0],'daniel',1,false,444);R.phase='race';return R;};
       APP.update=()=>{};KartMenu.char=1;KartMenu.track=0;KartMenu.start();const race=APP.kartRace;race.phase='race';render();
       ok('racing renders through WebGL2',Kart3D.renderer?.getContext() instanceof WebGL2RenderingContext);
-      let sprites=0,texturedDrivers=0;for(const d of Kart3D.drivers)d.traverse(o=>{if(o.isSprite)sprites++;if(o.material?.map)texturedDrivers++;});
+      let sprites=0,texturedDrivers=0;for(const d of Kart3D.drivers)d.traverse(o=>{if(o.isSprite)sprites++;if(o.material?.map&&!(o.material.map.image instanceof HTMLCanvasElement))texturedDrivers++;});
       ok('drivers are solid geometry without photo billboards',sprites===0&&texturedDrivers===0);
       const w=race.course.world(race.player.s,race.player.x),t=race.course.sample(race.player.s);ok('chase camera is behind the pilot',(Kart3D.camera.position.x-w.x)*t.tx+(Kart3D.camera.position.z-w.z)*t.tz<0);
       ok('sky follows camera without far-plane holes',Kart3D.skyMesh.position.distanceTo(Kart3D.camera.position)<.001);

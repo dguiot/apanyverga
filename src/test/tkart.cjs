@@ -26,7 +26,7 @@ const path=require('node:path');
     const unit=await page.evaluate(()=>{
       const out=[];const check=(name,pass,details)=>out.push({name,pass:!!pass,details});
       const fresh=(i=0,cc=1)=>{const r=new KartRace(KART_TRACKS[i],'daniel',cc,false,12345);r.phase='race';return r;};
-      for(const info of KART_TRACKS){const C=new KartCourse(info),a=C.sample(0),b=C.sample(C.length);check('closed course '+info.id,Math.hypot(a.x-b.x,a.z-b.z)<.001&&C.length>8000&&C.samples.every(p=>Number.isFinite(p.curve)&&p.width>=9),{km:C.length/1000,maxCurve:Math.max(...C.samples.map(p=>Math.abs(p.curve)))});}
+      for(const info of KART_TRACKS){const C=new KartCourse(info),a=C.sample(0),b=C.sample(C.length);check('closed course '+info.id,Math.hypot(a.x-b.x,a.z-b.z)<.001&&C.length>4000&&C.samples.every(p=>Number.isFinite(p.curve)&&p.width>=9),{km:C.length/1000,maxCurve:Math.max(...C.samples.map(p=>Math.abs(p.curve)))});}
       let R=fresh(),p=R.player;R.racers=[p];p.s=30;p.x=0;
       for(let i=0;i<90;i++)R.update({gas:true,steer:0});check('acceleration responds',p.v>35);
       const v=p.v;for(let i=0;i<40;i++)R.update({brake:true,steer:0});check('brake responds',p.v<v*.25);

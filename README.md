@@ -185,7 +185,8 @@ estructuras bajo los puentes y reflejos suaves en las zonas nocturnas. Los mater
 localmente y no requieren descargas adicionales.
 
 Los doce ítems tienen modelos 3D propios y se ven orbitando el vehículo mientras los llevas. Las cajas
-se leen desde seis caras, los cohetes dejan estela y avisan al objetivo, la piñata describe un arco y
+son cubos de cristal arcoíris con un «?» encendido que gira adentro, estallan en chispas al tomarlas,
+reaparecen con un rebote y se leen desde seis caras, los cohetes dejan estela y avisan al objetivo, la piñata describe un arco y
 el búmeran gira durante el vuelo. Una tortilla puede interceptar un cohete enemigo.
 
 En **Esmash Kart → ONLINE** (U / LB en el garaje), crea una sala o entra con el enlace que te compartan.
@@ -200,9 +201,11 @@ Abrir el menú no detiene una carrera online. Un piloto desconectado pasa tempor
 las llegadas durante una carrera son espectadores hasta la siguiente. Los resultados aparecen cuando
 terminan todos los pilotos conectados. El anfitrión puede volver a la sala sin cortar la voz ni la cámara.
 
-- **Mercado del Sol** — 8.9 km por vuelta; curvas enlazadas, adoquines, puestos y un puente estrecho.
-- **Cañón de Fuego** — 10.1 km; horquillas, desniveles, rocas móviles y puentes sobre el cañón.
-- **Cumbre Neón** — 11.0 km; eses, asfalto mojado, curvas cerradas y luces nocturnas.
+- **Mercado del Sol** — 4.7 km por vuelta (≈55 s a 150 cc); curvas enlazadas, adoquines, puestos y un puente estrecho.
+- **Cañón de Fuego** — 5.3 km (≈60 s); horquillas, desniveles, rocas móviles y puentes sobre el cañón.
+- **Cumbre Neón** — 5.7 km (≈72 s); eses, asfalto mojado, curvas cerradas y luces nocturnas.
+  Las pistas se acortaron a 0.76 de su trazo original (`KART_TRACK_SCALE`): antes una vuelta tardaba
+  de 95 a 145 s y una carrera de tres vueltas pasaba de cinco minutos.
 - Tres vueltas por carrera; carrera individual o copa de las tres pistas con puntuación acumulada.
 - 100, 150 y 200 cc; asistencia de dirección opcional. Velocidad, aceleración y agarre combinan el personaje y el vehículo; también cambian frenada, carga y duración del derrape, recuperación fuera de pista y respuesta al contacto.
 - Dirección y velocidad de los neumáticos independientes: el kart conserva su rumbo si no giras. Derrape con contravolante y tres niveles de mini turbo.
@@ -211,6 +214,13 @@ terminan todos los pilotos conectados. El anfitrión puede volver a la sala sin 
 - Placas de aceleración y salida turbo al acelerar al final del 2.
 - Banda sonora original con batería, bajo, acordes suaves y melodía; motor y neumáticos separados. **M** alterna música y solo efectos; en pausa también sirve X del mando.
 - Minimapa, aviso de curvas, posición, tiempos por vuelta y récord por pista, cilindrada y asistencia, guardado en este navegador.
+- Imagen de cine: brillo (bloom), gradación de color por pista, viñeta y desenfoque radial con turbo;
+  flamas de escape que cambian de azul a naranja y morado con la carga del derrape, chispas, humo de
+  llantas, polvo, sacudida de cámara y líneas de velocidad. Se apaga solo en Xbox, en Calidad «Rápida»,
+  con «Efectos reducidos», en pantalla dividida o si el equipo no alcanza 60 cuadros.
+- Vehículos con carrocería redondeada, pintura con barniz, llantas con dibujo, rines y número de piloto.
+- CPU que frena según el radio real de la curva, esquiva obstáculos según dónde van a estar, no derrapa
+  junto a un peligro y mantiene la carrera cerrada (±5 % de ritmo según la distancia a los humanos).
 - Mundo WebGL2 con iluminación, sombras, materiales, relieve y objetos con profundidad. Simulación a 60 Hz e interpolación; calidad adaptativa y modo Xbox sin sombras dinámicas. Pausa automática al cambiar de ventana en carreras locales; el online continúa.
 
 | Acción | Teclado | Control estándar |

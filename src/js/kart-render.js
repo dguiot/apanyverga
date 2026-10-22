@@ -48,7 +48,8 @@ const KartRender={
     ctx.lineCap='butt';
   },
   time(t){if(t===null||t===undefined)return '—';const m=Math.floor(t/60),s=Math.floor(t%60),ms=Math.floor(t%1*1000);return `${m}:${String(s).padStart(2,'0')}.${String(ms).padStart(3,'0')}`;},
-  panel(x,y,w,h,edge=null){ctx.fillStyle='rgba(6,18,31,.82)';roundRect(ctx,x,y,w,h,15);ctx.fill();ctx.strokeStyle=edge||'rgba(179,228,239,.16)';ctx.lineWidth=edge?2:1;ctx.stroke();},
+  // placas inclinadas como el marcador de las peleas (antes: cajas redondas oscuras genéricas)
+  panel(x,y,w,h,edge=null){slab(x,y,w,h,{skew:Math.min(.22,18/h),edge:edge||'rgba(154,167,184,.35)',lw:edge?2.5:1.5});},
   viewports(n){
     if(n<=1)return [{x:0,y:0,w:W,h:H}];
     if(n===2)return [{x:0,y:0,w:W/2,h:H},{x:W/2,y:0,w:W/2,h:H}];
@@ -81,13 +82,13 @@ const KartRender={
   hud(race){
     const r=race.player,pos=race.order.indexOf(r)+1,info=race.course.info;
     if(race.online){let y=306;for(const p of race.racers.filter(p=>p.human&&p!==r).slice(0,3)){const cam=AV.videoFor(p.peer);if(!cam)continue;this.panel(22,y,140,91);ctx.save();roundRect(ctx,28,y+6,128,66,6);ctx.clip();drawVideoCover(ctx,cam.v,28,y+6,128,66,cam.mirror);ctx.restore();text((p.label||CHARS[p.id].name).slice(0,17),92,y+80,12,PAPER,{body:true,weight:700});y+=98;}}
-    this.panel(22,20,224,99);text(String(pos),57,69,70,'#ffc53d',{weight:700});text('/ 8',99,83,23,'#a8becd',{body:true,weight:700});
-    text('VUELTA',169,43,13,'#a8becd',{body:true,weight:700});text(`${Math.min(3,r.completedLaps+1)} / 3`,169,78,39,'#f5f7ef',{weight:700});
-    this.panel(476,20,328,66);text(info.name,640,41,16,'#d0e5e7',{body:true,weight:600});text(this.time(r.finish===null?race.time:r.finish),640,66,28,'#fff6d8',{weight:700});
+    this.panel(22,20,224,99,pos===1?GOLD:null);sfText(String(pos),62,72,78,pos===1?GOLD:pos<=3?'#ffe08a':PAPER,{strokeW:8});text('/ 8',104,86,23,'#a8becd',{body:true,weight:700});
+    text('VUELTA',172,43,13,'#a8becd',{body:true,weight:700});sfText(`${Math.min(3,r.completedLaps+1)} / 3`,172,79,40,PAPER,{strokeW:6});
+    this.panel(476,20,328,66);text(info.name,640,40,15,'#d0e5e7',{body:true,weight:600});sfText(this.time(r.finish===null?race.time:r.finish),640,66,30,'#fff6d8',{keepCase:true,strokeW:5});
     this.panel(1050,20,206,187);this.map(race.course,1062,28,182,162,race.racers);
     this.panel(1094,222,162,41);text('●  '+r.coins+' / 10',1174,243,22,'#ffdc7c',{weight:700});
     if(r.slip>.1){this.panel(1094,273,162,45);text('REBUFO',1175,285,13,'#8ee7ee',{body:true,weight:700});ctx.fillStyle='#73e4ed';ctx.fillRect(1105,303,140*clamp(r.slip/2,0,1),4);}
-    if(!TouchPad.active){this.panel(1088,588,168,105);text(Math.round(r.v*1.8)+'',1172,627,59,'#fff5d1',{weight:700});text('km/h',1172,671,15,'#b7d0dd',{body:true});}
+    if(!TouchPad.active){const boost=r.turbo>0||r.star>0;this.panel(1088,588,168,105,boost?'#4fd8ff':null);sfText(Math.round(r.v*1.8)+'',1172,630,62,boost?'#bff4ff':'#fff5d1',{strokeW:7});text('km/h',1172,674,15,'#b7d0dd',{body:true});}
     this.panel(22,137,222,90);
     const item=r.item?KART_ITEMS[r.item]:null,rolling=r.roulette>0;
     ctx.fillStyle=item?'#15374c':rolling?'#8ee9ee':'#284356';roundRect(ctx,34,149,60,60,12);ctx.fill();if(item){ctx.drawImage(this.itemIcon(r.item).img,34,149,60,60);}else text(rolling?'?':'—',64,180,29,'#092334',{weight:700});
