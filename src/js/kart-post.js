@@ -18,6 +18,15 @@ const KartPost = {
   // apaga ART.measure cuando un equipo no llega a 60 cuadros: así un celular lento pierde el posproceso antes
   // que la resolución
   enabled() { return typeof KartGL !== 'undefined' && !!KartGL.EffectComposer && ART.hi && !ART.lite; },
+  // limpia la textura antes del brillo: un solo pixel NaN/Inf (relieve en superficies muy rasantes) se
+  // convertía en una mancha blanca enorme al pasar por el bloom
+  cleanShader() {
+    return {
+      uniforms: { tDiffuse: { value: null } },
+      vertexShader: 'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+      fragmentShader: 'uniform sampler2D tDiffuse;varying vec2 vUv;void main(){vec4 c=texture2D(tDiffuse,vUv);vec3 v=c.rgb;bvec3 ok=equal(v,v);v=vec3(ok.x?v.x:0.,ok.y?v.y:0.,ok.z?v.z:0.);gl_FragColor=vec4(clamp(v,0.,48.),1.);}',
+    };
+  },
   gradeShader() {
     return {
       uniforms: { tDiffuse: { value: null }, sat: { value: 1 }, contrast: { value: 1 }, lift: { value: new KartGL.Vector3() }, gain: { value: new KartGL.Vector3(1, 1, 1) },
@@ -51,7 +60,7 @@ void main(){vec2 d=vUv-.5;float r=length(d*vec2(aspect,1.));
     this.bloom = new T.UnrealBloomPass(new T.Vector2(Math.round(w / 2), Math.round(h / 2)), 0.4, 0.6, 0.9);
     this.grade = new T.ShaderPass(this.gradeShader());
     this.output = new T.OutputPass();
-    c.addPass(this.renderPass); c.addPass(this.bloom); c.addPass(this.grade); c.addPass(this.output);
+    c.addPass(this.renderPass); c.addPass(new T.ShaderPass(this.cleanShader())); c.addPass(this.bloom); c.addPass(this.grade); c.addPass(this.output);
     this.w = w; this.h = h; this.scene = scene; this.theme = null;
   },
   dispose() { if (this.composer) { this.composer.renderTarget1.dispose(); this.composer.renderTarget2.dispose(); this.bloom.dispose(); this.composer = null; } },

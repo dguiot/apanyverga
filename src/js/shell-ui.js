@@ -2,7 +2,7 @@
 // One front door, one persistent party, and the same three preparation steps.
 const ShellUI={
  active:false,online:false,game:'fight',step:'room',focus:0,tab:0,playerTab:0,edit:0,paused:false,returnScreen:null,connecting:false,joinWait:0,
- config:{locals:1,cpus:3,cpuLevel:5,target:12,minutes:7},locals:Array.from({length:4},(_,i)=>({ch:i*3%15,vh:i%6,fg:i%5})),ready:false,padPrev:new Map(),
+ config:{locals:1,cpus:3,cpuLevel:5,target:12,minutes:7,fpsLevel:1},locals:Array.from({length:4},(_,i)=>({ch:i*3%15,vh:i%6,fg:i%5})),ready:false,padPrev:new Map(),
  games:[{id:'fight',name:'ESMASH',sub:'PELEAS',color:'#ed9b73',desc:'Golpes, especiales y Smash.'},{id:'kart',name:'ESMASH KART',sub:'CARRERAS',color:'#72d7d1',desc:'Derrapes, objetos y seis vehículos.'},{id:'fps',name:'FPS',sub:'PRIMERA PERSONA',color:'#adc7ef',desc:'Un mundo abierto y cinco armas.'}],
  poster:new Image(),
  screens:new Set(['uiHub','uiRoom','uiSettings','uiPlayers','uiStage']),
@@ -21,7 +21,7 @@ const ShellUI={
  },
  publish(extra={}){
   if(!this.online||Net.role!=='host')return;
-  const ui={v:1,step:this.step,game:this.game,cfg:[this.config.cpus,this.config.cpuLevel,this.config.target,this.config.minutes]};
+  const ui={v:1,step:this.step,game:this.game,cfg:[this.config.cpus,this.config.cpuLevel,this.config.target,this.config.minutes],fl:this.config.fpsLevel};
   Object.assign(Net.lob,{ui,game:this.game,...extra});const json=JSON.stringify(Net.lob);if(json!==Net.lastLobJSON){Net.lastLobJSON=json;Net.set({lob:Net.lob});}
  },
  clearPlay(){
@@ -59,7 +59,7 @@ const ShellUI={
   if(!['room','settings','players','stage'].includes(u.step))return;
   const changed=this.step!==u.step;this.step=u.step;if(changed)this.stayInRoom=false;
   if(changed){if(u.step!=='stage')this.resetReady();this.focus=0;this.playerTab=0;}
-  if(Array.isArray(u.cfg)&&u.cfg.length===4&&u.cfg.every(Number.isFinite)){this.config.cpus=clamp(u.cfg[0]|0,0,3);this.config.cpuLevel=clamp(u.cfg[1]|0,1,AI_MAX);this.config.target=clamp(u.cfg[2]|0,5,30);this.config.minutes=clamp(u.cfg[3]|0,3,15);}
+  if(Array.isArray(u.cfg)&&u.cfg.length===4&&u.cfg.every(Number.isFinite)){this.config.cpus=clamp(u.cfg[0]|0,0,3);this.config.cpuLevel=clamp(u.cfg[1]|0,1,AI_MAX);this.config.target=clamp(u.cfg[2]|0,5,30);this.config.minutes=clamp(u.cfg[3]|0,3,15);}if(Number.isInteger(u.fl))this.config.fpsLevel=clamp(u.fl,0,2);
   if(hp.lob.ru)APP.rules={...APP.rules,...Net.decRules(hp.lob.ru)};
   KartMenu.cc=clamp(hp.lob.cc|0,0,2);KartMenu.assist=!!hp.lob.assist;KartMenu.track=clamp(hp.lob.track|0,0,2);APP.stageSel=clamp(hp.lob.stg|0,0,STAGE_INFO.length-1);
   const screen={room:'uiRoom',settings:'uiSettings',players:'uiPlayers',stage:'uiStage'}[u.step];
@@ -99,7 +99,7 @@ const ShellUI={
   }
   FPSMenu.char=this.locals[0].ch;FPSMenu.gun=this.locals[0].fg;
   if(this.online){Net.lob.players=people.map(p=>({peer:p.peer,id:CHAR_ORDER[p.ch],gun:p.fg,ready:1}));const sync=FPSOnline.sync;FPSOnline.sync=()=>{};try{return FPSOnline.start();}finally{FPSOnline.sync=sync;}}
-  const roster=Array.from({length:4},(_,i)=>({id:CHAR_ORDER[people[i]?.ch??(i*3+2)%15],gun:people[i]?.fg??i%5,bot:i>=people.length}));APP.fps=new FPSMatch(roster);APP.fps.target=this.config.target;APP.fps.duration=this.config.minutes*60;FPSControls.reset();APP.go('fpsGame');FPSControls.lock();
+  const roster=Array.from({length:4},(_,i)=>({id:CHAR_ORDER[people[i]?.ch??(i*3+2)%15],gun:people[i]?.fg??i%5,bot:i>=people.length}));APP.fps=new FPSMatch(roster);APP.fps.target=this.config.target;APP.fps.duration=this.config.minutes*60;APP.fps.level=this.config.fpsLevel;FPSControls.reset();APP.go('fpsGame');FPSControls.lock();
  },
  localDevices(){if(this.config.locals===1)return [APP.firstDev?.startsWith('pad')?APP.firstDev:'kb1'];const pads=padInfo.map(p=>'pad'+p.index);return this.game==='fight'?['kb1',...(pads.length>=this.config.locals-1?pads:['kb2',...pads])]:['kb1',...pads];},
  player(){return this.locals[this.online?0:this.edit];},
@@ -157,7 +157,7 @@ const ShellUI={
   const common=this.online?[]:[rule('Jugadores locales',String(this.config.locals),d=>{this.config.locals=clamp(this.config.locals+d,1,4);if(this.config.locals>1)KartMenu.cup=false;},locked)];
   if(this.game==='fight')return [rule('Tipo de partida',MODE_BY_ID[r.mode].name,d=>r.mode=MODES[(MODES.findIndex(m=>m.id===r.mode)+d+6)%6].id,locked),rule('Vidas / barras',String(r.stocks),d=>r.stocks=clamp(r.stocks+d,1,9),locked),rule('Tiempo límite',r.time+' min',d=>r.time=clamp(r.time+d,1,9),locked),rule('Objetos',['Ninguno','Pocos','Normal','Muchos'][r.items],d=>r.items=(r.items+d+4)%4,locked),rule('Equipos',r.teams||r.mode==='soccer'?'Sí':'No',()=>r.teams=!r.teams,locked),rule('Modo fiesta',r.party?'Sí':'No',()=>r.party=!r.party,locked),...common,rule('Rivales CPU',String(this.config.cpus),d=>this.config.cpus=clamp(this.config.cpus+d,0,3),locked),rule('Nivel CPU',String(this.config.cpuLevel),d=>this.config.cpuLevel=clamp(this.config.cpuLevel+d,1,AI_MAX),locked)];
   if(this.game==='kart')return [rule('Cilindrada',KART_CLASSES[KartMenu.cc].name,d=>KartMenu.cc=(KartMenu.cc+d+3)%3,locked),rule('Ayuda de dirección',KartMenu.assist?'Activada':'Desactivada',()=>KartMenu.assist=!KartMenu.assist,locked),rule('Tipo de carrera',KartMenu.cup?'Copa de tres pistas':'Carrera individual',()=>KartMenu.cup=!KartMenu.cup,locked||this.online||this.config.locals>1),...common,rule('Vueltas / participantes','3 vueltas · 8 pilotos',()=>{},true)];
-  return [rule('Tipo de partida','Combate libre',()=>{},true),rule('Bajas para ganar',String(this.config.target),d=>this.config.target=clamp(this.config.target+d*5,5,30),locked),rule('Tiempo límite',this.config.minutes+' min',d=>this.config.minutes=clamp(this.config.minutes+d,3,15),locked),...common,rule('Rivales CPU','Completan cuatro plazas',()=>{},true)];
+  return [rule('Tipo de partida','Combate libre',()=>{},true),rule('Bajas para ganar',String(this.config.target),d=>this.config.target=clamp(this.config.target+d*5,5,30),locked),rule('Tiempo límite',this.config.minutes+' min',d=>this.config.minutes=clamp(this.config.minutes+d,3,15),locked),...common,rule('Dificultad CPU',FPS_LEVELS[this.config.fpsLevel].name,d=>this.config.fpsLevel=clamp(this.config.fpsLevel+d,0,2),locked)];
  },
  settingsItems(){const rows=this.rows(),perColumn=Math.max(5,Math.ceil(rows.length/2)),pitch=340/perColumn,items=[0,1,2].map(i=>({x:44+i*244,y:146,w:230,h:43,tab:i}));rows.forEach((r,i)=>items.push({x:44+Math.floor(i/perColumn)*610,y:211+(i%perColumn)*pitch,w:580,h:pitch-11,row:i}));if(this.tab===2&&this.game==='fight')items.push({x:834,y:539,w:400,h:44,bind:true});items.push({x:44,y:641,w:220,h:49,back:true});items.push({x:864,y:631,w:370,h:59,next:true});if(this.returnScreen)items.push({x:340,y:641,w:460,h:49,room:true});return items;},
  settingsChange(i,d){const row=this.rows()[i];if(!row||row.locked)return;row.change(d);this.publish({ru:Net.encRules(APP.rules),cc:KartMenu.cc,assist:KartMenu.assist});},

@@ -11,6 +11,8 @@ const FPSGear={
  material(color,kind='polymer'){
   const map=this.texture(kind);return new KartGL.MeshStandardMaterial({color,roughness:kind==='metal'?.34:kind==='skin'?.72:.87,metalness:kind==='metal'?.78:0,bumpMap:map,bumpScale:kind==='fabric'?.0014:kind==='skin'?.00016:.0006});
  },
+ // materiales tácticos compartidos (registrados como comunes: liberar un modelo no los destruye)
+ tactical(color){const key='fps-tactical:'+color;if(!KartModels.materials.has(key))KartModels.materials.set(key,this.material(color,'fabric'));return KartModels.materials.get(key);},
  rounded(){
   if(KartModels.geometry.has('fps-rounded'))return;const T=KartGL,g=new T.BoxGeometry(1,1,1,3,3,3),p=g.attributes.position,n=g.attributes.normal;
   for(let i=0;i<p.count;i++){const v=new T.Vector3(p.getX(i),p.getY(i),p.getZ(i)),inner=v.clone().clampScalar(-.43,.43),normal=v.clone().sub(inner).normalize();v.copy(inner).addScaledVector(normal,.07);p.setXYZ(i,v.x,v.y,v.z);n.setXYZ(i,normal.x,normal.y,normal.z);}KartModels.geometry.set('fps-rounded',g);
@@ -26,6 +28,16 @@ const FPSGear={
   // Stitching and equipment follow the existing costume, with its face/art intact.
   for(const side of [-1,1]){this.link(b,seam,[side*w*.76,-h*.15,0],[side*w*.65,-h*.92,0],.005);for(let j=0;j<7;j++)b.add('sphere',cloth,[side*w*.72,-h*(.2+j*.09),.04],[.006,.002,.004]);}
   b.add('box',leather,[0,-h*.92,0],[w*1.45,.04,w*1.12]);b.add('box',metal,[.02,-h*.92,w*.58],[.042,.036,.01]);b.finish(u.detail);
+  // Equipo táctico sobre el vestuario: portaplacas a media altura (el estampado del pecho sigue a la vista),
+  // portacargadores, radio, tirantes, cinturón de combate con funda y guantes. El color táctico varía por
+  // personaje; cara, cabeza y colores de Esmash no se tocan.
+  this.rounded();const tac=this.tactical(['#6f6550','#545b48','#46494a','#7d725a'][Math.max(0,CHAR_ORDER.indexOf(id))%4]),strap=this.tactical('#2e302c'),pouch=this.tactical(['#655c49','#4b5141','#3d4041','#70664f'][Math.max(0,CHAR_ORDER.indexOf(id))%4]),vb=FPSScenery.batch();
+  vb.add('fps-rounded',tac,[0,-h*.5,-.012],[w*1.92,h*.42,w*1.38]);for(const z of [1,-1])vb.add('fps-rounded',strap,[0,-h*.31,-.012+z*w*.69],[w*1.5,h*.035,.012]);
+  for(let i=-1;i<=1;i++)vb.add('fps-rounded',pouch,[i*w*.36,-h*.6,-.012+w*.74],[w*.32,h*.2,w*.16]);for(let i=-1;i<=1;i++)vb.add('fps-rounded',strap,[i*w*.36,-h*.5,-.012+w*.83],[w*.26,h*.03,.006]);
+  vb.add('fps-rounded',pouch,[-w*.98,-h*.52,-.012],[w*.16,h*.3,w*.36]);vb.add('cylinder',strap,[-w*.98,-h*.28,.04],[.006,h*.3,.006]);
+  for(const x of [-1,1])vb.add('fps-rounded',strap,[x*w*.55,-h*.15,-.012],[w*.16,h*.32,w*1.3],[x*.12,0,0]);
+  vb.add('fps-rounded',strap,[0,-h*.9,-.012],[w*1.5,h*.09,w*1.16]);vb.add('fps-rounded',strap,[w*.86,-h*1.06,.0],[w*.2,h*.3,w*.34],[0,0,.08]);vb.finish(u.detail,true);
+  const glove=this.tactical(FPSHandArt.GLOVE);for(const arm of [u.limbs.armF,u.limbs.armB])arm.userData.end.traverse(o=>{if(o.isMesh)o.material=glove;});
   // Boots retain the canonical shoe palette; add a separate toe cap and laces.
   if(L.shoe&&L.feet!=='claw')for(const leg of [u.legL,u.legR]){const foot=leg.userData.end,fb=FPSScenery.batch();for(let i=0;i<3;i++)fb.add('box',seam,[0,.033,.08+i*.04],[.085,.005,.007]);fb.add('box',leather,[0,-.055,.19],[.145,.02,.1]);fb.finish(foot);}
   const old=m.children.find(c=>c.name===id+':equipped-gun');if(old){m.remove(old);old.traverse(c=>c.geometry?.dispose());}const eye=u.head.position.y*m.scale.y;m.scale.multiplyScalar(FPSBody.head/eye);u.baseHead=u.head.position.y;u.baseShoulder=u.torso.position.y;u.baseNeck=u.neck.position.y;u.weapon=null;u.weaponId=-1;return m;

@@ -6,7 +6,7 @@
 //  con más contraste, viñeta y un ligero desenfoque de orillas al correr. Solo con una vista local y
 //  con ART.hi (se apaga en Xbox, en Calidad «Rápida», con «Efectos reducidos» o si el equipo es lento).
 // ============================================================
-const FPS_GRADE = { sat: 1.0, contrast: 1.13, lift: [0.003, 0.002, -0.004], gain: [1.03, 1.0, 0.97], bloom: 0.24, radius: 0.5, threshold: 0.9, vig: 0.4, exposure: 1.04 };
+const FPS_GRADE = { sat: 1.0, contrast: 1.13, lift: [0.003, 0.002, -0.004], gain: [1.03, 1.0, 0.97], bloom: 0.2, radius: 0.45, threshold: 1.15, vig: 0.4, exposure: 1.04 };
 const FPSPost = {
   composer: null, w: 0, h: 0, blur: 0,
   enabled(views) { return views === 1 && KartPost.enabled(); },
@@ -17,7 +17,7 @@ const FPSPost = {
     this.bloom = new T.UnrealBloomPass(new T.Vector2(Math.round(w / 2), Math.round(h / 2)), G.bloom, G.radius, G.threshold);
     this.grade = new T.ShaderPass(KartPost.gradeShader());
     const u = this.grade.uniforms; u.sat.value = G.sat; u.contrast.value = G.contrast; u.lift.value.set(...G.lift); u.gain.value.set(...G.gain); u.vig.value = G.vig;
-    c.addPass(this.bloom); c.addPass(this.grade); c.addPass(new T.OutputPass());
+    c.addPass(new T.ShaderPass(KartPost.cleanShader())); c.addPass(this.bloom); c.addPass(this.grade); c.addPass(new T.OutputPass());
     this.w = w; this.h = h;
   },
   dispose() { if (this.composer) { this.composer.renderTarget1.dispose(); this.composer.renderTarget2.dispose(); this.bloom.dispose(); this.composer = null; } },

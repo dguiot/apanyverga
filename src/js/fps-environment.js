@@ -29,7 +29,20 @@ const FPSScenery={
   return c.lerp(P.path,1-s(6,9.5,path)).lerp(P.bank,1-s(14,18,river));
  },
  material(kind,color='#ffffff',vertexColors=false){const key=kind+color+vertexColors;if(!this.materials.has(key)){const map=this.texture(kind);this.materials.set(key,(kind==='grass'||kind==='earth'?this.antiTile.bind(this):m=>m)(new KartGL.MeshStandardMaterial({color,map,bumpMap:map,bumpScale:kind==='window'?0:kind==='stone'?.065:kind==='plaster'?.012:.025,roughness:kind==='window'?.19:kind==='steel'?.57:.91,metalness:kind==='window'?.48:kind==='steel'?.55:0,vertexColors})));}return this.materials.get(key);},
+ // auto compacto: carrocería con pintura metálica, cabina con vidrios oscuros, llantas, defensas y faros
+ car(b,batch){
+  const T=KartGL,paint=KartModels.mat(b.color||'#c9c2b4',.55,.32),glass=KartModels.mat('#1b2730',.6,.08),rubber=KartModels.mat('#18191a',0,.9),trim=KartModels.mat('#26292b',.3,.6),chrome=KartModels.mat('#b8bec2',.9,.25),lamp=KartModels.mat('#eef3f2',.2,.2,'#2b2b26'),tail=KartModels.mat('#a3241f',.2,.3,'#3a0806');
+  const ry=b.rot?Math.PI/2:0,c=Math.cos(ry),s=Math.sin(ry),at=(x,y,z)=>[b.x+x*c+z*s,b.y+y,b.z-x*s+z*c],add=(type,m,p,sc,r=[0,0,0])=>batch.add(type,m,at(...p),sc,[r[0],r[1]+ry,r[2]]);
+  FPSGear.rounded();add('fps-rounded',paint,[0,.52,0],[1.82,.66,4.4]);add('fps-rounded',paint,[0,1.1,-.18],[1.6,.56,2.25]);
+  add('box',glass,[0,1.1,.98],[1.46,.48,.05],[-.62,0,0]);add('box',glass,[0,1.1,-1.33],[1.42,.44,.05],[.66,0,0]);for(const x of [-1,1])add('box',glass,[x*.805,1.13,-.18],[.03,.38,1.95]);
+  for(const x of [-1,1])for(const z of [-1.36,1.36]){add('cylinder',rubber,[x*.82,.33,z],[.33,.24,.33],[0,0,Math.PI/2]);add('cylinder',chrome,[x*.95,.33,z],[.2,.02,.2],[0,0,Math.PI/2]);}
+  for(const z of [-1,1])add('fps-rounded',trim,[0,.42,z*2.22],[1.86,.2,.16]);add('box',trim,[0,.66,2.205],[.8,.16,.02]);
+  for(const x of [-1,1]){add('box',lamp,[x*.62,.66,2.2],[.32,.12,.03]);add('box',tail,[x*.66,.7,-2.2],[.3,.13,.03]);add('box',trim,[x*.93,1.02,.55],[.08,.06,.18]);}
+ },
+ // tambo de 200 litros con aros y tapa
+ barrel(b,batch){const paint=KartModels.mat(b.color||'#2f4f7a',.35,.6),rim=KartModels.mat(shade(b.color||'#2f4f7a',-.25),.4,.55);batch.add('cylinder',paint,[b.x,b.y+.44,b.z],[.29,.88,.29]);for(const y of [.29,.59])batch.add('torus',rim,[b.x,b.y+y,b.z],[.295,.295,.295],[Math.PI/2,0,0]);batch.add('cylinder',rim,[b.x,b.y+.885,b.z],[.27,.012,.27]);},
  box(view,b,batch){
+  if(b.type==='car'){this.car(b,batch);return;}if(b.type==='barrel'){this.barrel(b,batch);return;}
   if(['sandbag','gabion','supply'].includes(b.type)){this.cover(b,batch);return;}
   if(b.finish==='window'){batch.add('box',this.material('window','#c6d3d5'),[b.x,b.y+b.h/2,b.z],[b.w,b.h,b.d]);return;}
   const T=KartGL,geo=new T.BoxGeometry(b.w,b.h,b.d),p=geo.attributes.position,n=geo.attributes.normal,uv=geo.attributes.uv;
@@ -69,7 +82,20 @@ const FPSScenery={
   for(const x of [-13,13])for(const z of [-32,32]){const y=FPSWorld.height(x,z);batch.add('branch',dark,[x,y+3.4,z],[.065,6.8,.065]);batch.add('box',dark,[x+.6,y+6.8,z],[1.3,.08,.1]);batch.add('box',KartModels.mat('#fff2c8',0,.5,'#6c5a29'),[x+1.15,y+6.7,z],[.45,.06,.4]);}
   const gate=view.sign('SIERRA  //  DISTRITO 01');gate.scale.set(.9,.8,1);gate.position.set(0,FPSWorld.height(0,-76)+6.7,-74.98);scene.add(gate);
   const tower=FPSWorld.decor.find(b=>b.type==='tower');for(const x of [-3,3])for(const z of [-3,3])batch.add('box',blue,[tower.x+x,tower.y+10.5,tower.z+z],[.12,2.4,.12]);batch.add('box',metal,[tower.x,tower.y+11.7,tower.z],[8,.18,8]);
-  this.vegetation(view,batch);batch.finish(scene);this.river(view);
+  this.vegetation(view,batch);batch.finish(scene);this.river(view);this.grounding(view);
+ },
+ // asentar lo que está en el suelo: sombra de contacto suave bajo coberturas, autos y tambos, y una franja de
+ // mugre en la base de los edificios (dejando libres las puertas). Dos mallas en total.
+ grounding(view){
+  const T=KartGL,tex=(draw)=>{const cv=mkCanvas(128,128),c=cv.getContext('2d');draw(c);const t=new T.CanvasTexture(cv);return t;};
+  const blob=tex(c=>{const g=c.createRadialGradient(64,64,10,64,64,64);g.addColorStop(0,'rgba(0,0,0,.62)');g.addColorStop(.55,'rgba(0,0,0,.35)');g.addColorStop(1,'rgba(0,0,0,0)');c.fillStyle=g;c.fillRect(0,0,128,128);});
+  const grime=tex(c=>{const g=c.createLinearGradient(0,128,0,0);g.addColorStop(0,'rgba(34,29,22,.62)');g.addColorStop(.35,'rgba(40,34,26,.28)');g.addColorStop(1,'rgba(40,34,26,0)');c.fillStyle=g;c.fillRect(0,0,128,128);for(let i=0;i<40;i++){c.fillStyle='rgba(30,25,20,.08)';c.fillRect(Math.random()*128,40+Math.random()*88,1+Math.random()*3,10+Math.random()*40);}});
+  const shadows=[],strips=[];
+  for(const b of FPSWorld.solids){if(!['car','barrel','crate','sandbag','gabion','supply','container'].includes(b.type))continue;const g=new T.PlaneGeometry(b.w+1.3,b.d+1.3);g.rotateX(-Math.PI/2);g.translate(b.x,FPSWorld.height(b.x,b.z)+.03,b.z);shadows.push(g);}
+  for(const b of FPSWorld.decor.filter(b=>b.type==='building'))for(const [axis,side,len]of [['z',1,b.w],['z',-1,b.w],['x',1,b.d],['x',-1,b.d]]){
+   const off=(axis==='z'?b.d:b.w)/2+.245,parts=axis==='z'?[[-len/2,-1.65],[1.65,len/2]]:[[-len/2,len/2]];
+   for(const [u0,u1]of parts){const g=new T.PlaneGeometry(u1-u0,1.15);if(axis==='x')g.rotateY(side*Math.PI/2);else if(side<0)g.rotateY(Math.PI);const u=(u0+u1)/2;g.translate(axis==='z'?b.x+u:b.x+side*off,b.y+.575,axis==='z'?b.z+side*off:b.z+u);strips.push(g);}}
+  for(const [list,map]of [[shadows,blob],[strips,grime]]){if(!list.length)continue;const m=new T.Mesh(T.mergeGeometries(list,false),new T.MeshBasicMaterial({map,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2}));list.forEach(g=>g.dispose());m.renderOrder=1;view.scene.add(m);}
  },
  patch(view,x,z,w,d,kind,color,lift){const T=KartGL,geo=new T.PlaneGeometry(w,d,Math.ceil(w/2),Math.ceil(d/2)),p=geo.attributes.position,uv=geo.attributes.uv;for(let i=0;i<p.count;i++){const px=p.getX(i)+x,pz=-p.getY(i)+z;p.setZ(i,FPSWorld.height(px,pz)+lift);uv.setXY(i,px/3.5,pz/3.5);}geo.computeVertexNormals();const m=view.mesh(geo,this.material(kind,color),[x,0,z]);m.rotation.x=-Math.PI/2;},
  ridgePalette:[['#5f7a4e','#8d8b78'],['#71887a','#a3a497'],['#93a8b2','#c4d0d4']],

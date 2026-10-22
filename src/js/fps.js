@@ -17,6 +17,15 @@ const FPSBody={
  eyeHeight(p){return this.eye-this.drop*this.stance(p);},
  hitboxes(p){const drop=this.drop*this.stance(p);return [{y:p.y+.08,h:1.35-drop,w:.65,head:false},{y:p.y+1.43-drop,h:.48,w:.48,head:true}];},
 };
+// Dificultad de la CPU: reacción, error inicial de puntería, cuánto tarda en corregirlo, giro máximo por
+// cuadro, cuánto se le atrasa la mira a un blanco que se mueve (lag) y cuánto compensa el retroceso (comp),
+// qué tanto apunta a la cabeza, cuánto se cubre y usa granadas, y cuánto recuerda dónde te vio.
+// Normal ya pelea en serio; Experto castiga cualquier error.
+const FPS_LEVELS=[
+ {name:'Normal',react:.45,spread:.12,settle:.8,turn:.045,lag:.07,comp:0,head:0,cover:.4,nade:.4,memory:4},
+ {name:'Difícil',react:.3,spread:.08,settle:.5,turn:.062,lag:.04,comp:.5,head:.25,cover:.85,nade:.8,memory:8},
+ {name:'Experto',react:.2,spread:.05,settle:.32,turn:.085,lag:.015,comp:.9,head:.6,cover:1,nade:1,memory:12},
+];
 const FPSWorld={
  limit:246,bodyHeight:1.9,solids:[],decor:[],pickups:[],spawns:[[-10,12],[36,-28],[-42,-35],[14,63]],
  rawHeight(x,z){const edge=Math.max(0,(Math.max(Math.abs(x),Math.abs(z))-95)/130);return Math.sin(x*.017)*1.6+Math.cos(z*.019)*1.5+Math.sin((x+z)*.027)*.6+edge*edge*(18+Math.sin(x*.03+z*.02)*6);},
@@ -46,6 +55,10 @@ const FPSWorld={
   block(tx,tz,7.1,7.1,.35,'roof',base+8.4);for(const z of [-3.4,3.4])block(tx,tz+z,7,.16,1.3,'steel',base+8.75);
   for(let j=0;j<29;j++)block(tx-5,tz-12+j*.6,2.6,.68,(j+1)*8.75/29,'stair',base);block(tx-3.5,tz+3.9,5,2,.35,'roof',base+8.4);
   this.decor.push({type:'tower',x:tx,z:tz,y:base});
+  // Autos estacionados y tambos a la orilla de los caminos: cobertura real (frenan balas), lejos de los puntos de aparición
+  const free=(x,z,w,d)=>!this.spawns.some(p=>Math.hypot(x-p[0],z-p[1])<10)&&!this.solids.some(b=>Math.abs(x-b.x)<b.w/2+w/2+1.2&&Math.abs(z-b.z)<b.d/2+d/2+1.2);
+  for(const [x,z,rot,color]of [[5.6,-31,0,'#d9d6cf'],[-5.6,40,0,'#34465f'],[5.8,72,0,'#7a2b2b'],[-31,29.7,1,'#b8b2a3'],[-72,20.6,1,'#55636a'],[48,-8,1,'#c9c2b4']]){const w=rot?4.4:1.85,d=rot?1.85:4.4;if(!free(x,z,w,d))continue;const q=block(x,z,w,d,1.45,'car');q.color=color;q.rot=rot;}
+  for(const [cx,cz]of [[29,33],[-27,-49],[61,57]])for(const [ox,oz]of [[0,0],[.7,.15],[.25,.68]]){const x=cx+ox,z=cz+oz;if(free(x,z,.6,.6)){const q=block(x,z,.62,.62,.9,'barrel');q.color=['#2f4f7a','#7a3f22','#4f5a3a'][Math.abs(Math.round(cx))%3];}}
   // Tree trunks are cover too. Foliage remains soft, translucent dressing.
   const rng=srand(6192);for(let i=0;i<340;i++){
    const x=(rng()-.5)*530,z=(rng()-.5)*530,near=Math.abs(x)<100&&Math.abs(z)<108;
@@ -142,58 +155,89 @@ window.addEventListener('blur',()=>{if(APP.screen==='fpsGame'){APP.fps.paused=tr
 
 class FPSMatch{
  constructor(roster,online=false,seed=7331){
-  this.online=online;this.rng=new SimRNG(seed);this.time=0;this.tick=0;this.paused=false;this.phase='play';this.target=12;this.duration=420;this.effects=[];this.projectiles=[];this.grenades=[];this.grenadeSeq=0;this.effectSeq=0;this.feed=[];this.pickups=FPSWorld.pickups.map(p=>({...p}));
+  this.online=online;this.level=1;this.rng=new SimRNG(seed);this.time=0;this.tick=0;this.paused=false;this.phase='play';this.target=12;this.duration=420;this.effects=[];this.projectiles=[];this.grenades=[];this.grenadeSeq=0;this.effectSeq=0;this.feed=[];this.pickups=FPSWorld.pickups.map(p=>({...p}));
   this.players=roster.map((q,i)=>{const [x,z]=FPSWorld.spawns[i%4];return {...q,index:i,x,y:FPSWorld.height(x,z),z,vx:0,vz:0,vy:0,yaw:Math.atan2(-x,-z),pitch:0,grounded:true,gun:q.gun||0,ammo:FPS_GUNS.map(g=>g.mag),reserve:FPS_GUNS.map(g=>g.reserve),health:100,shield:50,kills:0,deaths:0,dead:0,invuln:2,cool:0,reloading:0,sprint:false,ads:0,recoil:0,shot:0,hit:0,hurt:0,bob:0,stance:0,grenades:1,throws:0,throwTimer:0,lastDamage:-999,regenerating:false,coyote:.1,jumpBuffer:0,stepAt:0};});
   this.player=this.players[0];this.localCount=online?1:Math.max(1,this.players.filter(p=>!p.bot).length);this.devices=[null,...padInfo.slice(0,3).map(p=>p.index)];this.cameraAlpha=0;
  }
  sound(type,p,origin=p){if(type==='blast'){const listeners=this.online?[this.player]:this.players.filter(q=>!q.bot),distance=Math.min(...listeners.map(q=>Math.hypot(q.x-origin.x,q.y-origin.y,q.z-origin.z)));if(distance<85){FPSAudio.play(type,p,.8*clamp(1-distance/95,.08,1));if(distance<9)Rumble.play('local',.25,.3,120);}return;}if(p===this.player||!this.online&&!p.bot){FPSAudio.play(type,p);Rumble.play('local',type==='shot'?.1:.22,.3,type==='shot'?55:100);}else if(type==='shot'){const distance=Math.hypot(p.x-this.player.x,p.z-this.player.z);if(distance<95)FPSAudio.play(type,p,.55*clamp(1-distance/110,.08,1));}}
- // CPU con criterio: apunta a quien VE (no al más cercano a través de una pared), tarda en reaccionar, su
- // puntería empieza con error y se corrige mientras te sigue, dispara en ráfagas, pelea moviéndose de lado,
- // rodea obstáculos con antenas, se destraba y se retira a recuperar vida. Sin Math.random: hash1 por bot y
- // por tiempo, así la simulación del anfitrión sigue siendo determinista.
+ // CPU con criterio: apunta a quien VE (no al más cercano a través de una pared) y recuerda dónde lo vio,
+ // tarda en reaccionar, su puntería empieza con error y se corrige mientras te sigue, dispara en ráfagas,
+ // pelea moviéndose de lado, rodea obstáculos, se cubre detrás de algo que le tape tu línea de tiro para
+ // recargar o curarse, y lanza granadas con el arco calculado a donde te escondiste. La dificultad
+ // (FPS_LEVELS) cambia reacción, error, giro, a qué apunta y cuánto usa cobertura y granadas. Sin
+ // Math.random: hash1 por bot y por tiempo, así la simulación del anfitrión sigue siendo determinista.
  inputAI(p){
-  const t=this.time,ai=p.ai||(p.ai={target:-1,seen:-1,check:0,los:false,err:0,errP:0,side:p.index%2?1:-1,sideUntil:0,burst:0,rest:0,nav:p.yaw,navAt:0,stuckAt:0,sx:p.x,sz:p.z,unstick:0,life:-1});
+  const t=this.time,L=FPS_LEVELS[this.level??1]||FPS_LEVELS[1],ai=p.ai||(p.ai={target:-1,seen:-1,check:0,los:false,err:0,errP:0,head:false,side:p.index%2?1:-1,sideUntil:0,burst:0,rest:0,nav:p.yaw,navAt:0,stuckAt:0,sx:p.x,sz:p.z,unstick:0,life:-1,lx:p.x,lz:p.z,lastAt:-99,cover:null,coverAt:0,nadeAt:0});
   const r=k=>hash1(p.index*97+k,Math.floor(t*3)+k*13),g=FPS_GUNS[p.gun],eye={x:p.x,y:p.y+FPSBody.eyeHeight(p),z:p.z};
-  if(ai.life!==p.deaths){ai.life=p.deaths;ai.target=-1;ai.seen=-1;ai.los=false;}
+  if(ai.life!==p.deaths){ai.life=p.deaths;ai.target=-1;ai.seen=-1;ai.los=false;ai.cover=null;ai.lastAt=-99;}
   const sees=q=>{const dx=q.x-p.x,dz=q.z-p.z,dy=q.y+FPSBody.eyeHeight(q)-.25-eye.y,d=Math.hypot(dx,dy,dz);return d<1||FPSWorld.wallDistance(eye,{x:dx/d,y:dy/d,z:dz/d},d)>=d-.5;};
   if(t>=ai.check){ai.check=t+.3;let best=null,score=Infinity,vis=false;
    for(const q of this.players){if(q===p||q.dead)continue;const d=Math.hypot(q.x-p.x,q.z-p.z),v=d<FPS_GUNS[4].range&&sees(q),s=d*(v?1:2.4)*(q.index===ai.target?.8:1);if(s<score){score=s;best=q;vis=v;}}
    const id=best?best.index:-1;
-   if(id!==ai.target||vis&&!ai.los){ai.target=id;ai.seen=vis?t:-1;ai.err=(r(1)-.5)*2*(.06+.05*r(2));ai.errP=(r(3)-.5)*.05;}
+   if(id!==ai.target||vis&&!ai.los){ai.target=id;ai.seen=vis?t:-1;ai.err=(r(1)-.5)*2*L.spread*(.6+.4*r(2));ai.errP=(r(3)-.5)*L.spread*.6;ai.head=r(12)<L.head;}
    if(!vis)ai.seen=-1;ai.los=vis;
   }
   const target=this.players[ai.target];if(!target||target.dead)return {};
+  if(ai.los){ai.lx=target.x;ai.lz=target.z;ai.lastAt=t;}
+  // sin verlo va a donde lo vio por última vez; si pasa mucho, lo busca (sabe más o menos dónde anda)
+  const remember=t-ai.lastAt<L.memory,goal=ai.los||!remember?target:{x:ai.lx,z:ai.lz,y:target.y};
   const dx=target.x-p.x,dz=target.z-p.z,distance=Math.max(.01,Math.hypot(dx,dz)),flight=distance/g.velocity,bearing=Math.atan2(dx,-dz);
-  const react=.3+.25*hash1(p.index,7),onTarget=ai.los&&ai.seen>=0?t-ai.seen:0,settle=Math.exp(-onTarget/.55);
-  // dónde queda bloqueado el paso: antenas a la altura de la rodilla
+  const react=L.react*(.8+.4*hash1(p.index,7)),onTarget=ai.los&&ai.seen>=0?t-ai.seen:0,settle=Math.exp(-onTarget/L.settle);
   const clear=(a,len)=>FPSWorld.wallDistance({x:p.x,y:p.y+.7,z:p.z},{x:Math.sin(a),y:0,z:-Math.cos(a)},len);
-  let look=bearing,x=0,z=0,sprint=false,crouch=false,jump=false;
-  if(ai.los){
+  // cobertura: herido, recargando o sin balas, busca algo que le tape la línea de tiro y se agacha ahí
+  const hurt=p.health<45||p.reloading>0||p.ammo[p.gun]===0;
+  if(ai.cover&&(p.health>=80&&!p.reloading&&p.ammo[p.gun]>g.mag*.5||t-ai.coverAt>9))ai.cover=null;
+  if(!ai.cover&&hurt&&ai.los&&t>=ai.coverAt&&r(13)<L.cover){ai.coverAt=t+1.5;ai.cover=this.findCover(p,target);if(ai.cover)ai.coverAt=t;}
+  let look=bearing,x=0,z=0,sprint=false,crouch=false,jump=false,moveTo=null;
+  if(ai.cover){const cd=Math.hypot(ai.cover.x-p.x,ai.cover.z-p.z);if(cd>.9)moveTo=ai.cover;else crouch=true;}
+  if(ai.los&&!moveTo){
    // pelea: mantiene la distancia de su arma y se mueve de lado; cambia de lado o si choca
    const preferred=[22,24,38,11,70][p.gun],low=p.health<35;
-   if(t>=ai.sideUntil||clear(p.yaw+ai.side*Math.PI/2,1.6)<1.4){ai.side*=-1;ai.sideUntil=t+.7+r(5)*1.1;}
-   x=ai.side*(.55+.4*r(6));z=low?-.75:distance>preferred*1.25?.8:distance<preferred*.6?-.6:0;
-   crouch=p.gun===4&&distance>40&&!low&&r(8)>.35;if(crouch)x=0;
-   look=Math.atan2(dx+target.vx*flight,-dz-target.vz*flight)+ai.err*settle;
+   if(t>=ai.sideUntil||clear(p.yaw+ai.side*Math.PI/2,1.6)<1.4){ai.side*=-1;ai.sideUntil=t+.6+r(5)*1.1;}
+   if(!crouch){x=ai.side*(.55+.4*r(6));z=low?-.75:distance>preferred*1.25?.8:distance<preferred*.6?-.6:0;}
+   if(p.gun===4&&!low&&p.cool<=0&&!p.reloading){x=0;z=0;}
+   if(p.gun===4&&distance>40&&!low&&r(8)>.35){crouch=true;x=0;}
+   if(L.head>.5&&p.grounded&&r(14)>.985)jump=true;
+   look=Math.atan2(dx+target.vx*(flight-L.lag),-dz-target.vz*(flight-L.lag))+ai.err*settle;
   }else{
-   // sin línea de vista: rodea lo que estorba hacia donde está el rival (cada .35 s elige rumbo)
-   const way=FPSWorld.route(p,target),toward=Math.atan2(way.x-p.x,-(way.z-p.z));
+   // sin línea de vista (o yendo a cubrirse): rodea lo que estorba; cada .35 s elige rumbo
+   const dest=moveTo||goal,way=FPSWorld.route(p,dest),toward=Math.atan2(way.x-p.x,-(way.z-p.z));
    if(t>=ai.navAt){ai.navAt=t+.35;let best=toward,top=-Infinity;
     for(const o of [0,.45,-.45,.9,-.9,1.35,-1.35,1.8,-1.8]){const a=toward+o,s=Math.min(clear(a,7),7)/7+.55*Math.cos(o)+(Math.abs(Math.atan2(Math.sin(a-ai.nav),Math.cos(a-ai.nav)))<.5?.15:0);if(s>top){top=s;best=a;}}
     ai.nav=best;}
    // atorado: si en 1 s no avanzó medio metro, prueba otro rumbo un momento
-   if(t>=ai.stuckAt){if(Math.hypot(p.x-ai.sx,p.z-ai.sz)<.5)ai.unstick=t+.8;ai.stuckAt=t+1;ai.sx=p.x;ai.sz=p.z;}
-   const heading=ai.nav+(t<ai.unstick?(p.index%2?1.6:-1.6):0),rel=heading-p.yaw;look=heading;
-   x=Math.sin(rel);z=Math.cos(rel);sprint=distance>22&&z>.7;jump=p.grounded&&clear(heading,1.2)<1&&t<ai.unstick;
+   if(t>=ai.stuckAt){if(Math.hypot(p.x-ai.sx,p.z-ai.sz)<.5&&!crouch)ai.unstick=t+.8;ai.stuckAt=t+1;ai.sx=p.x;ai.sz=p.z;}
+   const heading=ai.nav+(t<ai.unstick?(p.index%2?1.6:-1.6):0),rel=heading-p.yaw;look=moveTo&&ai.los?bearing:heading;
+   const far=Math.hypot(dest.x-p.x,dest.z-p.z);if(far>.6&&!crouch){x=Math.sin(heading-p.yaw);z=Math.cos(heading-p.yaw);}sprint=!moveTo&&far>22&&Math.cos(rel)>.7;jump=p.grounded&&clear(heading,1.2)<1&&t<ai.unstick;
+   if(!ai.los&&!moveTo&&remember&&far<3)look=bearing;
   }
-  const delta=Math.atan2(Math.sin(look-p.yaw),Math.cos(look-p.yaw)),aimPitch=Math.atan2(eye.y-target.y-FPSBody.eyeHeight(target)+.22,distance)+ai.errP*settle;
+  const delta=Math.atan2(Math.sin(look-p.yaw),Math.cos(look-p.yaw)),aimY=target.y+FPSBody.eyeHeight(target)-(ai.head?-.02:.35),aimPitch=Math.atan2(eye.y-aimY,distance)+ai.errP*settle+p.recoil*.35*L.comp;
+  // granada con arco calculado hacia donde lo vio esconderse (no a ciegas a través del mapa)
+  let grenade=false,ly=clamp(aimPitch-p.pitch,-.025,.025);
+  const nd=Math.hypot(ai.lx-p.x,ai.lz-p.z);
+  if(p.grenades>0&&!ai.los&&t-ai.lastAt<4&&nd>8&&nd<28&&t>=ai.nadeAt&&!p.throwTimer){
+   if(!ai.nade){ai.nadeAt=t+5;if(r(15)<L.nade*.55)ai.nade={pitch:this.lobPitch(nd,FPSWorld.height(ai.lx,ai.lz)-(p.y+FPSBody.eyeHeight(p)-.12)),until:t+1.2};}
+  }
+  if(ai.nade){if(t>ai.nade.until)ai.nade=null;else{look=Math.atan2(ai.lx-p.x,-(ai.lz-p.z));const nd2=Math.atan2(Math.sin(look-p.yaw),Math.cos(look-p.yaw));ly=clamp(ai.nade.pitch-p.pitch,-.04,.04);if(Math.abs(nd2)<.06&&Math.abs(ai.nade.pitch-p.pitch)<.05){grenade=true;ai.nade=null;}return {x:0,z:0,lx:clamp(nd2*.4,-L.turn,L.turn),ly,grenade,crouch:false};}}
   // ráfagas: automáticas disparan .35-.8 s y descansan .2-.45 s; el francotirador espera a asentar la mira
   if(t>=ai.rest&&t>=ai.burst){ai.burst=t+.35+.45*r(9);ai.rest=ai.burst+.2+.25*r(10);}
-  const auto=p.gun===1||p.gun===2,ready=onTarget>react+(p.gun===4?.45:0),aligned=Math.abs(delta)<Math.max(.025,.7/distance);
+  const auto=p.gun===1||p.gun===2,ready=onTarget>react+(p.gun===4?.45*L.settle/.45:0),aligned=Math.abs(delta)<Math.max(.025,.7/distance);
   const fire=ai.los&&ready&&aligned&&distance<g.range*.85&&(!auto||t<ai.burst)&&(p.gun!==4||Math.hypot(p.vx,p.vz)<2);
-  return {x,z,lx:clamp(delta*.35,-.05,.05),ly:clamp(aimPitch-p.pitch,-.025,.025),aim:ai.los&&distance>12&&p.gun!==3,fire,crouch,sprint,jump,
-   grenade:p.grenades>0&&ai.los&&distance>17&&distance<30&&Math.abs(delta)<.15&&r(11)>.985,reload:p.ammo[p.gun]===0||!ai.los&&p.ammo[p.gun]<g.mag*.4&&p.reserve[p.gun]>0};
+  return {x,z,lx:clamp(delta*.35,-L.turn,L.turn),ly,aim:ai.los&&distance>12&&p.gun!==3,fire,crouch,sprint,jump,
+   grenade:grenade||p.grenades>0&&ai.los&&L.nade>.5&&distance>17&&distance<30&&Math.abs(delta)<.15&&r(11)>.985,reload:p.ammo[p.gun]===0||(!ai.los||!!ai.cover)&&p.ammo[p.gun]<g.mag*.4&&p.reserve[p.gun]>0};
  }
+ // punto detrás de una cobertura (lado contrario al rival) que de verdad le tape la línea de tiro
+ findCover(p,target){
+  const te={x:target.x,y:target.y+FPSBody.eyeHeight(target),z:target.z};let best=null,score=Infinity;
+  for(const b of FPSWorld.solids){if(b.h<1||b.building||['roof','bridge','stair','trunk'].includes(b.type))continue;const d=Math.hypot(b.x-p.x,b.z-p.z);if(d>18)continue;
+   const ax=b.x-target.x,az=b.z-target.z,al=Math.hypot(ax,az)||1,reach=Math.max(b.w,b.d)/2+.8,c={x:b.x+ax/al*reach,z:b.z+az/al*reach};c.y=FPSWorld.height(c.x,c.z);
+   if(Math.abs(c.y-p.y)>1.2||!FPSWorld.fits({x:c.x,y:c.y,z:c.z},FPSBody.height))continue;
+   const dx=c.x-te.x,dy=c.y+.9-te.y,dz=c.z-te.z,dl=Math.hypot(dx,dy,dz);if(FPSWorld.wallDistance(te,{x:dx/dl,y:dy/dl,z:dz/dl},dl)>=dl-.4)continue;
+   const s=Math.hypot(c.x-p.x,c.z-p.z);if(s<score){score=s;best=c;}}
+  return best;
+ }
+ // inclinación para que la granada (17 m/s, +4.5 m/s hacia arriba) caiga a cierta distancia y altura
+ lobPitch(d,dy){let best=0,err=Infinity;for(let pitch=-.9;pitch<=.5;pitch+=.02){const h=Math.cos(pitch)*17,vy=4.5-Math.sin(pitch)*17,time=d/h,y=vy*time-4.905*time*time,e=Math.abs(y-dy);if(e<err){err=e;best=pitch;}}return best;}
  move(p,I,dt){
   if(p.dead)return;
   const look=I.absoluteLook?1:this.lookScale(p);p.yaw+=clamp(I.lx||0,-.3,.3)*look;p.yaw=Math.atan2(Math.sin(p.yaw),Math.cos(p.yaw));p.pitch=clamp(p.pitch+clamp(I.ly||0,-.3,.3)*look,-1.4,1.4);

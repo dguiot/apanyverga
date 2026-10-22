@@ -3,11 +3,14 @@ const FPSSupplyArt={
  looseWeapon(id){
   const T=KartGL,model=FPSGear.weapon(id,'daniel',true),parts=[];model.updateMatrixWorld(true);model.traverse(o=>{if(!o.isMesh||!o.visible||o.material.transparent)return;const geo=(o.geometry.index?o.geometry.toNonIndexed():o.geometry.clone()).applyMatrix4(o.matrixWorld),color=o.material.color,c=[];for(let i=0;i<geo.attributes.position.count;i++)c.push(color.r,color.g,color.b);geo.setAttribute('color',new T.Float32BufferAttribute(c,3));parts.push(geo);});const geometry=T.mergeGeometries(parts,false);parts.forEach(g=>g.dispose());FPSView.release(model);const mesh=new T.Mesh(geometry,new T.MeshStandardMaterial({vertexColors:true,roughness:.65,metalness:.42}));mesh.castShadow=mesh.receiveShadow=true;return mesh;
  },
- grenade(){
-  const T=KartGL,g=new T.Group(),b=FPSScenery.batch(),metal=KartModels.mat('#67745a',.5,.62),dark=KartModels.mat('#233029',.3,.58),pin=KartModels.mat('#aeb3a1',.75,.3);
-  b.add('sphere',metal,[0,0,0],[.085,.115,.085]);for(let i=0;i<4;i++)b.add('torus',dark,[0,-.06+i*.04,0],[.078,.078,.078],[Math.PI/2,0,0]);
-  for(let i=0;i<8;i++){const a=i*TAU/8;b.add('box',dark,[Math.cos(a)*.081,0,Math.sin(a)*.081],[.006,.15,.006],[0,-a,0]);}
-  b.add('cylinder',dark,[0,.12,0],[.034,.055,.034]);b.add('box',pin,[.015,.14,.005],[.028,.018,.108],[.12,0,0]);b.add('box',pin,[.015,.062,.056],[.027,.16,.012],[.16,0,0]);b.add('torus',pin,[-.05,.14,0],[.037,.037,.037],[0,Math.PI/2,0]);b.finish(g);return g;
+ // granada de fragmentación tipo M67: 6.4 cm, verde olivo, espoleta, palanca (cuchara) y anillo del seguro
+ grenade(scale=1){
+  FPSWeaponArt.shapes();const T=KartGL,g=new T.Group(),b=FPSScenery.batch(),M=FPSWeaponArt.mats(),body=M.od;
+  b.add('sphere',body,[0,0,0],[.032,.035,.032]);b.add('torus',M.dark,[0,-.006,0],[.0315,.0315,.0315],[Math.PI/2,0,0]);
+  b.add('gun-cyly',M.steel,[0,.039,0],[.011,.016,.011]);b.add('gun-cyly',M.steel,[0,.049,0],[.008,.008,.008]);
+  b.add('fps-rounded',M.steel,[.016,.032,0],[.03,.004,.012],[0,0,-.35]);b.add('fps-rounded',M.steel,[.03,.008,0],[.004,.05,.011],[0,0,.08]);
+  b.add('torus',M.steel,[-.016,.046,0],[.011,.011,.011],[0,Math.PI/2,0]);b.add('gun-cylx',M.steel,[-.006,.046,0],[.002,.002,.012]);
+  b.finish(g);g.scale.setScalar(scale);return g;
  },
  pickup(q){
   const T=KartGL,root=new T.Group(),b=KartModels.batch(),color=q.type==='ammo'?'#d6b06a':q.type==='weapon'?'#b9dbe1':q.type==='grenade'?'#e4b968':'#83c9e1';root.userData.type=q.type;
@@ -17,11 +20,11 @@ const FPSSupplyArt={
    b.add('box','#405447',[0,.17,0],[.62,.34,.38],null,.4,.65);b.add('box','#68725c',[0,.35,0],[.66,.035,.4],null,.4,.6);b.add('torus','#24352c',[0,.4,0],[.14,.07,.07]);
    for(const x of [-.22,.22])b.add('box','#b0aa8c',[x,.18,.2],[.065,.16,.016],null,.6,.45);
    for(let i=0;i<6;i++){b.add('cylinder','#b79a56',[(i-2.5)*.073,.075,.31],[.017,.145,.017],[Math.PI/2,0,0],.72,.36);b.add('cone','#bfc4b6',[(i-2.5)*.073,.075,.405],[.016,.045,.016],[Math.PI/2,0,0],.7,.34);}
-  }else if(q.type==='grenade'){for(const x of [-.16,.16]){const grenade=this.grenade();grenade.position.set(x,.2,0);root.add(grenade);}}
+  }else if(q.type==='grenade'){for(const x of [-.16,.16]){const grenade=this.grenade(2.2);grenade.position.set(x,.2,0);root.add(grenade);}}
   else{b.add('box','#e3e8dc',[0,.23,0],[.44,.46,.3],null,.2,.6);b.add('box','#438897',[0,.24,.157],[.27,.075,.012]);b.add('box','#438897',[0,.24,.16],[.075,.27,.012]);b.add('box','#a8c6c5',[0,.48,0],[.22,.04,.18]);}
   b.finish(root,false);root.position.set(q.x,q.y??FPSWorld.height(q.x,q.z),q.z);return root;
  },
- build(view){view.grenadeModels=Array.from({length:8},()=>{const g=this.grenade();g.visible=false;view.scene.add(g);return g;});},
+ build(view){view.grenadeModels=Array.from({length:8},()=>{const g=this.grenade(1.4);g.visible=false;view.scene.add(g);return g;});},
  update(view,m){
   const viewers=m.online?[m.player]:m.players.filter(p=>!p.bot);m.pickups.forEach((q,i)=>{const mesh=view.pickupModels[i];mesh.visible=q.ready<=m.time&&viewers.some(p=>Math.hypot(p.x-q.x,p.z-q.z)<65);});
   view.grenadeModels.forEach((mesh,i)=>{const g=m.grenades[i];mesh.visible=!!g;if(!g)return;const a=m.online&&Net.role==='guest'?clamp((performance.now()-FPSOnline.lastAt)/50,0,1):GameFeel.alpha,prev=g.prev||g.pos;mesh.position.set(lerp(prev.x,g.pos.x,a),lerp(prev.y,g.pos.y,a),lerp(prev.z,g.pos.z,a));mesh.rotation.set(m.time*4,g.seq+m.time*2,m.time*3);});

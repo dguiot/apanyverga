@@ -15,9 +15,21 @@ const {chromium}=require('playwright'),path=require('node:path'),{pathToFileURL}
   m=new FPSMatch([{id:'daniel',gun:2,bot:true},{id:'torito',gun:2,bot:true}]);[a,q]=m.players;
   Object.assign(a,{x:0,z:0,y:50,yaw:0,pitch:0});Object.assign(q,{x:0,z:-20,y:50,vx:0,vz:0});let first=-1;
   for(let i=0;i<120;i++){const I=m.inputAI(a);if(I.fire&&first<0)first=m.time;a.yaw+=(I.lx||0)*m.lookScale(a);m.time+=1/60;}
-  ok('bots react before their first shot instead of firing on the first frame',first>=.3&&first<1.2,{first});
+  ok('bots react before their first shot instead of firing on the first frame',first>=FPS_LEVELS[m.level].react*.8-1e-6&&first<1.2,{first,level:m.level});
   const aimErrors=[0,1,2,3].map(i=>{const mm=new FPSMatch([{id:'daniel',gun:2,bot:true},{id:'torito',gun:2,bot:true}].map((r,k)=>({...r,id:CHAR_ORDER[(i+k)%15]})));mm.time=i*.7;const [x]=mm.players;Object.assign(x,{x:0,z:0,y:50,yaw:0});Object.assign(mm.players[1],{x:0,z:-20,y:50});mm.inputAI(x);return Math.abs(x.ai.err);});
   ok('initial bot aim carries a bounded error that differs between bots',aimErrors.every(e=>e<.12)&&new Set(aimErrors.map(e=>e.toFixed(4))).size>1,{aimErrors});
+  // Difficulty: against a target strafing like a person, harder levels react sooner and land more hits.
+  const bench=level=>{let hits=0,shots=0;for(let seed=0;seed<4;seed++){const mm=new FPSMatch([{id:'daniel',gun:2,bot:false},{id:'torito',gun:2,bot:true}],false,700+seed);mm.level=level;const [h,c]=mm.players;Object.assign(h,{x:0,z:-25,y:50,invuln:0,health:1e6,shield:0});Object.assign(c,{x:0,z:0,y:50,yaw:(seed-1.5)*.3});FPSWorld.solids.push({x:0,z:0,y:49.7,w:400,d:400,h:.3,type:'roof'});
+   for(let i=0;i<60*6;i++){const before=h.health;mm.update([{x:Math.sin(i/60*2.6+seed)>0?1:-1,z:0}]);if(h.health<before)hits++;}FPSWorld.solids.pop();shots+=c.shot;}return hits/Math.max(1,shots);};
+  const acc=[0,1,2].map(bench);ok('CPU difficulty is a real ladder against a strafing player',acc[0]<acc[1]&&acc[1]<acc[2]&&acc[1]>.2&&acc[2]>.4,{acc});
+  ok('Difícil is the default CPU level',new FPSMatch([{id:'daniel',gun:0}]).level===1&&ShellUI.config.fpsLevel===1&&FPS_LEVELS.length===3);
+  // A hurt bot in sight of its target moves to a spot whose line of fire is blocked.
+  m=new FPSMatch([{id:'daniel',gun:2,bot:true},{id:'torito',gun:2,bot:true}]);[a,q]=m.players;const wall=FPSWorld.solids.find(b=>b.type==='sandbag');
+  Object.assign(a,{x:wall.x+1.5,z:wall.z+(wall.d+4),y:FPSWorld.height(wall.x,wall.z),health:30});Object.assign(q,{x:wall.x,z:wall.z-14,y:FPSWorld.height(wall.x,wall.z-14)});
+  const spot=m.findCover(a,q);ok('cover search returns a reachable spot hidden from the shooter',!!spot&&(()=>{const e={x:q.x,y:q.y+FPSBody.eyeHeight(q),z:q.z},dx=spot.x-e.x,dy=spot.y+.9-e.y,dz=spot.z-e.z,dl=Math.hypot(dx,dy,dz);return FPSWorld.wallDistance(e,{x:dx/dl,y:dy/dl,z:dz/dl},dl)<dl-.4;})(),{spot});
+  // Grenade lobs are solved for distance instead of thrown blindly.
+  const land=(pitch,dy)=>{const h=Math.cos(pitch)*17,vy=4.5-Math.sin(pitch)*17;let t=0,y=0;while(t<5&&!(t>.1&&y<=dy)){t+=.001;y=vy*t-4.905*t*t;}return h*t;};
+  ok('grenade lob pitch lands within a metre of the intended distance',[10,18,26].every(d=>Math.abs(land(m.lobPitch(d,0),0)-d)<1),{ranges:[10,18,26].map(d=>+land(m.lobPitch(d,0),0).toFixed(2))});
   // Every bot in a free-for-all gets into the fight (the old AI left one walled in for the whole match).
   m=new FPSMatch(CHAR_ORDER.slice(0,4).map((id,i)=>({id,gun:i,bot:true})),false,1077);for(let i=0;i<60*30;i++)m.update([]);
   ok('all four bots fire within thirty seconds',m.players.every(q=>q.shot>0),{shots:m.players.map(q=>q.shot)});

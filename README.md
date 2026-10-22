@@ -81,17 +81,42 @@ El combate libre termina a las 12 bajas o a los siete minutos, con escudos, muni
 coberturas que bloquean disparos, reaparición y CPU para completar cuatro plazas.
 
 Las cinco armas tienen cargadores, cadencias, dispersión, retroceso y tiempos de recarga
-distintos: Cobalto 9 (pistola), Avispa (subfusil), Sierra M4 (fusil), Trueno 12 (escopeta)
-y Horizonte (francotirador). El arma y los brazos se dibujan en primera persona; apuntar,
-disparar, cambiar de arma y recargar tienen transiciones propias. Agacharse mientras corres
-hace una **barrida** de unos 0.7 s, más rápida que correr, que termina en cuclillas.
+distintos, y modelos a escala real con acabados de verdad (aluminio anodizado con desgaste,
+acero, polímero punteado, Cerakote, nogal): Cobalto 9 (pistola con miras de tritio), Avispa
+(subfusil con punto rojo), Sierra M4 (fusil con guardamanos color arena y mira holográfica),
+Trueno 12 (escopeta de bomba con mira de fibra óptica) y Horizonte (francotirador de cerrojo con
+anteojo de 30 mm). Las retículas brillan contra cualquier fondo. Todos llevan guantes tácticos.
 
-La CPU apunta a quien ve (no a quien está más cerca detrás de una pared), tarda un instante
-en reaccionar, su puntería empieza con error y se afina mientras te sigue, dispara en ráfagas,
-pelea moviéndose de lado, rodea obstáculos, sale de los edificios por la puerta y se retira a
-recuperar vida. Cada CPU conserva el papel de su arma (distancia preferida y forma de disparar).
-En partidas de prueba de cuatro CPU el tiempo atorado bajó de ~400 s a ~6 s y la precisión de
-70 % a 44 %; antes, quien aparecía dentro de un almacén se quedaba ahí toda la partida.
+En la mano el arma tiene inercia al mirar, paso en forma de ocho, postura baja al correr,
+inclinación al moverte de lado, caída al aterrizar y retroceso propio (patada, cabeceo y giro).
+La luz del arma sale del mismo lado que el sol y el fogonazo ilumina el arma y lo que tienes cerca.
+Las recargas son completas: el cargador sale y cae, la mano trae otro, lo inserta y lo golpea, y si
+estaba vacía jala la palanca o la corredera; la escopeta se carga cartucho por cartucho y bombea
+después de cada tiro, y el francotirador mueve el cerrojo. Cada paso tiene su sonido.
+Agacharse mientras corres hace una **barrida** de unos 0.7 s, más rápida que correr.
+
+La granada es de fragmentación a escala real y su explosión tiene bola de fuego, humo que sube,
+esquirlas que rebotan, onda en el suelo, marca quemada, luz propia, sacudida según la distancia y
+zumbido de oídos si estalla muy cerca. Las granadas cercanas se marcan en pantalla con su distancia.
+
+La CPU tiene tres niveles (**Ajustes → Dificultad CPU**, por omisión *Difícil*). Apunta a quien ve
+y recuerda dónde te vio (no ve a través de paredes), tarda en reaccionar, su puntería empieza con
+error y se afina mientras te sigue, se le atrasa la mira si te mueves de lado, compensa el retroceso
+según su nivel, dispara en ráfagas, rodea obstáculos, sale de los edificios por la puerta, se cubre
+detrás de algo que le tape tu línea de tiro para recargar o curarse y lanza granadas con el arco
+calculado a donde te escondiste. Contra alguien que se mueve de lado todo el tiempo a 25 m:
+
+| Nivel | Precisión | Daño por segundo |
+| --- | --- | --- |
+| Normal | ~15 % | ~10 |
+| Difícil | ~35 % | ~26 |
+| Experto | ~55 % | ~42 |
+
+Los personajes llevan portaplacas con portacargadores, radio y cinturón de combate sobre su vestuario
+(cara y colores de Esmash intactos). Corren en la dirección real del movimiento, inclinan el torso,
+siguen la mira, se llevan el arma al hombro al apuntar, la bajan al correr, recogen las piernas en
+el aire, reaccionan al recibir un tiro y caen al morir. El mapa suma autos estacionados y tambos que
+frenan balas, sombras de contacto bajo las coberturas y mugre en la base de los edificios.
 
 En pantalla hay marcador con tiempo, bajas y lugar; un arco rojo alrededor de la mira que
 señala de dónde vino el daño (también en línea); aviso al eliminar a alguien, con otro color
@@ -396,9 +421,11 @@ pausa, reaparición, teclado/mando inalámbrico, recargas animadas y validación
 `node src/test/tfps-polish.cjs` comprueba las cinco miras sin oclusión, caída y viaje
 de las balas, impactos, límites gráficos y liberación de recursos al salir del FPS.
 `node src/test/tfps-feel.cjs` comprueba que la CPU sale de un edificio por la puerta, reacciona
-antes de disparar con un error de puntería acotado y que las cuatro CPU entran al combate; la
-barrida, que el posproceso solo corre con una vista a calidad completa, el arco de daño hacia
-quien disparó y el aviso de eliminación.
+antes de disparar con un error de puntería acotado, que los tres niveles de dificultad forman una
+escalera real contra un blanco que se mueve de lado, que la búsqueda de cobertura devuelve un punto
+oculto del tirador, que el arco de la granada cae a la distancia pedida y que las cuatro CPU entran
+al combate; la barrida, que el posproceso solo corre con una vista a calidad completa, el arco de
+daño hacia quien disparó y el aviso de eliminación.
 `node src/test/tfps-architecture.cjs` recorre las entradas y escaleras de los cuatro
 edificios, comprueba el acceso a azoteas y la cobertura de sus ventanas empotradas,
 verifica que el terreno queda bajo los pisos y compara píxeles para detectar
