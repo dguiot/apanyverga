@@ -12,6 +12,8 @@ const LAUNCH_DECAY = 0.31;
 const SPECIAL_SPEED = 1.15;
 const AIM = 0.33; // cuánto hay que inclinar el stick para dirigir un golpe // los especiales (menos la recuperación) corren un poco más rápido
 
+// arma en la mano, a lo largo del antebrazo desde el puño (px del dibujo a escala 1): de dónde a dónde pega y su grosor
+const BLADE = { bat: { from: 2, to: 66, r: 12 }, sword: { from: 10, to: 82, r: 12 } };
 const MOVE_CANCEL = new Set(['jab1', 'jab2', 'jab3', 'ftilt', 'utilt', 'dtilt', 'dash']);
 // poses de movimiento
 const DASH_BURST = mkPose({ lean: 0.55, legF: [1.15, -1.3], legB: [-0.85, -0.15], armF: [-0.4, 1.8], armB: [1.3, 1.6], bodyY: 2 });
@@ -65,6 +67,7 @@ class Fighter {
   // ---------- ciclo ----------
   update() {
     const B = BATTLE;
+    this.sweepX = this.x; this.sweepY = this.y; // de aquí sale el barrido de quien le pegue en este cuadro o el siguiente
     if (this.dead) {
       if (this.stocks > 0 && --this.respawnT <= 0) this.respawn();
       return;
@@ -98,6 +101,19 @@ class Fighter {
     this.checkLedge();
     this.checkBlast();
     this.updatePose();
+  }
+  // Ya que todos se movieron: lo que se ve en pantalla es lo que pega. Las cajas activas se revisan otra vez
+  // con la posición y la pose de este cuadro (antes el rival se medía donde estaba un cuadro atrás).
+  lateHits() {
+    const m = this.move;
+    if (this.dead || this.state !== 'attack' || !m || !m.def.hits || this.hitlag > 0) return;
+    if (this.item && BLADE[this.item.type]) { this.bladeHits(); if (this.move !== m) return; }
+    for (let i = 0; i < m.def.hits.length; i++) {
+      const h = m.def.hits[i], pc = m.hc && m.hc[i];
+      if (m.f < h.f0 || m.f > h.f1 || !pc || pc[2] !== m.f) continue;
+      this.activeHit(h, m.hitSets[i], m, i, null, true);
+      if (this.move !== m || this.hitlag > 0) return;
+    }
   }
 
   runState() {
@@ -555,7 +571,7 @@ class Fighter {
     const born = m.bornT; this.startMove(key); this.move.late = true; this.move.bornT = born;
     return true;
   }
-  activeHit(h, set, m, i) {
+  activeHit(h, set, m, i, test, late) {
     const s = this.size();
     const cs = h.chargeScale;
     const ch = m.charge;
@@ -566,22 +582,56 @@ class Fighter {
     if (m.def.smash) hit.dmg = h.dmg * (1 + 0.45 * ch);
     if (cs) { hit.dmg = h.dmg + cs.dmg * ch; hit.bkb = h.bkb + cs.bkb * ch; hit.kbg = h.kbg + cs.kbg * ch; }
     if (m.v.dmg) hit.dmg = m.v.dmg;
+    // la caja barre desde donde estaba en el cuadro anterior (si ya estaba activa): moverse no la hace fallar
+    const pc = !test && m.hc && m.hc[i], swept = !!pc && m.f - pc[2] <= 1;
+    if (!test) (m.hc || (m.hc = []))[i] = [hx, hy, m.f];
+    if (late && !swept) return;
     for (const t of BATTLE.fighters) {
       if (t === this || t.dead || t.stocks <= 0) continue;
       const last = set.get(t);
       if (last !== undefined && !(h.rehit && m.t - last >= h.rehit)) continue;
-      const hb = t.hurtbox();
-      if (!circleRect(hx, hy, r, hb.x, hb.y, hb.w, hb.h)) continue;
+      const at = test ? test(t) : sweptCircle(swept ? pc[0] : hx, swept ? pc[1] : hy, hx, hy, r, t, swept);
+      if (!at) continue;
       // un grupo solo golpea una vez por fotograma
       if (h.grp && m.hitSets.some((st2, j) => j !== i && m.def.hits[j].grp === h.grp && st2.get(t) === m.t)) continue;
       const dir = Math.abs(h.x) < 12 ? (sign(t.x - this.x) || this.face) : this.face;
-      const res = applyHit(this, t, hit, dir);
+      const res = applyHit(this, t, hit, dir, { at });
       if (res) set.set(t, m.t);
       if (res && !h.rehit) for (let j = 0; j < m.hitSets.length; j++) if (j !== i && m.def.hits[j].f0 <= h.f1 && m.def.hits[j].f1 >= h.f0 && !m.def.hits[j].rehit) m.hitSets[j].set(t, m.t);
       if (res === 'counter' || this.move !== m) return;
     }
+    if (test || late) return;
     hitItems(this, hx, hy, r, hit.dmg);
     if (BATTLE.ms && BATTLE.ms.ball && !m.ballHit && Modes.kickBall(this, hit, Math.abs(h.x) < 12 ? (sign(BATTLE.ms.ball.x - this.x) || this.face) : this.face, hx, hy, r)) m.ballHit = true;
+  }
+  // bate y espada: dónde quedan la empuñadura y la punta con la pose que se dibuja (mismas cuentas que drawCharacter)
+  bladeSegment() {
+    const P = this.pose, S = skOf(this.id), L = LOOKS[this.id], s = this.size(), B = BLADE[this.item.type];
+    const leg = l => Math.cos(l[0]) * S.thigh + Math.cos(l[0] + l[1]) * S.shin;
+    let hipY = P.grounded ? -Math.max(leg(P.legF), leg(P.legB), 10) : -(S.thigh + S.shin);
+    hipY += P.bodyY || 0;
+    const sx = Math.sin(Math.PI - P.lean) * S.torso, sy = hipY + Math.cos(Math.PI - P.lean) * S.torso;
+    const q = limbPoints(sx + L.build.chest * 0.3 * Math.cos(P.lean), sy + 4, P.armF[0], P.armF[1], S.upper, S.fore);
+    const dx = Math.sin(q.a), dy = Math.cos(q.a), hx = q.fx + dx * 5, hy = q.fy + dy * 5;
+    const world = (lx, ly) => {
+      let x = lx * (P.sx || 1), y = ly * (P.sy || 1);
+      if (P.rot) { const pv = P.pivot || -56, c = Math.cos(P.rot), n = Math.sin(P.rot); [x, y] = [x * c - (y - pv) * n, x * n + (y - pv) * c + pv]; }
+      x += P.bodyX || 0;
+      return [this.x + this.face * s * x, this.y + s * y];
+    };
+    return [...world(hx + dx * B.from, hy + dy * B.from), ...world(hx + dx * B.to, hy + dy * B.to)];
+  }
+  bladeHits() {
+    const m = this.move, d = m.def; if (!d.hits || this.hitlag > 0) return;
+    const seg = this.bladeSegment(), prev = m.v.blade, r = BLADE[this.item.type].r * this.size();
+    m.v.blade = [...seg, m.f];
+    for (let i = 0; i < d.hits.length; i++) {
+      const h = d.hits[i];
+      if (m.f < h.f0 || m.f > h.f1) continue;
+      const swept = !!prev && m.f - prev[4] <= 1 && prev[4] >= h.f0, from = swept ? prev : seg;
+      this.activeHit(h, m.hitSets[i], m, i, t => sweptBlade(from, seg, r, t, swept));
+      if (this.move !== m) return;
+    }
   }
   endMove() {
     const d = this.move ? this.move.def : null;
@@ -885,7 +935,7 @@ class Fighter {
         if (this.stretch > 0) sq = -0.08 * this.stretch;
         k = this.flipT > 0 ? 0.5 : 0.3; break;
       case 'helpless': tgt = mkPose(Object.assign({}, POSES.fall, { face: 'sad' })); break;
-      case 'hitstun': tgt = mkPose(Object.assign({}, POSES.hurt, { rot: this.tumble ? (this.pose.rot || 0) + 0.35 * -this.face * sign(this.lx || 1) : 0 })); k = 0.6; break;
+      case 'hitstun': tgt = mkPose(Object.assign({}, POSES[this.hurtPose] || POSES.hurt, { rot: this.tumble ? (this.pose.rot || 0) + 0.35 * -this.face * sign(this.lx || 1) : 0 })); k = 0.6; break;
       case 'down': tgt = mkPose({ rot: -Math.PI / 2, pivot: -14, face: 'ko', grounded: false, legF: [0.1, 0], legB: [-0.1, 0], armF: [2.9, 0.2], armB: [2.6, 0.2] }); break;
       case 'shield': tgt = POSES.shield; sq = 0.04; break;
       case 'dizzy': tgt = mkPose(Object.assign({}, POSES.dizzy, { rot: Math.sin(t * 6) * 0.15 })); break;
@@ -937,7 +987,8 @@ class Fighter {
       g.addColorStop(0, 'rgba(255,190,11,0.0)'); g.addColorStop(0.6, `rgba(255,190,11,${0.3 + Math.sin(performance.now() / 80) * 0.15})`); g.addColorStop(1, 'rgba(230,57,70,0)');
       c.fillStyle = g; c.beginPath(); c.arc(visual.x, visual.y - 50 * s, 90 * s, 0, TAU); c.fill();
     }
-    const shakeX = !reducedMotion && this.hitlag > 0 && this.flinch > 0 ? FightView.noise((BATTLE.t + GameFeel.alpha) * 2, this.port + 501) * 2.5 : 0;
+    // durante el congelamiento del golpe tiembla más cuanto más fuerte fue
+    const shakeX = !reducedMotion && this.hitlag > 0 && this.flinch > 0 ? FightView.noise((BATTLE.t + GameFeel.alpha) * 2, this.port + 501) * clamp(1.5 + this.hitlag * 0.4, 2, 6.5) : 0;
     c.save();
     c.translate(visual.x + shakeX, visual.y);
     if ((this.invuln > 0 && this.state !== 'attack' && this.state !== 'respawn' && Math.floor(this.invuln / 3) % 2) || this.state === 'dodge' || this.state === 'airdodge') c.globalAlpha = 0.55;
