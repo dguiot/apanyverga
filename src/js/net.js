@@ -12,7 +12,7 @@ const NET_ITEMS = ['bat', 'sword', 'gun', 'bomb', 'heart', 'taco', 'star', 'shro
 const NET_PHASES = ['intro', 'fight', 'end'];
 // movimientos en curso (para que el invitado dibuje la pose exacta y la estela)
 const NET_MOVES = Object.keys(baseMoves()).concat(['sp_n', 'sp_s', 'sp_u', 'sp_d', 'sp_f', 'pickup', 'counterHit']);
-const NET_FX = new Set(['hit', 'boom', 'smoke', 'text', 'target', 'slashline', 'shock', 'coin', 'rock', 'wind', 'pillar', 'claw', 'cateyes', 'impact', 'zzz', 'ring', 'spike', 'drop']);
+const NET_FX = new Set(['strike', 'hit', 'boom', 'smoke', 'text', 'target', 'slashline', 'shock', 'coin', 'rock', 'wind', 'pillar', 'claw', 'cateyes', 'impact', 'zzz', 'ring', 'spike', 'drop']);
 const r1 = v => Math.round(v * 10) / 10, r2 = v => Math.round(v * 100) / 100, ri = v => Math.round(v);
 
 // Eventos del anfitrión que los invitados reproducen (efectos, sonidos, anuncios)

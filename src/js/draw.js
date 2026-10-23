@@ -18,6 +18,10 @@ const POSES = {
   land: mkPose({ lean: 0.3, legF: [1.0, -1.6], legB: [0.3, -1.3] }),
   shield: mkPose({ lean: -0.05, armF: [1.2, 2.1], armB: [1.0, 2.2], legF: [0.5, -0.6], legB: [-0.5, -0.3], face: 'angry' }),
   hurt: mkPose({ grounded: false, lean: -0.55, armF: [2.4, 0.6], armB: [2.8, 0.4], legF: [0.7, -0.9], legB: [-0.3, -0.4], face: 'hurt' }),
+  // según dónde entró el golpe: a la cara la cabeza se va atrás, abajo se dobla, por la espalda se arquea
+  hurtHigh: mkPose({ grounded: false, lean: -0.78, head: -0.5, armF: [2.75, 0.45], armB: [3.05, 0.3], legF: [0.55, -0.6], legB: [-0.4, -0.3], face: 'hurt' }),
+  hurtLow: mkPose({ grounded: false, lean: 0.55, head: 0.32, armF: [0.95, 0.85], armB: [0.6, 1.05], legF: [1.15, -1.5], legB: [-0.2, -0.9], face: 'hurt' }),
+  hurtBack: mkPose({ grounded: false, lean: 0.45, head: -0.28, armF: [-0.55, 0.5], armB: [-0.85, 0.4], legF: [0.9, -1.0], legB: [-0.6, -0.5], face: 'hurt' }),
   dizzy: mkPose({ lean: -0.2, armF: [0.15, 0.3], armB: [-0.1, 0.3], legF: [0.2, -0.2], legB: [-0.2, -0.1], face: 'dizzy' }),
   ledge: mkPose({ grounded: false, lean: 0.15, armF: [3.05, 0.05], armB: [2.95, 0.05], legF: [0.25, -0.4], legB: [-0.05, -0.2] }),
   grab: mkPose({ lean: 0.25, armF: [1.55, 0.1], armB: [1.45, 0.2], legF: [0.5, -0.5], legB: [-0.4, -0.2], face: 'angry' }),

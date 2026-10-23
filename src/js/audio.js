@@ -121,6 +121,16 @@ const Audio8 = {
         this.tone('sine', 130, 32, .24, .38);
         this.noise(.035, .2, 3500, .6);
         break;
+      // un sonido por tipo de golpe (k: fuerza ~0.3-2.5): puño seco, patada con aire, filo metálico,
+      // contundente grave con chasquido de madera, chispa eléctrica, llamarada, impacto de disparo, meteoro
+      case 'punch': { const p = clamp(k, 0.3, 2.5); this.noise(0.06 + p * 0.03, 0.3 + p * 0.08, 1500 + p * 300, 0.9); this.tone('sine', 230 + p * 20, 70, 0.07 + p * 0.02, 0.16 + p * 0.03); this.noise(0.02, 0.14, 4200, 0.8); break; }
+      case 'kick': { const p = clamp(k, 0.3, 2.5); this.noise(0.1, 0.12, 1800, 1.2, 0, 'bandpass', null, 600); this.noise(0.09 + p * 0.03, 0.34 + p * 0.08, 700 + p * 200, 0.8, 0.012); this.tone('sine', 150 + p * 15, 48, 0.1 + p * 0.03, 0.2 + p * 0.03, 0.012); break; }
+      case 'slice': { const p = clamp(k, 0.3, 2.5); this.noise(0.12, 0.22 + p * 0.05, 7000, 2, 0, 'highpass', null, 2200); this.tone('triangle', 1900, 1200, 0.16, 0.06 + p * 0.015); this.tone('sine', 2600, 2400, 0.22, 0.03, 0.01); this.noise(0.05, 0.2 + p * 0.05, 1200, 0.8, 0.01); break; }
+      case 'thwack': { const p = clamp(k, 0.3, 2.5); this.tone('square', 1250, 900, 0.035, 0.07); this.noise(0.18 + p * 0.05, 0.42 + p * 0.08, 520, 0.7, 0, 'lowpass', null, 160); this.tone('sine', 110, 38, 0.18 + p * 0.04, 0.28 + p * 0.04); break; }
+      case 'zap': { const p = clamp(k, 0.3, 2.5); this.tone('square', 95, 60, 0.18, 0.07 + p * 0.015); this.tone('sawtooth', 1400, 2600, 0.06, 0.04); this.tone('sawtooth', 2200, 900, 0.09, 0.035, 0.05); this.noise(0.16, 0.2 + p * 0.05, 5200, 1.5, 0, 'highpass'); break; }
+      case 'scorch': { const p = clamp(k, 0.3, 2.5); this.noise(0.3, 0.26 + p * 0.06, 1400, 0.5, 0, 'lowpass', null, 260); this.noise(0.08, 0.2, 900, 0.8); this.tone('sine', 140, 50, 0.12, 0.16 + p * 0.03); break; }
+      case 'ping': { const p = clamp(k, 0.3, 2.5); this.tone('sine', 1300, 420, 0.09, 0.08 + p * 0.02); this.noise(0.05, 0.18 + p * 0.05, 2600, 1); this.tone('sine', 190, 70, 0.07, 0.12); break; }
+      case 'spike': { const p = clamp(k, 0.3, 2.5); this.tone('sawtooth', 520, 90, 0.16, 0.07); this.noise(0.2, 0.36 + p * 0.06, 800, 0.7, 0, 'lowpass', null, 120); this.tone('sine', 120, 34, 0.22, 0.26); break; }
       case 'swing': this.noise(0.12, 0.12 * k, 2400, 1.4, 0, 'bandpass', null, 900); break;
       case 'jump': this.noise(.07, .045, 1700, .6, 0, 'bandpass', null, 3000); this.tone('sine', 240, 420, .065, .035); break;
       case 'djump': this.noise(.09, .055, 2100, .7, 0, 'bandpass', null, 3800); this.tone('sine', 330, 620, .09, .045); break;

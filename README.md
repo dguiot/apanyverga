@@ -353,6 +353,14 @@ suspensión a 30/60/120/144 Hz, pausa, corrección online y continuidad de las e
 incluyendo dibujo durante la partida y comparación de estados confirmados. Estas pruebas
 no sustituyen la medición de FPS ni las pruebas de tacto en el dispositivo final.
 
+`node src/test/tfight-hits.cjs` comprueba que los golpes se registran como se ven: disparos y
+objetos lanzados a quemarropa, bate y espada que pegan con la forma dibujada (de la empuñadura a la
+punta, cuadro por cuadro y con cuerpos distintos), cajas que barren el camino entre cuadros para que
+nadie las atraviese, que lo que se ve tocando al final de un cuadro pegue aunque los dos se muevan,
+un efecto y un sonido por tipo de golpe (puño, patada, filo, contundente, eléctrico, fuego, disparo,
+meteoro y líneas de enfoque en los golpes brutales), la reacción según dónde entró el golpe y que
+todo siga siendo determinista con resimulación (rollback).
+
 `node src/test/tkart-screen.cjs` reproduce un lienzo de PC opaco, comprueba píxeles reales
 de las tres pistas, redimensionado, pausa, miniaturas, vista individual online y pérdida/restauración
 del contexto WebGL.

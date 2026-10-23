@@ -72,6 +72,7 @@ class Battle {
       if (this.phase === 'intro') { const c = f.ctrl, save = c.cur; c.cur = blankState(); c.prev = blankState(); f.update(); c.cur = save; }
       else f.update();
     }
+    for (const f of this.fighters) f.lateHits();
     updateProjectiles();
     updateItems();
     Modes.tick(this);

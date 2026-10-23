@@ -2016,6 +2016,16 @@ const Audio8 = {
         this.tone('sine', 130, 32, .24, .38);
         this.noise(.035, .2, 3500, .6);
         break;
+      // un sonido por tipo de golpe (k: fuerza ~0.3-2.5): puño seco, patada con aire, filo metálico,
+      // contundente grave con chasquido de madera, chispa eléctrica, llamarada, impacto de disparo, meteoro
+      case 'punch': { const p = clamp(k, 0.3, 2.5); this.noise(0.06 + p * 0.03, 0.3 + p * 0.08, 1500 + p * 300, 0.9); this.tone('sine', 230 + p * 20, 70, 0.07 + p * 0.02, 0.16 + p * 0.03); this.noise(0.02, 0.14, 4200, 0.8); break; }
+      case 'kick': { const p = clamp(k, 0.3, 2.5); this.noise(0.1, 0.12, 1800, 1.2, 0, 'bandpass', null, 600); this.noise(0.09 + p * 0.03, 0.34 + p * 0.08, 700 + p * 200, 0.8, 0.012); this.tone('sine', 150 + p * 15, 48, 0.1 + p * 0.03, 0.2 + p * 0.03, 0.012); break; }
+      case 'slice': { const p = clamp(k, 0.3, 2.5); this.noise(0.12, 0.22 + p * 0.05, 7000, 2, 0, 'highpass', null, 2200); this.tone('triangle', 1900, 1200, 0.16, 0.06 + p * 0.015); this.tone('sine', 2600, 2400, 0.22, 0.03, 0.01); this.noise(0.05, 0.2 + p * 0.05, 1200, 0.8, 0.01); break; }
+      case 'thwack': { const p = clamp(k, 0.3, 2.5); this.tone('square', 1250, 900, 0.035, 0.07); this.noise(0.18 + p * 0.05, 0.42 + p * 0.08, 520, 0.7, 0, 'lowpass', null, 160); this.tone('sine', 110, 38, 0.18 + p * 0.04, 0.28 + p * 0.04); break; }
+      case 'zap': { const p = clamp(k, 0.3, 2.5); this.tone('square', 95, 60, 0.18, 0.07 + p * 0.015); this.tone('sawtooth', 1400, 2600, 0.06, 0.04); this.tone('sawtooth', 2200, 900, 0.09, 0.035, 0.05); this.noise(0.16, 0.2 + p * 0.05, 5200, 1.5, 0, 'highpass'); break; }
+      case 'scorch': { const p = clamp(k, 0.3, 2.5); this.noise(0.3, 0.26 + p * 0.06, 1400, 0.5, 0, 'lowpass', null, 260); this.noise(0.08, 0.2, 900, 0.8); this.tone('sine', 140, 50, 0.12, 0.16 + p * 0.03); break; }
+      case 'ping': { const p = clamp(k, 0.3, 2.5); this.tone('sine', 1300, 420, 0.09, 0.08 + p * 0.02); this.noise(0.05, 0.18 + p * 0.05, 2600, 1); this.tone('sine', 190, 70, 0.07, 0.12); break; }
+      case 'spike': { const p = clamp(k, 0.3, 2.5); this.tone('sawtooth', 520, 90, 0.16, 0.07); this.noise(0.2, 0.36 + p * 0.06, 800, 0.7, 0, 'lowpass', null, 120); this.tone('sine', 120, 34, 0.22, 0.26); break; }
       case 'swing': this.noise(0.12, 0.12 * k, 2400, 1.4, 0, 'bandpass', null, 900); break;
       case 'jump': this.noise(.07, .045, 1700, .6, 0, 'bandpass', null, 3000); this.tone('sine', 240, 420, .065, .035); break;
       case 'djump': this.noise(.09, .055, 2100, .7, 0, 'bandpass', null, 3800); this.tone('sine', 330, 620, .09, .045); break;
@@ -3043,6 +3053,10 @@ const POSES = {
   land: mkPose({ lean: 0.3, legF: [1.0, -1.6], legB: [0.3, -1.3] }),
   shield: mkPose({ lean: -0.05, armF: [1.2, 2.1], armB: [1.0, 2.2], legF: [0.5, -0.6], legB: [-0.5, -0.3], face: 'angry' }),
   hurt: mkPose({ grounded: false, lean: -0.55, armF: [2.4, 0.6], armB: [2.8, 0.4], legF: [0.7, -0.9], legB: [-0.3, -0.4], face: 'hurt' }),
+  // según dónde entró el golpe: a la cara la cabeza se va atrás, abajo se dobla, por la espalda se arquea
+  hurtHigh: mkPose({ grounded: false, lean: -0.78, head: -0.5, armF: [2.75, 0.45], armB: [3.05, 0.3], legF: [0.55, -0.6], legB: [-0.4, -0.3], face: 'hurt' }),
+  hurtLow: mkPose({ grounded: false, lean: 0.55, head: 0.32, armF: [0.95, 0.85], armB: [0.6, 1.05], legF: [1.15, -1.5], legB: [-0.2, -0.9], face: 'hurt' }),
+  hurtBack: mkPose({ grounded: false, lean: 0.45, head: -0.28, armF: [-0.55, 0.5], armB: [-0.85, 0.4], legF: [0.9, -1.0], legB: [-0.6, -0.5], face: 'hurt' }),
   dizzy: mkPose({ lean: -0.2, armF: [0.15, 0.3], armB: [-0.1, 0.3], legF: [0.2, -0.2], legB: [-0.2, -0.1], face: 'dizzy' }),
   ledge: mkPose({ grounded: false, lean: 0.15, armF: [3.05, 0.05], armB: [2.95, 0.05], legF: [0.25, -0.4], legB: [-0.05, -0.2] }),
   grab: mkPose({ lean: 0.25, armF: [1.55, 0.1], armB: [1.45, 0.2], legF: [0.5, -0.5], legB: [-0.4, -0.2], face: 'angry' }),
@@ -9393,6 +9407,7 @@ function spawnFx(type, x, y, o = {}) {
     case 'text': fx.life = 70; fx.vy = -1.2; break;
     case 'shock': fx.life = 18; break;
     case 'pillar': fx.life = 24; break;
+    case 'strike': fx.kind = o.txt || 'pow'; fx.life = { pow: 11, kick: 13, slash: 13, thwack: 17, zap: 15, flame: 20, proj: 12, spike: 15, focus: 16 }[fx.kind] || 12; fx.ang = o.ang || 0; fx.seeds = Array.from({ length: 12 }, () => [rand(-1, 1), rand(0.55, 1.2), rand(0, TAU)]); break;
     case 'impact': fx.life = 16; fx.ang = o.ang || 0; fx.seeds = Array.from({ length: 9 }, () => [rand(-0.55, 0.55), rand(0.6, 1.25)]); break;
     case 'claw': fx.life = 12; fx.dir = o.dir || 1; break;
     case 'cateyes': fx.life = 120; break;
@@ -9490,6 +9505,7 @@ function drawFx(c, layer) {
       case 'trail': ART.drawGlow(c, p.x, p.y, p.r * 1.6 * a + 2, p.col, a * 0.9); break;
       case 'text': text(p.txt, p.x, p.y, p.size || 34, p.col, { stroke: '#10131a' }); break;
       case 'shock': c.strokeStyle = p.col; c.lineWidth = 5 * a; c.beginPath(); c.ellipse(p.x, p.y, 20 + k * 90, 6 + k * 14, 0, 0, TAU); c.stroke(); break;
+      case 'strike': drawStrike(c, p, k, a); break;
       case 'impact': {
         // rayas en la dirección en que sale volando + anillo: se lee la fuerza y hacia dónde
         c.save(); c.translate(p.x, p.y); c.rotate(p.ang);
@@ -9535,10 +9551,152 @@ function drawFx(c, layer) {
   }
 }
 
+// cada golpe con su forma (k: de 0 a 1 en su vida, a = 1 - k)
+function drawStrike(c, p, k, a) {
+  const R = p.r, col = typeof p.col === 'string' && p.col.length === 7 ? p.col : '#ffd166', S = p.seeds;
+  c.save(); c.translate(p.x, p.y); c.lineCap = 'round'; c.lineJoin = 'round';
+  switch (p.kind) {
+    case 'pow': {
+      // puño: estrella de cómic que revienta y se apaga
+      const g = easeOut(Math.min(1, k * 3)), s = R * (0.5 + g * 0.75);
+      ART.drawGlow(c, 0, 0, s * 2.2, col, a * 0.9);
+      c.rotate(S[0][2]); c.globalAlpha = clamp(a * 1.6, 0, 1);
+      c.beginPath();
+      for (let i = 0; i < 18; i++) { const an = i / 18 * TAU, rr = i % 2 ? s * 0.42 : s * (0.8 + S[i >> 1][1] * 0.35); c.lineTo(Math.cos(an) * rr, Math.sin(an) * rr); }
+      c.closePath(); c.fillStyle = '#ffffff'; c.fill(); c.lineWidth = Math.max(1.5, R / 9); c.strokeStyle = col; c.stroke();
+      c.fillStyle = withAlpha(col, 0.6); c.beginPath(); c.arc(0, 0, s * 0.26, 0, TAU); c.fill();
+      break;
+    }
+    case 'kick': {
+      // patada: media luna en la dirección del golpe (se lee el barrido de la pierna)
+      c.rotate(p.ang);
+      const g = easeOut(Math.min(1, k * 2.2)), rr = R * (0.8 + g * 0.9), th = R * 0.5 * (1 - k * 0.6);
+      ART.drawGlow(c, 0, 0, R * 1.7, col, a * 0.7);
+      c.globalAlpha = clamp(a * 1.4, 0, 1);
+      c.beginPath(); c.arc(-rr * 0.55, 0, rr, -1.05, 1.05); c.arc(-rr * 0.55 - th, 0, rr - th * 0.25, 1.0, -1.0, true); c.closePath();
+      c.fillStyle = '#ffffff'; c.fill(); c.strokeStyle = col; c.lineWidth = 2; c.stroke();
+      c.fillStyle = withAlpha(col, 0.85 * a); c.beginPath(); c.arc(0, 0, R * 0.32 * (1 - k), 0, TAU); c.fill();
+      break;
+    }
+    case 'slash': {
+      // filo: una hoja de luz larga y delgada que cruza el cuerpo; los fuertes dejan una X
+      c.globalCompositeOperation = 'lighter'; c.globalAlpha = clamp(a * 1.3, 0, 1);
+      for (let j = 0; j < (R > 30 ? 2 : 1); j++) {
+        c.save(); c.rotate(p.ang + (j ? 1.15 : 0) + S[j][0] * 0.12);
+        const L = R * 2.5 * easeOut(Math.min(1, k * 4)), w = R * 0.2 * (1 - k * 0.8) + 0.8, off = (k - 0.3) * R * 0.7;
+        c.fillStyle = withAlpha(col, 0.5);
+        c.beginPath(); c.moveTo(off - L, 0); c.quadraticCurveTo(off, -w * 2.8, off + L, 0); c.quadraticCurveTo(off, w * 0.9, off - L, 0); c.fill();
+        c.fillStyle = '#ffffff';
+        c.beginPath(); c.moveTo(off - L, 0); c.quadraticCurveTo(off, -w, off + L, 0); c.quadraticCurveTo(off, w * 0.25, off - L, 0); c.fill();
+        c.restore();
+      }
+      break;
+    }
+    case 'thwack': {
+      // contundente (bate, cabezazo, objeto lanzado): destello corto, onda gruesa y astillas que salen volando
+      const g = easeOut(k);
+      ART.drawGlow(c, 0, 0, R * 1.8, col, a * 0.6);
+      c.globalAlpha = clamp(a * 1.5, 0, 1);
+      if (k < 0.2) { c.fillStyle = withAlpha('#ffffff', 1 - k * 5); c.beginPath(); c.arc(0, 0, R * (0.45 + k * 1.4), 0, TAU); c.fill(); }
+      c.save(); c.rotate(p.ang); c.scale(1, 0.6);
+      c.strokeStyle = withAlpha(col, 0.95 * a); c.lineWidth = Math.max(2, R * 0.3 * a); c.beginPath(); c.arc(0, 0, R * (0.6 + g * 1.5), 0, TAU); c.stroke();
+      c.restore();
+      for (let i = 0; i < 9; i++) {
+        const [sd, sl, sa] = S[i], an = p.ang + sd * 1.4, d = R * (0.4 + g * 2.3 * sl);
+        c.save(); c.translate(Math.cos(an) * d, Math.sin(an) * d + k * k * R * 1.8); c.rotate(sa + k * 7);
+        c.fillStyle = i % 3 ? '#e9d3a8' : '#9a6a3a'; c.fillRect(-3.5 * sl, -1.6, 7 * sl, 3.2); c.restore();
+      }
+      break;
+    }
+    case 'zap': {
+      // eléctrico: relámpagos que tiemblan (se rehacen cada dos cuadros)
+      const flick = Math.floor(p.t / 2);
+      ART.drawGlow(c, 0, 0, R * 2.3, col, a);
+      c.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < 5; i++) {
+        const base = S[i][2] + i * 1.26, len = R * (1.1 + S[i][1]) * (0.7 + k * 0.6);
+        c.beginPath(); c.moveTo(0, 0);
+        for (let j = 1; j <= 4; j++) { const u = j / 4, jit = (hash1(flick * 7 + i, j) - 0.5) * R * 0.55; c.lineTo(Math.cos(base) * len * u - Math.sin(base) * jit, Math.sin(base) * len * u + Math.cos(base) * jit); }
+        c.strokeStyle = withAlpha(col, 0.9 * a); c.lineWidth = 4 * a + 1; c.stroke();
+        c.strokeStyle = withAlpha('#ffffff', a); c.lineWidth = 1.5; c.stroke();
+      }
+      break;
+    }
+    case 'flame': {
+      // fuego: bola encendida y lenguas que se abren y suben
+      c.globalCompositeOperation = 'lighter';
+      const g = easeOut(Math.min(1, k * 1.8)), s = R * (0.55 + g * 0.8);
+      c.globalAlpha = clamp(a * 1.3, 0, 1); c.drawImage(ART.fireball(), -s, -s, s * 2, s * 2);
+      for (let i = 0; i < 7; i++) {
+        const [sd, sl] = S[i], an = -Math.PI / 2 + sd * 1.5, len = R * (0.8 + sl) * g, tx = Math.cos(an) * len, ty = Math.sin(an) * len - k * R * 0.9;
+        const nx = -Math.sin(an), ny = Math.cos(an), w = R * 0.24 * (1 - k * 0.5);
+        c.fillStyle = withAlpha(i % 2 ? '#ffd166' : '#ff6d00', 0.85 * a);
+        c.beginPath(); c.moveTo(nx * w, ny * w); c.quadraticCurveTo(tx * 0.5 + nx * w * 1.3, ty * 0.5 + ny * w * 1.3, tx, ty); c.quadraticCurveTo(tx * 0.5 - nx * w * 1.3, ty * 0.5 - ny * w * 1.3, -nx * w, -ny * w); c.fill();
+      }
+      break;
+    }
+    case 'proj': {
+      // disparo: salpicadura del color del proyectil y un anillo fino
+      const g = easeOut(k);
+      ART.drawGlow(c, 0, 0, R * 1.9, col, a);
+      c.strokeStyle = withAlpha(col, a); c.lineWidth = 2.5 * a + 0.5; c.beginPath(); c.arc(0, 0, R * (0.4 + g * 1.1), 0, TAU); c.stroke();
+      c.fillStyle = '#ffffff'; c.beginPath(); c.arc(0, 0, R * 0.32 * (1 - k), 0, TAU); c.fill();
+      c.fillStyle = withAlpha(col, a);
+      for (let i = 0; i < 8; i++) { const [sd, sl] = S[i], an = p.ang + sd * 1.3, d = R * (0.3 + g * 1.7 * sl); c.beginPath(); c.arc(Math.cos(an) * d, Math.sin(an) * d + k * k * R * 0.9, 2.6 * (1 - k) + 0.8, 0, TAU); c.fill(); }
+      break;
+    }
+    case 'spike': {
+      // meteoro: chevrones que bajan en la dirección del golpe
+      ART.drawGlow(c, 0, 0, R * 1.9, col, a);
+      c.rotate(p.ang - Math.PI / 2);
+      for (let i = 0; i < 3; i++) {
+        const y = (k * 1.6 + i * 0.45) * R, w = R * (0.9 - i * 0.2);
+        c.beginPath(); c.moveTo(-w, y - w * 0.6); c.lineTo(0, y); c.lineTo(w, y - w * 0.6);
+        c.strokeStyle = withAlpha('#10131a', 0.55 * a); c.lineWidth = Math.max(4, R * 0.3 * a); c.stroke();
+        c.strokeStyle = withAlpha(i ? col : '#ffffff', a * (1 - i * 0.2)); c.lineWidth = Math.max(2.5, R * 0.2 * a); c.stroke();
+      }
+      break;
+    }
+    case 'focus': {
+      // golpe brutal: líneas de enfoque de cómic que convergen en el impacto;
+      // tinta oscura con alma blanca: se leen igual en escenarios claros y oscuros
+      c.globalAlpha = clamp(a * 0.9, 0, 1);
+      const inner = R * (1.3 + k * 0.8);
+      for (let i = 0; i < 30; i++) {
+        const sd = S[i % 12], an = i / 30 * TAU + sd[0] * 0.08, w = 0.014 + (i % 3) * 0.007, r0 = inner * (0.9 + sd[1] * 0.45);
+        for (const [ink, ww] of [['rgba(12,14,22,.5)', w], ['rgba(255,255,255,.85)', w * 0.4]]) {
+          c.fillStyle = ink; c.beginPath(); c.moveTo(Math.cos(an) * r0, Math.sin(an) * r0); c.lineTo(Math.cos(an - ww) * 760, Math.sin(an - ww) * 760); c.lineTo(Math.cos(an + ww) * 760, Math.sin(an + ww) * 760); c.fill();
+        }
+      }
+      break;
+    }
+  }
+  c.restore();
+}
+
 const KB_MIN_GROWTH = 4.5, KB_BASE = 0.85, KB_ACCEL = 0.33;
 // los peligros del escenario empujan 20% menos desde que todos aguantan más (v12)
 const HAZARD_KB = 0.8;
 const EFFECT_COL = { fire: '#ff9f1c', elec: '#48cae4', slash: '#f1f5f9', normal: '#ffd166' };
+
+const STRIKE_COL = { pow: '#ffd166', kick: '#fff1c1', slash: '#e0f7ff', thwack: '#ffe2a8', zap: '#48cae4', flame: '#ff9f1c', spike: '#ff5d73' };
+const STRIKE_SFX = { pow: 'punch', kick: 'kick', slash: 'slice', thwack: 'thwack', zap: 'zap', flame: 'scorch', proj: 'ping', spike: 'spike' };
+// de qué está hecho el golpe: lo dice el efecto, el objeto en la mano o la extremidad que pega
+function strikeKind(att, hit, opts) {
+  if (hit.effect === 'fire' || ['boom', 'cannon', 'meteor', 'fireball'].includes(hit.type)) return 'flame';
+  if (hit.effect === 'elec') return 'zap';
+  if (hit.meteor || (hit.ang > 225 && hit.ang < 315)) return 'spike';
+  if (opts.proj) return hit.type === 'item' ? 'thwack' : hit.effect === 'slash' ? 'slash' : 'proj';
+  if (hit.effect === 'slash') return 'slash';
+  const m = att && att.move;
+  if (!m || !m.def) return 'pow';
+  if (att.item && /^bat/.test(m.key)) return 'thwack';
+  const limb = animFor(att, m).limb;
+  if (limb === 'footF' || limb === 'footB' || limb === 'feet' || limb === 'tail') return 'kick';
+  if (limb === 'head' || limb === 'chest' || limb === 'guitar') return 'thwack';
+  if (limb === 'estoque') return 'slash';
+  return 'pow';
+}
 
 // ---------- aplicar un golpe ----------
 // dir: 1 lanza hacia la derecha para ángulos "hacia delante", -1 hacia la izquierda
@@ -9554,7 +9712,9 @@ function applyHit(att, t, hit, dir, opts = {}) {
   if (sameTeam(att, t)) return false; // sin fuego amigo
   // contraataque
   if (att && t.inCounter()) { triggerCounter(t, att, hit.dmg); return 'counter'; }
-  const px = t.x - dir * 10, py = t.y - t.h * 0.55;
+  // el destello sale donde tocó el golpe (puño, pie, punta del arma, bala), no siempre en el pecho
+  let px = t.x - dir * 10, py = t.y - t.h * 0.55;
+  if (opts.at) { const hb = t.hurtbox(); px = clamp(opts.at[0], hb.x + 6, hb.x + hb.w - 6); py = clamp(opts.at[1], hb.y + 10, hb.y + hb.h - 8); }
   // escudo
   if (t.state === 'shield' && t.shieldHP > 0 && !opts.unblockable) {
     // parry: el escudo recién levantado detiene el golpe sin desgaste y deja al atacante expuesto
@@ -9612,14 +9772,20 @@ function applyHit(att, t, hit, dir, opts = {}) {
   if (!opts.proj && att) att.hitlag = Math.max(att.hitlag, hitlag);
   t.hitlag = hitlag;
   Rumble.hurt(t, dmg, armored ? 0 : kb, hitlag); if (att) Rumble.land(att, dmg, hitlag);
-  spawnFx('hit', px, py, { col, r: 14 + dmg * 1.2 });
-  for (let i = 0; i < 4 + dmg / 3; i++) spawnFx('spark', px, py, { col });
+  // cada tipo de golpe se ve y se oye distinto: puño, patada, filo, contundente, eléctrico, fuego, disparo, meteoro
+  const kind = strikeKind(att, hit, opts), a0 = (hit.ang || 0) * Math.PI / 180, kcol = STRIKE_COL[kind] || (opts.proj && hit.col) || col;
+  const along = opts.at && opts.at[2] !== undefined && opts.at[2] !== 0 ? opts.at[2] : Math.atan2(-Math.sin(a0), Math.cos(a0) * dir);
+  spawnFx('strike', px, py, { txt: kind, col: kcol, r: Math.round(clamp(12 + dmg * 1.5 + kb * 0.35 + (hit.heavy ? 6 : 0), 12, 70)), ang: along });
+  for (let i = 0; i < (kind === 'slash' ? 6 : 3) + dmg / 4; i++) spawnFx('spark', px, py, { col: kcol });
   const sfxK = kb / 10;
-  Audio8.sfx(hit.sfx === 'bighit' || kb > 20 ? 'bighit' : (hit.sfx && hit.sfx !== 'hit' ? hit.sfx : 'hit'), sfxK);
-  if (hit.sfx && hit.sfx !== 'bighit' && hit.sfx !== 'hit') Audio8.sfx('hit', sfxK);
+  if (hit.sfx === 'bighit' || kb > 20) Audio8.sfx('bighit', sfxK);
+  Audio8.sfx(STRIKE_SFX[kind] || 'hit', clamp(dmg / 8, 0.3, 2.5));
+  if (hit.sfx && hit.sfx !== 'bighit' && hit.sfx !== 'hit') Audio8.sfx(hit.sfx, sfxK);
   if (armored) { t.armorFlash = 8; return true; }
   if (t.grabbing) t.releaseGrab();
   if (t.grabbedBy) t.grabbedBy.releaseGrab();
+  // la reacción depende de dónde entró: a la cara, al cuerpo, a las piernas o por la espalda
+  { const rel = (t.y - py) / Math.max(1, t.h); t.hurtPose = att && Math.abs(t.x - att.x) > 6 && sign(t.x - att.x) === t.face ? 'hurtBack' : rel > 0.72 ? 'hurtHigh' : rel < 0.38 ? 'hurtLow' : 'hurt'; }
   if (opts.noLaunch || (hit.sleep && (t.grounded || hit.trap)) || (hit.trip && t.grounded)) {
     t.setState('hitstun'); t.hitstun = 22; t.lx = 0; t.ly = 0; t.vx = 0; t.vy = 0; t.tumble = false;
     // dormido / atrapado: queda mareado un rato (machacar botones lo despierta antes)
@@ -9650,13 +9816,46 @@ function applyHit(att, t, hit, dir, opts = {}) {
   if (t.tumble) { t.airUsed = {}; if (t.jumps < 1 && t.ch.jumps > 1) t.jumps = 1; }
   t.setState('hitstun');
   t.updatePose(); // the victim reacts on the same frame that the hit connects
-  spawnFx('impact', px, py, { col, r: 16 + dmg * 1.6 + kb * 0.8, ang: Math.atan2(ly, lx) });
+  if (kb > 9) spawnFx('impact', px, py, { col: kcol, r: 16 + dmg * 1.6 + kb * 0.8, ang: Math.atan2(ly, lx) });
+  // los que mandan a volar: líneas de enfoque de cómic hacia el impacto
+  if (kb > 26) spawnFx('strike', px, py, { txt: 'focus', col: '#ffffff', r: Math.round(Math.min(90, kb * 1.4)), ang: Math.atan2(ly, lx) });
   if (B && kb > 12) B.camKick = Math.max(B.camKick || 0, Math.min(0.075, kb * 0.0022));
   // golpe que seguramente saca del escenario: un instante en cámara lenta
   if (B && kb > 58 && B.phase === 'fight' && !B.slow && (B.slowCd || 0) <= 0) { B.slow = 12; B.slowCd = 300; }
   if (kb > 18) { shake(Math.min(22, kb * 0.45)); flash(Math.min(0.22, kb * 0.0055)); t.hitlag += 2; if (att) att.hitlag += 2; }
   if (hit.homerun && kb > 22) spawnFx('text', t.x, t.y - 140, { txt: '¡HOME RUN!', col: '#ffbe0b', size: 42 });
   return true;
+}
+
+// ---------- detección con barrido ----------
+// Entre dos cuadros nada atraviesa a nadie: la caja de golpe y el blanco se revisan en todo el camino que
+// recorrieron desde la revisión anterior (el blanco, desde su posición al empezar su último cuadro).
+// Devuelven el punto de contacto (o null).
+function hurtShift(t) {
+  if (t.sweepX === undefined) return [0, 0];
+  const dx = t.sweepX - t.x, dy = t.sweepY - t.y;
+  return Math.abs(dx) + Math.abs(dy) > 90 ? [0, 0] : [dx, dy]; // reaparecer o un agarre no es moverse
+}
+function sweptCircle(x0, y0, x1, y1, r, t, sweepT) {
+  const hb = t.hurtbox(), [dx, dy] = sweepT ? hurtShift(t) : [0, 0];
+  const span = Math.max(Math.hypot(x1 - x0, y1 - y0), Math.hypot(dx, dy)), n = Math.min(10, Math.ceil(span / Math.max(4, r * 0.6)));
+  for (let k = n; k >= 0; k--) {
+    const u = n ? k / n : 1, w = 1 - u, cx = lerp(x0, x1, u), cy = lerp(y0, y1, u);
+    if (circleRect(cx, cy, r, hb.x + dx * w, hb.y + dy * w, hb.w, hb.h)) return [cx, cy];
+  }
+  return null;
+}
+// arma en la mano: un segmento (empuñadura→punta) con grosor, barrido desde el segmento del cuadro anterior
+function sweptBlade(a, b, r, t, sweepT) {
+  const hb = t.hurtbox(), [dx, dy] = sweepT ? hurtShift(t) : [0, 0];
+  const span = Math.max(Math.hypot(b[2] - a[2], b[3] - a[3]), Math.hypot(b[0] - a[0], b[1] - a[1]), Math.hypot(dx, dy)), n = Math.min(10, Math.ceil(span / Math.max(4, r * 0.8)));
+  for (let k = n; k >= 0; k--) {
+    const u = n ? k / n : 1, w = 1 - u, x0 = lerp(a[0], b[0], u), y0 = lerp(a[1], b[1], u), x1 = lerp(a[2], b[2], u), y1 = lerp(a[3], b[3], u);
+    const len = Math.hypot(x1 - x0, y1 - y0), m = Math.max(1, Math.ceil(len / r));
+    // de la punta hacia la mano: el golpe sale donde pegó la parte más lejana del arma
+    for (let j = m; j >= 0; j--) { const cx = lerp(x0, x1, j / m), cy = lerp(y0, y1, j / m); if (circleRect(cx, cy, r, hb.x + dx * w, hb.y + dy * w, hb.w, hb.h)) return [cx, cy, Math.atan2(b[3] - a[3], b[2] - a[2])]; }
+  }
+  return null;
 }
 
 // golpe a todos los rivales dentro de un rectángulo
@@ -9684,6 +9883,8 @@ function spawnProjectile(owner, o) {
   // los disparos salen a la altura de las manos del cuerpo de cada quien
   if (owner && owner.id && typeof skOf === 'function' && o.y < owner.y && o.y > owner.y - 160) o = Object.assign({}, o, { y: owner.y + (o.y - owner.y) * skOf(owner.id).bodyK });
   const p = Object.assign({ owner, t: 0, grav: 0, reflect: 1, hitSet: new Set(), rehitT: new Map(), ang: 40, bkb: 4, kbg: 4, dmg: 5, r: 10, life: 60, vx: 0, vy: 0, col: '#fff', delay: 0 }, o);
+  // a quemarropa: lo que sale de la mano también pega a quien está entre el cuerpo y la boca del arma
+  if (owner && owner.x !== undefined && !p.delay && Math.abs(p.x - owner.x) < 90 && p.y < owner.y + 10 && p.y > owner.y - 170) p.muzzleX = owner.x + sign(p.x - owner.x) * Math.min(p.r, Math.abs(p.x - owner.x));
   BATTLE.projectiles.push(p);
   return p;
 }
@@ -9706,7 +9907,7 @@ function updateProjectiles() {
       if (tg) { const a = Math.atan2(tg.y - 50 - p.y, tg.x - p.x), cur = Math.atan2(p.vy, p.vx); let d = a - cur; while (d > Math.PI) d -= TAU; while (d < -Math.PI) d += TAU; const na = cur + clamp(d, -p.homing, p.homing); p.vx = Math.cos(na) * p.speed; p.vy = Math.sin(na) * p.speed; }
     }
     p.vy += p.grav * (p.owner ? 1 : 1);
-    const oy = p.y;
+    const oy = p.y, ox = p.t === 1 && p.muzzleX !== undefined ? p.muzzleX : p.x;
     p.x += p.vx; p.y += p.vy;
     if (p.grow) p.r += p.grow;
     if (p.trail && p.t % 2 === 0) spawnFx('ember', p.x - sign(p.vx) * p.r, p.y + rand(-4, 4));
@@ -9733,8 +9934,8 @@ function updateProjectiles() {
     for (const f of BATTLE.fighters) {
       if (p.life <= 0) break;
       if (f === p.owner || f.dead || f.stocks <= 0) continue;
-      const hb = f.hurtbox();
-      if (!circleRect(p.x, p.y, p.r, hb.x, hb.y, hb.w, hb.h)) continue;
+      const at = sweptCircle(ox, oy, p.x, p.y, p.r, f, true);
+      if (!at) continue;
       if (p.hitSet.has(f)) continue;
       if (p.rehitT.get(f) > p.t) continue;
       if (p.arm && p.t < p.arm) continue;
@@ -9744,7 +9945,7 @@ function updateProjectiles() {
         Audio8.sfx('counter'); spawnFx('hit', p.x, p.y, { col: '#8ecae6', r: 20 });
         continue;
       }
-      const r = applyHit(p.owner, f, p, sign(p.vx) || (p.owner ? p.owner.face : 1), { proj: true });
+      const r = applyHit(p.owner, f, p, sign(p.vx) || (p.owner ? p.owner.face : 1), { proj: true, at });
       if (!r) continue;
       if (p.rehit) p.rehitT.set(f, p.t + p.rehit); else p.hitSet.add(f);
       if (p.explodeGround || p.boomOnHit || p.type === 'cannon') { explodeProj(p); break; }
@@ -10469,6 +10670,8 @@ const LAUNCH_DECAY = 0.31;
 const SPECIAL_SPEED = 1.15;
 const AIM = 0.33; // cuánto hay que inclinar el stick para dirigir un golpe // los especiales (menos la recuperación) corren un poco más rápido
 
+// arma en la mano, a lo largo del antebrazo desde el puño (px del dibujo a escala 1): de dónde a dónde pega y su grosor
+const BLADE = { bat: { from: 2, to: 66, r: 12 }, sword: { from: 10, to: 82, r: 12 } };
 const MOVE_CANCEL = new Set(['jab1', 'jab2', 'jab3', 'ftilt', 'utilt', 'dtilt', 'dash']);
 // poses de movimiento
 const DASH_BURST = mkPose({ lean: 0.55, legF: [1.15, -1.3], legB: [-0.85, -0.15], armF: [-0.4, 1.8], armB: [1.3, 1.6], bodyY: 2 });
@@ -10522,6 +10725,7 @@ class Fighter {
   // ---------- ciclo ----------
   update() {
     const B = BATTLE;
+    this.sweepX = this.x; this.sweepY = this.y; // de aquí sale el barrido de quien le pegue en este cuadro o el siguiente
     if (this.dead) {
       if (this.stocks > 0 && --this.respawnT <= 0) this.respawn();
       return;
@@ -10555,6 +10759,20 @@ class Fighter {
     this.checkLedge();
     this.checkBlast();
     this.updatePose();
+  }
+  // Ya que todos se movieron: lo que se ve en pantalla es lo que pega. Las cajas activas se revisan otra vez
+  // con la posición y la pose de este cuadro (antes el rival se medía donde estaba un cuadro atrás).
+  lateHits() {
+    const m = this.move;
+    if (this.dead || this.state !== 'attack' || !m || !m.def.hits || this.hitlag > 0) return;
+    // solo los golpes con el arma (bate…, espada…), no un especial hecho con el bate en la mano
+    if (this.item && BLADE[this.item.type] && m.key.startsWith(this.item.type)) { this.bladeHits(); if (this.move !== m) return; }
+    for (let i = 0; i < m.def.hits.length; i++) {
+      const h = m.def.hits[i], pc = m.hc && m.hc[i];
+      if (m.f < h.f0 || m.f > h.f1 || !pc || pc[2] !== m.f) continue;
+      this.activeHit(h, m.hitSets[i], m, i, null, true);
+      if (this.move !== m || this.hitlag > 0) return;
+    }
   }
 
   runState() {
@@ -11012,7 +11230,7 @@ class Fighter {
     const born = m.bornT; this.startMove(key); this.move.late = true; this.move.bornT = born;
     return true;
   }
-  activeHit(h, set, m, i) {
+  activeHit(h, set, m, i, test, late) {
     const s = this.size();
     const cs = h.chargeScale;
     const ch = m.charge;
@@ -11023,22 +11241,56 @@ class Fighter {
     if (m.def.smash) hit.dmg = h.dmg * (1 + 0.45 * ch);
     if (cs) { hit.dmg = h.dmg + cs.dmg * ch; hit.bkb = h.bkb + cs.bkb * ch; hit.kbg = h.kbg + cs.kbg * ch; }
     if (m.v.dmg) hit.dmg = m.v.dmg;
+    // la caja barre desde donde estaba en el cuadro anterior (si ya estaba activa): moverse no la hace fallar
+    const pc = !test && m.hc && m.hc[i], swept = !!pc && m.f - pc[2] <= 1;
+    if (!test) (m.hc || (m.hc = []))[i] = [hx, hy, m.f];
+    if (late && !swept) return;
     for (const t of BATTLE.fighters) {
       if (t === this || t.dead || t.stocks <= 0) continue;
       const last = set.get(t);
       if (last !== undefined && !(h.rehit && m.t - last >= h.rehit)) continue;
-      const hb = t.hurtbox();
-      if (!circleRect(hx, hy, r, hb.x, hb.y, hb.w, hb.h)) continue;
+      const at = test ? test(t) : sweptCircle(swept ? pc[0] : hx, swept ? pc[1] : hy, hx, hy, r, t, swept);
+      if (!at) continue;
       // un grupo solo golpea una vez por fotograma
       if (h.grp && m.hitSets.some((st2, j) => j !== i && m.def.hits[j].grp === h.grp && st2.get(t) === m.t)) continue;
       const dir = Math.abs(h.x) < 12 ? (sign(t.x - this.x) || this.face) : this.face;
-      const res = applyHit(this, t, hit, dir);
+      const res = applyHit(this, t, hit, dir, { at });
       if (res) set.set(t, m.t);
       if (res && !h.rehit) for (let j = 0; j < m.hitSets.length; j++) if (j !== i && m.def.hits[j].f0 <= h.f1 && m.def.hits[j].f1 >= h.f0 && !m.def.hits[j].rehit) m.hitSets[j].set(t, m.t);
       if (res === 'counter' || this.move !== m) return;
     }
+    if (test || late) return;
     hitItems(this, hx, hy, r, hit.dmg);
     if (BATTLE.ms && BATTLE.ms.ball && !m.ballHit && Modes.kickBall(this, hit, Math.abs(h.x) < 12 ? (sign(BATTLE.ms.ball.x - this.x) || this.face) : this.face, hx, hy, r)) m.ballHit = true;
+  }
+  // bate y espada: dónde quedan la empuñadura y la punta con la pose que se dibuja (mismas cuentas que drawCharacter)
+  bladeSegment() {
+    const P = this.pose, S = skOf(this.id), L = LOOKS[this.id], s = this.size(), B = BLADE[this.item.type];
+    const leg = l => Math.cos(l[0]) * S.thigh + Math.cos(l[0] + l[1]) * S.shin;
+    let hipY = P.grounded ? -Math.max(leg(P.legF), leg(P.legB), 10) : -(S.thigh + S.shin);
+    hipY += P.bodyY || 0;
+    const sx = Math.sin(Math.PI - P.lean) * S.torso, sy = hipY + Math.cos(Math.PI - P.lean) * S.torso;
+    const q = limbPoints(sx + L.build.chest * 0.3 * Math.cos(P.lean), sy + 4, P.armF[0], P.armF[1], S.upper, S.fore);
+    const dx = Math.sin(q.a), dy = Math.cos(q.a), hx = q.fx + dx * 5, hy = q.fy + dy * 5;
+    const world = (lx, ly) => {
+      let x = lx * (P.sx || 1), y = ly * (P.sy || 1);
+      if (P.rot) { const pv = P.pivot || -56, c = Math.cos(P.rot), n = Math.sin(P.rot); [x, y] = [x * c - (y - pv) * n, x * n + (y - pv) * c + pv]; }
+      x += P.bodyX || 0;
+      return [this.x + this.face * s * x, this.y + s * y];
+    };
+    return [...world(hx + dx * B.from, hy + dy * B.from), ...world(hx + dx * B.to, hy + dy * B.to)];
+  }
+  bladeHits() {
+    const m = this.move, d = m.def; if (!d.hits || this.hitlag > 0) return;
+    const seg = this.bladeSegment(), prev = m.v.blade, r = BLADE[this.item.type].r * this.size();
+    m.v.blade = [...seg, m.f];
+    for (let i = 0; i < d.hits.length; i++) {
+      const h = d.hits[i];
+      if (m.f < h.f0 || m.f > h.f1) continue;
+      const swept = !!prev && m.f - prev[4] <= 1 && prev[4] >= h.f0, from = swept ? prev : seg;
+      this.activeHit(h, m.hitSets[i], m, i, t => sweptBlade(from, seg, r, t, swept));
+      if (this.move !== m) return;
+    }
   }
   endMove() {
     const d = this.move ? this.move.def : null;
@@ -11342,7 +11594,7 @@ class Fighter {
         if (this.stretch > 0) sq = -0.08 * this.stretch;
         k = this.flipT > 0 ? 0.5 : 0.3; break;
       case 'helpless': tgt = mkPose(Object.assign({}, POSES.fall, { face: 'sad' })); break;
-      case 'hitstun': tgt = mkPose(Object.assign({}, POSES.hurt, { rot: this.tumble ? (this.pose.rot || 0) + 0.35 * -this.face * sign(this.lx || 1) : 0 })); k = 0.6; break;
+      case 'hitstun': tgt = mkPose(Object.assign({}, POSES[this.hurtPose] || POSES.hurt, { rot: this.tumble ? (this.pose.rot || 0) + 0.35 * -this.face * sign(this.lx || 1) : 0 })); k = 0.6; break;
       case 'down': tgt = mkPose({ rot: -Math.PI / 2, pivot: -14, face: 'ko', grounded: false, legF: [0.1, 0], legB: [-0.1, 0], armF: [2.9, 0.2], armB: [2.6, 0.2] }); break;
       case 'shield': tgt = POSES.shield; sq = 0.04; break;
       case 'dizzy': tgt = mkPose(Object.assign({}, POSES.dizzy, { rot: Math.sin(t * 6) * 0.15 })); break;
@@ -11394,7 +11646,8 @@ class Fighter {
       g.addColorStop(0, 'rgba(255,190,11,0.0)'); g.addColorStop(0.6, `rgba(255,190,11,${0.3 + Math.sin(performance.now() / 80) * 0.15})`); g.addColorStop(1, 'rgba(230,57,70,0)');
       c.fillStyle = g; c.beginPath(); c.arc(visual.x, visual.y - 50 * s, 90 * s, 0, TAU); c.fill();
     }
-    const shakeX = !reducedMotion && this.hitlag > 0 && this.flinch > 0 ? FightView.noise((BATTLE.t + GameFeel.alpha) * 2, this.port + 501) * 2.5 : 0;
+    // durante el congelamiento del golpe tiembla más cuanto más fuerte fue
+    const shakeX = !reducedMotion && this.hitlag > 0 && this.flinch > 0 ? FightView.noise((BATTLE.t + GameFeel.alpha) * 2, this.port + 501) * clamp(1.5 + this.hitlag * 0.4, 2, 6.5) : 0;
     c.save();
     c.translate(visual.x + shakeX, visual.y);
     if ((this.invuln > 0 && this.state !== 'attack' && this.state !== 'respawn' && Math.floor(this.invuln / 3) % 2) || this.state === 'dodge' || this.state === 'airdodge') c.globalAlpha = 0.55;
@@ -12002,7 +12255,7 @@ const NET_ITEMS = ['bat', 'sword', 'gun', 'bomb', 'heart', 'taco', 'star', 'shro
 const NET_PHASES = ['intro', 'fight', 'end'];
 // movimientos en curso (para que el invitado dibuje la pose exacta y la estela)
 const NET_MOVES = Object.keys(baseMoves()).concat(['sp_n', 'sp_s', 'sp_u', 'sp_d', 'sp_f', 'pickup', 'counterHit']);
-const NET_FX = new Set(['hit', 'boom', 'smoke', 'text', 'target', 'slashline', 'shock', 'coin', 'rock', 'wind', 'pillar', 'claw', 'cateyes', 'impact', 'zzz', 'ring', 'spike', 'drop']);
+const NET_FX = new Set(['strike', 'hit', 'boom', 'smoke', 'text', 'target', 'slashline', 'shock', 'coin', 'rock', 'wind', 'pillar', 'claw', 'cateyes', 'impact', 'zzz', 'ring', 'spike', 'drop']);
 const r1 = v => Math.round(v * 10) / 10, r2 = v => Math.round(v * 100) / 100, ri = v => Math.round(v);
 
 // Eventos del anfitrión que los invitados reproducen (efectos, sonidos, anuncios)
@@ -12743,6 +12996,7 @@ class Battle {
       if (this.phase === 'intro') { const c = f.ctrl, save = c.cur; c.cur = blankState(); c.prev = blankState(); f.update(); c.cur = save; }
       else f.update();
     }
+    for (const f of this.fighters) f.lateHits();
     updateProjectiles();
     updateItems();
     Modes.tick(this);
