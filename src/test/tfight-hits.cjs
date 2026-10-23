@@ -8,7 +8,10 @@ const {chromium}=require('playwright'),path=require('node:path'),{pathToFileURL}
   const out=[],ok=(name,pass,details)=>out.push({name,pass:!!pass,details});Audio8.sfx=()=>{};Rumble.play=()=>{};
   // pelea de dos con el blanco congelado (sin física ni defensa) para medir solo la detección
   const duel=(char='daniel',x=60)=>{APP.startBattle({players:[{port:0,char,dev:'kb1'},{port:1,char:'torito',dev:'kb2'}],stage:'temple',rules:{mode:'stock',stocks:3,items:0}});const B=APP.battle;B.phase='fight';B.t=400;const [a,t]=B.fighters;a.brain=t.brain=null;
-   for(const f of [a,t]){f.state='idle';f.vx=f.vy=0;f.invuln=0;}a.x=0;a.face=1;t.x=x;t.face=-1;t.update=function(){this.sweepX=this.x;this.sweepY=this.y;};return {B,a,t};};
+   // empiezan en el aire (aparecen cayendo): se paran en el piso principal
+   const ground=(f,gx)=>{const sf=B.stage.surfaces().filter(q=>!q.plat&&gx>=q.x&&gx<=q.x+q.w).sort((q,r)=>q.y-r.y)[0];f.x=gx;if(sf){f.y=sf.y;f.grounded=true;f.surface=sf;}};
+   for(const f of [a,t]){f.state='idle';f.vx=f.vy=0;f.invuln=0;}ground(a,0);a.face=1;ground(t,x);t.face=-1;t.update=function(){this.sweepX=this.x;this.sweepY=this.y;};return {B,a,t};};
+  const lift=(f,dy)=>{f.y-=dy;f.grounded=false;f.surface=null;f.state='air';};
   const give=(f,type)=>{f.item={type,ammo:14,holder:f,t:0,hp:30};};
   const run=(B,t,n)=>{const p0=t.percent;for(let i=0;i<n&&t.percent===p0;i++)B.advance();return t.percent>p0;};
   // 1. pistola y objetos lanzados a quemarropa: el disparo sale de la mano, no de un punto ya pasado el rival
@@ -18,36 +21,41 @@ const {chromium}=require('playwright'),path=require('node:path'),{pathToFileURL}
   ok('point-blank shots still never hit someone standing behind the shooter',!behind);
   const thrown=[14,26].map(d=>{const {B,a,t}=duel('daniel',d);give(a,'bomb');a.startMove('itemThrow');return run(B,t,40);});
   ok('an item thrown at an opponent standing right in front connects',thrown.every(Boolean),{thrown});
-  // 2. bate y espada: el golpe sigue al arma dibujada (de la empuñadura a la punta) en cada cuadro activo
-  const blade=type=>{const {B,a}=duel('daniel',600);give(a,type);a.startMove(type);const h=a.move.def.hits[0],s=a.size(),segs=[];
-   for(let i=0;i<60&&a.move;i++){B.advance();if(a.move&&a.move.f>=h.f0&&a.move.f<=h.f1)segs.push({f:a.move.f,seg:a.bladeSegment(),circle:[a.x+a.face*h.x*s,a.y+h.y*s,h.r*s]});}
-   // el cuadro activo donde la punta queda más lejos del círculo fijo de antes
-   const far=segs.map(q=>({...q,gap:Math.hypot(q.seg[2]-q.circle[0],q.seg[3]-q.circle[1])-q.circle[2]})).sort((x,y)=>y.gap-x.gap)[0];
-   const r2=duel('daniel',0);give(r2.a,type);r2.a.startMove(type);const tt=r2.t;tt.grounded=false;tt.state='air';
-   const hb=tt.hurtbox(),cx=far.seg[2],cy=far.seg[3],place=()=>{tt.x=cx+(cx>r2.a.x?18:-18);tt.y=cy+hb.h*0.5;tt.sweepX=tt.x;tt.sweepY=tt.y;};place();
-   const box=tt.hurtbox(),[ox,oy,orr]=far.circle,outside=!circleRect(ox,oy,orr,box.x,box.y,box.w,box.h);
-   const p0=tt.percent;for(let i=0;i<60&&r2.a.move&&tt.percent===p0;i++){r2.B.advance();place();}
-   return {frame:far.f,gap:Math.round(far.gap),outside,hit:tt.percent>p0,frames:segs.length};};
-  const sword=blade('sword'),bat=blade('bat');
-  ok('the sword tip hits where it is drawn, beyond the old fixed circle',sword.outside&&sword.gap>8&&sword.hit,sword);
-  ok('the bat barrel hits where it is drawn, beyond the old fixed circle',bat.outside&&bat.gap>8&&bat.hit,bat);
+  // 2. bate y espada: el golpe sigue al arma dibujada. La punta y la empuñadura que pinta drawCharacter
+  //    (en el mismo cuadro, misma pose) caen dentro de la zona que pega, para cuerpos distintos.
+  const drawnTip=(f,item)=>{const cv=document.createElement('canvas').getContext('2d'),B=BLADE[item];let got=null;
+   cv.setTransform(1,0,0,1,0,0);cv.translate(f.x,f.y);cv.scale(f.face*f.size(),f.size());
+   drawCharacter(cv,f.id,f.pose,{flip:f.face<0,onHand:(cc,hx,hy,ang)=>{const m=cc.getTransform(),pt=(d)=>{const x=hx+Math.sin(ang)*d,y=hy+Math.cos(ang)*d;return [m.a*x+m.c*y+m.e,m.b*x+m.d*y+m.f];};got=[...pt(B.from),...pt(B.to)];}});return got;};
+  const follow=[];
+  for(const char of ['daniel','torito','axo','chilazo'])for(const item of ['sword','bat']){const {B,a}=duel(char,600);give(a,item);a.startMove(item);const h=a.move.def.hits[0];
+   for(let i=0;i<40&&a.move;i++){B.advance();if(!a.move||a.move.f<h.f0-2||a.move.f>h.f1+2)continue;const seg=a.bladeSegment(),d=drawnTip(a,item);
+    follow.push(Math.max(Math.hypot(seg[0]-d[0],seg[1]-d[1]),Math.hypot(seg[2]-d[2],seg[3]-d[3])));}}
+  ok('bat and sword hit zones follow the drawn weapon frame by frame for different bodies',follow.length>30&&Math.max(...follow)<1.5,{frames:follow.length,worstPx:+Math.max(...follow).toFixed(2)});
+  const tipHit=type=>{const {B,a,t}=duel('daniel',600);give(a,type);a.startMove(type);const h=a.move.def.hits[0];
+   for(let i=0;i<40&&a.move;i++){B.advance();if(!a.move||a.move.f!==h.f0)continue;
+    // la punta dibujada en el primer cuadro activo: el rival queda tocando solo esa punta
+    const d=drawnTip(a,type);lift(t,0);const put=()=>{t.x=d[2]+(d[2]>a.x?17:-17);t.y=d[3]+t.hurtbox().h*0.5;t.sweepX=t.x;t.sweepY=t.y;};put();
+    const s=a.size(),hb=t.hurtbox(),p0=t.percent,outsideOldCircle=!circleRect(a.x+a.face*h.x*s,a.y+h.y*s,h.r*s,hb.x,hb.y,hb.w,hb.h);
+    for(let k=0;k<4&&t.percent===p0;k++){B.advance();put();}return {hit:t.percent>p0,outsideOldCircle};}return null;};
+  const sword=tipHit('sword'),bat=tipHit('bat');
+  ok('an opponent touched only by the drawn tip of the sword or bat takes the hit',sword&&sword.hit&&bat&&bat.hit,{sword,bat});
   const whiff=(()=>{const {B,a,t}=duel('daniel',-90);give(a,'sword');a.startMove('sword');return run(B,t,40);})();
   ok('a forward sword swing still misses an opponent well behind',!whiff);
   // 3. lo que se ve es lo que pega: si al final de un cuadro la caja activa toca al rival, ese cuadro le pegó
   let seen=0;const missed=[];
   for(const key of ['jab1','ftilt','dtilt','fsmash','dash','nair','bair','uair'])for(const v of [-6,-12,6])for(let d=40;d<=170;d+=13){
-   const {B,a,t}=duel('daniel',d);if(/air$/.test(key)){a.y-=70;a.grounded=false;a.state='air';t.y-=70;t.grounded=false;}
+   const {B,a,t}=duel('daniel',d);if(/air$/.test(key)){lift(a,70);lift(t,70);}
    t.update=function(){this.sweepX=this.x;this.sweepY=this.y;this.x+=v;};a.startMove(key);const def=a.move.def,s=a.size(),p0=t.percent;
-   for(let i=0;i<def.dur+5;i++){B.advance();const m=a.move;if(!m||m.def!==def||t.percent>p0)break;
+   for(let i=0;i<def.dur+5;i++){B.advance();const m=a.move,hit=t.percent>p0;if(!m||m.def!==def)break;
     const hb=t.hurtbox(),touching=def.hits.some(h=>m.f>=h.f0&&m.f<=h.f1&&circleRect(a.x+a.face*h.x*s,a.y+h.y*s,h.r*s,hb.x,hb.y,hb.w,hb.h));
-    if(touching){seen++;if(t.percent===p0)missed.push([key,d,v,m.f]);break;}}}
+    if(touching){seen++;if(!hit)missed.push([key,d,v,m.f]);break;}if(hit)break;}}
   ok('an active hitbox drawn touching a moving opponent at the end of a frame always registers',seen>40&&missed.length===0,{seen,missed:missed.slice(0,6)});
   // 4. sin atravesar: un rival muy rápido que cruza una caja activa entre dos cuadros recibe el golpe
   const tunnel=[30,45,60].map(v=>{const {B,a,t}=duel('daniel',400);t.update=function(){this.sweepX=this.x;this.sweepY=this.y;this.x-=v;};a.startMove('fsmash');const h=a.move.def.hits[0];
    for(let i=0;i<120&&a.move;i++){if(a.move.f===h.f0-1){const s=a.size(),cx=a.x+a.face*h.x*s;t.x=cx+h.r*s+20*t.size()+v*0.6;}B.advance();if(t.percent>0)return true;}return false;});
   ok('a fast opponent cannot pass through an active hitbox between frames',tunnel.every(Boolean),{tunnel});
   // 5. cada golpe se ve distinto: puño, patada, filo, contundente, disparo y meteoro
-  const kindOf=(key,item)=>{const {B,a,t}=duel('daniel',key==='gun'?40:50);if(item)give(a,item);if(key==='dair'){a.y-=120;a.grounded=false;a.state='air';t.y-=60;t.grounded=false;t.state='air';}
+  const kindOf=(key,item)=>{const {B,a,t}=duel('daniel',key==='gun'?40:50);if(item)give(a,item);if(key==='dair'){lift(a,160);lift(t,60);}
    B.fx.length=0;a.startMove(key);const p0=t.percent;for(let i=0;i<60&&t.percent===p0;i++){if(key==='dair')t.x=a.x;B.advance();}const fx=B.fx.find(f=>f.type==='strike'&&f.kind!=='focus');
    return {kind:fx&&fx.kind,limb:animFor(a,{key,def:a.moves[key]}).limb,hit:t.percent>p0};};
   const jab=kindOf('jab1'),ftilt=kindOf('ftilt'),slash=kindOf('sword','sword'),bonk=kindOf('bat','bat'),shot=kindOf('gun','gun'),dair=kindOf('dair');
