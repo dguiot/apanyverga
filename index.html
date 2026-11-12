@@ -20231,21 +20231,21 @@ void main() {
 const KART_TRACKS = [
   { id: 'mercado', name: 'Mercado del Sol', tag: 'EL BARRIO A TODA VELOCIDAD', difficulty: 3,
     desc: 'Adoquines, curvas enlazadas y un puente sobre los canales. Cuidado con los puestos.',
-    sky: ['#258bc6', '#caeff5'], ground: '#668b51', road: '#5b6770', edge: '#ee7851', accent: '#ffc53d', fog: '#bddde2', theme: 'town', width: 14,
+    sky: ['#258bc6', '#caeff5'], ground: '#7fb568', road: '#5b6770', edge: '#ee7851', accent: '#ffc53d', fog: '#bddde2', theme: 'town', width: 14,
     points: [[0,0,0],[0,0,380],[180,10,650],[480,22,670],[650,25,490],[620,8,200],[870,6,60],[1090,16,260],[1180,34,600],[1450,42,720],[1690,32,520],[1740,10,100],[1580,5,-210],[1210,10,-320],[990,24,-150],[740,35,-390],[470,20,-470],[180,6,-350],[-100,0,-170]],
     zones: [{from:.27,to:.35,type:'bridge',width:10.8},{from:.61,to:.68,type:'cobbles'},{from:.81,to:.87,type:'narrow',width:11.8}],
     hazards: [{at:.17,x:.65,type:'crate'},{at:.38,x:-.55,type:'crate'},{at:.65,x:.42,type:'crate'},{at:.85,x:-.5,type:'crate'}],
     boosts: [.12,.43,.73], boxes: [.065,.21,.37,.51,.67,.84,.94] },
   { id: 'volcan', name: 'Cañón de Fuego', tag: 'DOMINA EL BORDE DEL VOLCÁN', difficulty: 4,
     desc: 'Horquillas en ascenso, puentes estrechos y rocas que cruzan la pista. Frena antes de girar.',
-    sky: ['#492d62', '#e9a16e'], ground: '#704a42', road: '#473e48', edge: '#f56c3e', accent: '#ff9857', fog: '#b37671', theme: 'canyon', width: 13,
+    sky: ['#492d62', '#e9a16e'], ground: '#d39a72', road: '#473e48', edge: '#f56c3e', accent: '#ff9857', fog: '#b37671', theme: 'canyon', width: 13,
     points: [[0,5,0],[0,18,400],[240,68,740],[590,110,780],[800,136,580],[680,120,370],[440,90,350],[420,64,120],[750,50,40],[1100,75,300],[1420,116,630],[1650,140,560],[1720,125,260],[1480,90,30],[1500,70,-330],[1210,42,-570],[900,30,-470],[640,22,-650],[280,12,-540],[-120,6,-300]],
     zones: [{from:.2,to:.29,type:'bridge',width:9.8},{from:.54,to:.62,type:'bridge',width:10.4},{from:.76,to:.83,type:'gravel'}],
     hazards: [{at:.135,x:.2,type:'rock',moving:true},{at:.34,x:-.4,type:'rock'},{at:.47,x:.3,type:'rock',moving:true},{at:.71,x:-.3,type:'rock',moving:true},{at:.88,x:.55,type:'rock'}],
     boosts: [.09,.4,.67,.93], boxes: [.06,.18,.31,.45,.6,.74,.89] },
   { id: 'neon', name: 'Cumbre Neón', tag: 'LA NOCHE SE GANA DERRAPANDO', difficulty: 5,
     desc: 'Una cumbre de neón: eses rápidas, asfalto mojado y una horquilla final de precisión.',
-    sky: ['#080d30', '#313261'], ground: '#152c43', road: '#23374e', edge: '#32e5db', accent: '#d989ff', fog: '#303759', theme: 'neon', width: 13.5,
+    sky: ['#080d30', '#313261'], ground: '#1c2f5a', road: '#23374e', edge: '#32e5db', accent: '#d989ff', fog: '#303759', theme: 'neon', width: 13.5,
     points: [[0,0,0],[0,8,420],[230,34,760],[500,52,650],[600,65,410],[880,90,370],[1050,112,660],[1340,138,800],[1630,125,650],[1740,96,340],[1520,70,140],[1260,54,230],[1110,40,-20],[1250,26,-360],[1550,20,-580],[1510,12,-850],[1200,5,-980],[900,0,-760],[550,15,-850],[230,28,-620],[360,20,-410],[120,6,-280],[-140,0,-230]],
     zones: [{from:.22,to:.3,type:'bridge',width:10.8},{from:.42,to:.51,type:'wet'},{from:.64,to:.73,type:'wet'},{from:.85,to:.93,type:'narrow',width:10}],
     hazards: [{at:.16,x:.5,type:'barrier'},{at:.38,x:-.55,type:'barrier'},{at:.57,x:.35,type:'barrier',moving:true},{at:.79,x:-.25,type:'barrier',moving:true},{at:.91,x:.5,type:'barrier'}],
@@ -21155,7 +21155,7 @@ const Kart3D={
     if(this.renderer)return true;if(this.error)return false;
     try{
       const T=KartGL,r=this.renderer=new T.WebGLRenderer({antialias:!IS_XBOX,alpha:true,powerPreference:'high-performance'});
-      r.outputColorSpace=T.SRGBColorSpace;r.toneMapping=T.ACESFilmicToneMapping;r.toneMappingExposure=1.22;
+      r.outputColorSpace=T.SRGBColorSpace;r.toneMapping=7;r.toneMappingExposure=1.05; // 7 = Neutral: conserva el color saturado (ACES lo deslavaba)
       r.shadowMap.enabled=!IS_XBOX;r.shadowMap.type=T.PCFSoftShadowMap;
       this.rebuildEnvironment();
       r.domElement.id='kart-world';r.domElement.setAttribute('aria-hidden','true');
@@ -21234,7 +21234,7 @@ const Kart3D={
     const T=KartGL,info=C.info,neon=info.theme==='neon';
     const asphalt=KartWorld.texture('asphalt');
     asphalt.wrapS=asphalt.wrapT=T.RepeatWrapping;asphalt.anisotropy=Math.min(16,this.renderer.capabilities.getMaxAnisotropy());
-    const road=new T.MeshStandardMaterial({color:neon?'#30475f':info.theme==='canyon'?'#827972':'#89949e',map:asphalt,bumpMap:asphalt,bumpScale:.004,roughness:neon?.64:1,metalness:neon?.08:0});road.name='race-asphalt';
+    const road=new T.MeshStandardMaterial({color:neon?'#3a4a8c':info.theme==='canyon'?'#8f7a86':'#8e93ad',map:asphalt,bumpMap:asphalt,bumpScale:.004,roughness:neon?.64:1,metalness:neon?.08:0});road.name='race-asphalt';
     const terrain=KartWorld.material(info.theme==='canyon'?'earth':'grass','#a0ac8b',true),curb=new T.MeshStandardMaterial({vertexColors:true,roughness:.86});
     this.ribbon(C,-1,1,.03,road);
     const land=(s,x)=>{const noise=Math.sin(s*.007+x*.42)*Math.sin(s*.017-x*.4);return -Math.max(0,Math.abs(x)-1.6)*2+noise*Math.max(0,Math.abs(x)-1.8)*2.3;};
@@ -21263,10 +21263,10 @@ const Kart3D={
       for(let i=-1;i<2;i++){const q=C.world(b.s+i*3,b.x,.16);this.instance('box','#f8ffd7',[q.x,q.y,q.z],[p.width*.43,.025,.35],[0,Math.atan2(p.tx,p.tz),0],0,.5,'#9ee1a4');}}
     for(const ramp of C.ramps||[]){const p=C.sample(ramp.s),w=C.world(ramp.s,ramp.x,.6);this.instance('box','#d6b25c',[w.x,w.y,w.z],[p.width*.55,.3,11],[-.13,Math.atan2(p.tx,p.tz),0],.3);
       for(let i=0;i<3;i++){const v=C.world(ramp.s-4+i*2,ramp.x,.3+i*.27);this.instance('box','#ffe8a5',[v.x,v.y,v.z],[p.width*.5,.09,.25],[0,Math.atan2(p.tx,p.tz),0]);}}
-    const floor=new T.Mesh(new T.PlaneGeometry(12000,12000),KartModels.mat(info.theme==='canyon'?'#4e342f':info.theme==='neon'?'#142b41':'#82a76a',0,1));floor.rotation.x=-Math.PI/2;floor.position.set(1000,-90,0);floor.receiveShadow=true;this.scene.add(floor);
+    const floor=new T.Mesh(new T.PlaneGeometry(12000,12000),KartModels.mat(info.theme==='canyon'?'#8a4a3a':info.theme==='neon'?'#141c4a':'#62b05a',0,1));floor.rotation.x=-Math.PI/2;floor.position.set(1000,-90,0);floor.receiveShadow=true;this.scene.add(floor);
   },
   scenery(C){
-    const rng=srand(984+C.info.id.length),theme=C.info.theme,colors=['#e9c190','#d78467','#91b0a5','#d89f91','#a8bfd0'];
+    const rng=srand(984+C.info.id.length),theme=C.info.theme,colors=['#ffc857','#f47c5c','#45b8c8','#f58fb0','#b99aee','#fff0c8']; // la misma paleta de fachadas que el mundo del FPS
     for(let s=30;s<C.length;s+=theme==='town'?28:76){
       const p=C.sample(s),angle=Math.atan2(p.tx,p.tz);if(p.zone==='bridge')continue;
       for(const side of [-1,1]){
@@ -21348,8 +21348,8 @@ const Kart3D={
     for(let i=0;i<4;i++)this.instance('sphere',i%2?'#5e956c':'#488963',[w.x+Math.sin(i*2)*1.5,w.y+h+(i%2)*1.3,w.z+Math.cos(i*2)*1.5],[2.5,2.4,2.6]);
   },
   lighting(scene,theme){
-    const T=KartGL,night=theme==='neon';scene.add(new T.HemisphereLight(night?'#92b7ee':'#c9e8ff',night?'#142332':'#72865c',night?1.3:1.35));
-    const sun=new T.DirectionalLight(night?'#b7d6ff':theme==='canyon'?'#ffd2a3':'#fff2d0',night?1.4:2.5);sun.position.set(-60,110,-40);
+    const T=KartGL,night=theme==='neon',P=Style3D.THEMES[Style3D.themeOf({theme})];scene.add(new T.HemisphereLight(P.hemiSky,P.hemiGround,night?1.05:1.55));
+    const sun=new T.DirectionalLight(P.sunLight,night?1.5:2.7);sun.position.set(-60,110,-40);
     sun.castShadow=!IS_XBOX;sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-45,right:45,top:45,bottom:-45,near:.1,far:300});sun.shadow.bias=-.0007;sun.shadow.normalBias=.15;
     scene.add(sun);scene.add(sun.target);return sun;
   },
@@ -21362,7 +21362,7 @@ const Kart3D={
   },
   build(race){
     const T=KartGL;this.disposeScene();this.race=race;this.scene=new T.Scene();this.scene.environment=this.environment;this.scene.environmentIntensity=race.course.info.theme==='neon'?.18:.4;this.batches.clear();
-    this.scene.fog=new T.FogExp2(race.course.info.theme==='neon'?'#182841':race.course.info.theme==='canyon'?'#d5a580':'#b3d3de',.00029);
+    this.scene.fog=new T.FogExp2(Style3D.THEMES[Style3D.themeOf(race.course.info)].fog,race.course.info.theme==='neon'?.00022:.00034);
     this.sky(this.scene,race.course.info);this.sun=this.lighting(this.scene,race.course.info.theme);this.terrainSurface(race.course);this.track(race.course);this.scenery(race.course);this.flush();
     this.camera=new T.PerspectiveCamera(60,W/H,.45,6500);this.cameraPos=null;this.cameraLook=null;this.views=new Map();
     this.drivers=race.racers.map(r=>{const mesh=KartModels.kart(r.id,r.vehicle);this.scene.add(mesh);return mesh;});
@@ -21469,7 +21469,7 @@ const Kart3D={
     this.followCamera(race,p,alpha,this);
     const w=C.world(s,x),texel=90/this.sun.shadow.mapSize.x,sx=Math.round(w.x/texel)*texel,sz=Math.round(w.z/texel)*texel;
     this.sun.position.set(sx-65,w.y+110,sz-50);this.sun.target.position.set(sx,w.y,sz);this.sun.target.updateMatrixWorld();
-    this.renderer.shadowMap.enabled=!IS_XBOX&&!ART.lite&&Prefs.fx==='full';this.renderer.toneMappingExposure=C.info.theme==='neon'?1.18:1.12;
+    this.renderer.shadowMap.enabled=!IS_XBOX&&!ART.lite&&Prefs.fx==='full';this.renderer.toneMappingExposure=C.info.theme==='neon'?1.1:1;Style3D.tick(GameFeel.dt||1/60);Style3D.inkBudget(!ART.lite&&Prefs.fx==='full');
   },
   followCamera(race,p,alpha,view){
     const T=KartGL,C=race.course,v=KartMotion.view(p,alpha),s=v.s,x=v.x;
@@ -21982,6 +21982,180 @@ Kart3D.instance=function(type,color,pos,scale,rot,metal=0,rough=.8,emit=null){
 };
 const kartSceneryBase=Kart3D.scenery;
 Kart3D.scenery=function(C){kartSceneryBase.call(this,C);KartScenery.build(C);};
+
+// ---- js/style3d.js ----
+// ============================================================
+//  ESTILO ESMASH EN 3D — una sola dirección de arte para Kart, FPS y Total
+//  Las peleas son caricatura: tinta gruesa, color plano con una sombra, cielos pintados. Kart y FPS
+//  se veían como otro juego (grises, realistas, sin contorno). Aquí vive lo que los tres comparten:
+//   · sombreado: color saturado, luz de borde del cielo y, en personajes, sombra de un solo corte (cel)
+//   · tinta: contorno oscuro en personajes, vehículos, armas y objetos (casco invertido)
+//   · cielo pintado: degradado, sol con halo y rayos, nubes de caricatura con borde nítido, estrellas y aurora
+//  Todo se inyecta en los materiales que ya existen: ningún modelo se reescribe.
+// ============================================================
+const Style3D = {
+  INK: '#171226', ready: false, time: 0,
+  U: null, // uniformes compartidos por todos los materiales (se cambian una vez por escena)
+  // Paletas por ambiente: las mismas familias de color que los fondos de las peleas
+  THEMES: {
+    day:    { zenith: '#1f7fe0', mid: '#58b6f2', horizon: '#c8f0ff', haze: '#ffe9c4', sun: '#fff3c9', sunDir: [-.48, .52, -.62], cloudLit: '#ffffff', cloudShade: '#a9c4f2', cloudRim: '#ffffff', cover: .56, night: 0, rim: '#bfe6ff', fog: '#bfe6f2', hemiSky: '#cfeaff', hemiGround: '#8fae62', sunLight: '#fff0cf' },
+    sunset: { zenith: '#27358f', mid: '#8a5fc4', horizon: '#ffb47a', haze: '#ffe0a0', sun: '#ffd88a', sunDir: [-.55, .2, -.6], cloudLit: '#ffe6c8', cloudShade: '#8f5fae', cloudRim: '#fff4b8', cover: .56, night: 0, rim: '#ffd0b0', fog: '#e6b4a8', hemiSky: '#e8d6f0', hemiGround: '#a8705c', sunLight: '#ffd0a0' },
+    night:  { zenith: '#070a2c', mid: '#1b1f6b', horizon: '#6a3fb0', haze: '#ff5fc8', sun: '#cfe0ff', sunDir: [.38, .55, -.52], cloudLit: '#5a63c4', cloudShade: '#1f2260', cloudRim: '#7af0ff', cover: .6, night: 1, rim: '#6ab8ff', fog: '#10143c', hemiSky: '#7f96f0', hemiGround: '#221a44', sunLight: '#b9cdff' },
+  },
+  themeOf(info) { const t = info && info.theme; return t === 'canyon' || t === 'sunset' ? 'sunset' : t === 'neon' || t === 'night' ? 'night' : 'day'; },
+  uniforms() {
+    if (!this.U) { const T = KartGL; this.U = { rim: { value: new T.Color('#bfe6ff') }, rimPower: { value: 1 }, fogColor: { value: new T.Color('#bfe6f2') }, fogDensity: { value: .001 }, ink: { value: new T.Color(this.INK) }, time: { value: 0 } }; }
+    return this.U;
+  },
+  // ---------- sombreado ----------
+  install() {
+    if (this.ready || typeof KartGL === 'undefined') return; this.ready = true;
+    const S = this, proto = Object.getPrototypeOf(KartGL.MeshStandardMaterial.prototype);
+    proto.onBeforeCompile = function (shader) { if (this.isMeshStandardMaterial) S.inject(shader, this); };
+    proto.customProgramCacheKey = function () { return this.isMeshStandardMaterial ? 'esmash:' + S.variant(this) : ''; };
+  },
+  variant(m) { const u = m.userData || {}; return (u.esToon ? 'toon' : 'soft') + (u.esPlain ? ':plain' : '') + (u.esKey || ''); },
+  inject(shader, m) {
+    const U = this.uniforms(), u = m.userData || {}, toon = !!u.esToon;
+    shader.uniforms.esRim = U.rim; shader.uniforms.esRimPower = U.rimPower;
+    let f = shader.fragmentShader;
+    f = f.replace('#include <common>', '#include <common>\nuniform vec3 esRim;uniform float esRimPower;');
+    // color: más saturado que el pigmento original (texturas, color por vértice y por instancia incluidos)
+    if (!u.esPlain) f = f.replace('#include <color_fragment>', '#include <color_fragment>\n{float esL=dot(diffuseColor.rgb,vec3(.2126,.7152,.0722));diffuseColor.rgb=max(vec3(0.),mix(vec3(esL),diffuseColor.rgb,' + (toon ? '1.15' : '1.22') + '));}');
+    // personajes: la luz directa no se degrada, corta en dos tonos como la sombra dibujada de las peleas
+    if (toon) f = f.replace('#include <lights_physical_pars_fragment>', `#include <lights_physical_pars_fragment>
+void RE_Direct_Esmash(const in IncidentLight directLight,const in vec3 geometryPosition,const in vec3 geometryNormal,const in vec3 geometryViewDir,const in vec3 geometryClearcoatNormal,const in PhysicalMaterial material,inout ReflectedLight reflectedLight){
+ float esD=dot(geometryNormal,directLight.direction),esT=smoothstep(-.02,.09,esD);
+ reflectedLight.directDiffuse+=directLight.color*(esT*.58)*BRDF_Lambert(material.diffuseColor);
+ vec3 esH=normalize(directLight.direction+geometryViewDir);float esS=smoothstep(.955,.975,dot(geometryNormal,esH))*(1.-material.roughness);
+ reflectedLight.directSpecular+=directLight.color*esS*.1;
+}
+#undef RE_Direct
+#define RE_Direct RE_Direct_Esmash`);
+    // luz de borde: el cielo se asoma por la silueta (más arriba que abajo)
+    f = f.replace('#include <opaque_fragment>', `{vec3 esN=normalize(normal),esV=normalize(vViewPosition);float esF=1.-clamp(dot(esN,esV),0.,1.);
+ vec3 esUp=normalize((viewMatrix*vec4(0.,1.,0.,0.)).xyz);float esSky=.35+.65*clamp(.5+.5*dot(esN,esUp),0.,1.);
+ ${toon ? 'float esR=smoothstep(.62,.7,esF)*.34;' : 'float esR=esF*esF*esF*.42;'}
+ outgoingLight+=(diffuseColor.rgb*.75+.25)*esRim*esR*esSky*esRimPower;}
+#include <opaque_fragment>`);
+    shader.fragmentShader = f;
+  },
+  // material de caricatura (personajes): mismo pigmento, sombra de un corte
+  toon(color, metal = 0, rough = .7, emissive = null) {
+    const key = 'toon:' + [color, metal, rough, emissive].join(':'), M = KartModels.materials;
+    if (!M.has(key)) { const m = new KartGL.MeshStandardMaterial({ color, metalness: Math.min(metal, .35), roughness: Math.max(rough, .45), emissive: emissive || '#000000', emissiveIntensity: emissive ? 1.1 : 0 }); m.userData.esToon = true; M.set(key, m); }
+    return M.get(key);
+  },
+  // ---------- tinta ----------
+  inkMaterial(width) {
+    const key = 'esmash-ink:' + width, M = KartModels.materials;
+    if (M.has(key)) return M.get(key);
+    const T = KartGL, U = this.uniforms();
+    const m = new T.ShaderMaterial({
+      side: T.BackSide, uniforms: { width: { value: width }, ink: U.ink, fogColor: U.fogColor, fogDensity: U.fogDensity },
+      vertexShader: 'uniform float width;varying float vDepth;void main(){vec4 mv=modelViewMatrix*vec4(position,1.);vec3 n=normalize(normalMatrix*normal);float d=max(0.,-mv.z);mv.xyz+=n*width*(.75+min(d,90.)*.045);vDepth=d;gl_Position=projectionMatrix*mv;}',
+      fragmentShader: 'uniform vec3 ink,fogColor;uniform float fogDensity;varying float vDepth;void main(){float f=1.-exp(-fogDensity*fogDensity*vDepth*vDepth);gl_FragColor=vec4(mix(ink,fogColor,clamp(f,0.,1.)),1.);\n#include <tonemapping_fragment>\n#include <colorspace_fragment>\n}',
+    });
+    m.name = 'esmash-ink'; M.set(key, m); return m;
+  },
+  // contorno para un modelo ya armado. Se cuelga de cada malla (mismo movimiento, misma geometría).
+  outline(root, width = .022) {
+    if (!root || root.userData.esInked) return root; root.userData.esInked = true;
+    const T = KartGL, mat = this.inkMaterial(width), targets = [];
+    root.traverse(o => {
+      if (!o.isMesh || o.isInstancedMesh || o.userData.esInk || o.userData.noInk) return;
+      const m = o.material; if (!m || Array.isArray(m) || m.transparent || m.alphaTest > 0 || m.isMeshBasicMaterial || m.isShaderMaterial || m.side === T.DoubleSide) return;
+      if (!o.geometry.attributes.normal) return;
+      targets.push(o);
+    });
+    for (const o of targets) { const ink = new T.Mesh(o.geometry, mat); ink.userData.esInk = true; ink.name = 'ink'; ink.castShadow = ink.receiveShadow = false; ink.matrixAutoUpdate = false; o.add(ink); }
+    return root;
+  },
+  // la tinta cuesta una pasada extra por malla: se apaga sola con el presupuesto bajo
+  inkBudget(on) { for (const [key, m] of KartModels.materials) if (key.startsWith('esmash-ink:')) m.visible = on; },
+  // ---------- cielo ----------
+  skyMaterial(theme) {
+    const T = KartGL, P = this.THEMES[theme] || this.THEMES.day, U = this.uniforms(), col = c => ({ value: new T.Color(c) });
+    return new T.ShaderMaterial({
+      side: T.BackSide, depthWrite: false, fog: false,
+      uniforms: { time: U.time, zenith: col(P.zenith), mid: col(P.mid), horizon: col(P.horizon), haze: col(P.haze), sunColor: col(P.sun), cloudLit: col(P.cloudLit), cloudShade: col(P.cloudShade), cloudRim: col(P.cloudRim), sunDir: { value: new T.Vector3(...P.sunDir).normalize() }, cover: { value: P.cover }, night: { value: P.night } },
+      vertexShader: 'varying vec3 direction;void main(){direction=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+      fragmentShader: `varying vec3 direction;uniform vec3 zenith,mid,horizon,haze,sunColor,cloudLit,cloudShade,cloudRim,sunDir;uniform float time,cover,night;
+float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+1.),f.x),f.y);}
+float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<5;i++){v+=a*noise(p);p=p*2.07+vec2(13.2,4.7);a*=.5;}return v;}
+// nube de caricatura: borde nítido, panza en sombra, cresta iluminada hacia el sol
+vec4 clouds(vec3 d,float scale,float speed,float density){
+ vec2 uv=d.xz/max(.12,d.y+.14)*scale+vec2(time*speed,time*speed*.35);
+ float c=fbm(uv)+.18*fbm(uv*3.1+7.);float edge=cover+.2-density*.2;
+ float mask=smoothstep(edge,edge+.035,c)*smoothstep(.015,.11,d.y);
+ vec2 toSun=normalize(sunDir.xz+vec2(1e-4))*.09;float lit=smoothstep(-.03,.07,c-fbm(uv+toSun)-.18*fbm((uv+toSun)*3.1+7.)+.035);
+ float core=smoothstep(edge+.05,edge+.3,c);
+ vec3 col=mix(cloudShade,cloudLit,max(lit,.25*core));col=mix(col,cloudRim,(1.-smoothstep(edge+.03,edge+.1,c))*.75*lit);
+ return vec4(col,mask);}
+void main(){vec3 d=normalize(direction);float h=d.y;
+ vec3 sky=mix(horizon,mid,smoothstep(-.02,.22,h));sky=mix(sky,zenith,smoothstep(.16,.78,h));
+ sky=mix(sky,haze,(1.-smoothstep(-.06,.1,h))*.55);
+ float sd=max(0.,dot(d,sunDir));
+ // halo ancho, corona y disco; rayos suaves que giran muy despacio, como en los escenarios de pelea
+ sky+=sunColor*(pow(sd,6.)*.22+pow(sd,48.)*.5);
+ vec3 sx=normalize(cross(sunDir,vec3(0.,1.,0.))),sy=cross(sx,sunDir);float ang=atan(dot(d,sy),dot(d,sx));
+ float rays=(.5+.5*sin(ang*14.+time*.05))*(.5+.5*sin(ang*5.-time*.03));sky+=sunColor*rays*pow(sd,5.)*.16*(1.-night*.6);
+ sky=mix(sky,sunColor*(1.6-night*.5),smoothstep(.9991,.9996,sd));
+ if(night>.5){vec2 su=d.xz/max(.2,abs(d.y)+.25)*90.;vec2 cell=floor(su);float st=step(.985,hash(cell));float tw=.6+.4*sin(time*2.+hash(cell+3.)*40.);
+  sky+=vec3(.9,.95,1.)*st*tw*(1.-smoothstep(.05,.32,length(fract(su)-.5)))*smoothstep(.06,.4,h);
+  float band=sin(d.x*5.+time*.12+sin(d.z*3.)*1.3)*.5+.5;float au=smoothstep(.12,.3,h)*(1.-smoothstep(.34,.62,h))*band;
+  sky+=mix(vec3(.1,.95,.8),vec3(.85,.3,1.),.5+.5*sin(d.z*4.+time*.07))*au*.34;}
+ vec4 far=clouds(d,1.15,.004,.35);sky=mix(sky,mix(far.rgb,horizon,.45),far.a*.8);
+ vec4 near=clouds(d,.62,.009,1.);sky=mix(sky,near.rgb,near.a*(.96-night*.25));
+ gl_FragColor=vec4(sky,1.);
+#include <tonemapping_fragment>
+#include <colorspace_fragment>
+}`,
+    });
+  },
+  sky(scene, info) {
+    const T = KartGL, theme = this.themeOf(info), mesh = new T.Mesh(new T.SphereGeometry(6500, 32, 20), this.skyMaterial(theme));
+    mesh.frustumCulled = false; mesh.name = 'atmospheric-sky'; mesh.renderOrder = -10; scene.add(mesh); this.apply(scene, theme); return mesh;
+  },
+  // uniformes compartidos de la escena activa: color de la luz de borde y niebla de la tinta
+  apply(scene, theme) {
+    const P = this.THEMES[theme] || this.THEMES.day, U = this.uniforms(); this.install();
+    U.rim.value.set(P.rim); U.rimPower.value = theme === 'night' ? .8 : 1;
+    if (scene.fog) { U.fogColor.value.copy(scene.fog.color); U.fogDensity.value = scene.fog.density || 0; }
+    scene.userData.esTheme = theme; return P;
+  },
+  tick(dt) { this.time += dt; if (this.U) this.U.time.value = this.time; },
+  // ---------- vegetación compartida ----------
+  // add(tipo, color, posición, escala, rotación): cada modo la manda a su propio lote de geometría.
+  // Copas de bloque facetadas con tres tonos (sombra abajo, luz arriba); una de cada cinco florece.
+  tree(add, x, y, z, h, rng, opt = {}) {
+    const roll = rng(), kind = roll < .16 ? 'jacaranda' : roll < .26 ? 'flamboyan' : roll < .44 ? 'pine' : 'round';
+    const tones = kind === 'jacaranda' ? ['#8b5fd0', '#b58af0', '#d9bcff'] : kind === 'flamboyan' ? ['#e2553a', '#ff7f4a', '#ffb347'] : kind === 'pine' ? ['#2f8f5a', '#49ab62', '#7fca6a'] : ['#3f9f52', '#62bf55', '#a2de5e'];
+    const top = y + h * .58, r = h * .26;
+    if (opt.trunk !== false) add('branch', '#9a6a44', [x, y + h * .3, z], [h * .05, h * .62, h * .05], [.02, 0, .03]);
+    if (kind === 'pine') { for (let i = 0; i < 3; i++) add('cone', tones[i], [x, top + i * r * .95 + r * .3, z], [r * (1.45 - i * .36), r * 1.7, r * (1.45 - i * .36)], [0, rng() * 6, 0]); return; }
+    add('branch', '#9a6a44', [x, top + r * .1, z], [h * .035, r * 1.2, h * .035]);
+    const n = 5 + Math.floor(rng() * 3);
+    for (let i = 0; i < n; i++) {
+      const a = i * 2.399 + rng(), lift = i / (n - 1), rad = r * (1.05 - lift * .75) * (i ? 1 : 0), s = r * (1.25 - lift * .45) * (.85 + rng() * .3);
+      add('hill', tones[lift < .34 ? 0 : lift < .72 ? 1 : 2], [x + Math.cos(a) * rad, top + r * (.55 + lift * 1.25), z + Math.sin(a) * rad], [s, s * .82, s], [rng() * .5, rng() * 6, rng() * .5]);
+    }
+  },
+};
+Style3D.install();
+// El cielo de Kart y FPS es el mismo cielo pintado.
+KartWorld.sky = (scene, info) => { Kart3D.skyMesh = Style3D.sky(scene, info); };
+// Personajes: todo lo que arma CharacterModels usa el material de caricatura.
+Style3D.toonDepth = 0;
+{
+  const mat = KartModels.mat; KartModels.mat = function (color, metal, rough, emissive) { return Style3D.toonDepth > 0 ? Style3D.toon(color, metal, rough, emissive) : mat.call(this, color, metal, rough, emissive); };
+  const create = CharacterModels.create; CharacterModels.create = function (id) { Style3D.toonDepth++; try { return create.call(this, id); } finally { Style3D.toonDepth--; } };
+  const drawing = CharacterArt.drawing; CharacterArt.drawing = function (id, part, face) { const art = drawing.call(this, id, part, face); art.material.userData.esToon = true; return art; };
+  const kart = KartModels.kart; KartModels.kart = function (id, vehicle) { return Style3D.outline(kart.call(this, id, vehicle), .026); };
+}
+// Las pistas usan los mismos árboles de bloque que el mundo del FPS.
+KartWorld.tree = (w, rng) => Style3D.tree((type, color, pos, scale, rot) => Kart3D.instance(type, color, pos, scale, rot, 0, .9), w.x, w.y, w.z, 7.5 + rng() * 4, rng);
 
 // ---- js/kart-item-art.js ----
 const KartItemArt={
@@ -22842,7 +23016,7 @@ const FPSArchitecture={
   world.decor.push(b);return b;
  },
  build(view,b,batch){
-  const T=KartGL,S=FPSScenery,trim=S.material('plaster','#eee7d6'),base=S.material('stone','#aaa997'),metal=S.material('steel','#677572'),dark=KartModels.mat('#273b3b',.3,.65),wood=S.material('wood','#a28b68'),roof=S.material('stone','#c6c5b4');
+  const T=KartGL,S=FPSScenery,trim=S.material('plaster','#fffaf0'),base=S.material('stone','#9aa0c0'),metal=S.material('steel','#5f8fb0'),dark=KartModels.mat('#2f4a66',.3,.65),wood=S.material('wood','#e0a868'),roof=S.material('stone','#f0876a');
   const box=(mat,x,y,z,w,h,d,rot)=>batch.add('box',mat,[x,y,z],[w,h,d],rot);
   for(const wall of b.walls){
    const {axis,side}=wall,face=(u,y,out)=>[b.x+(axis==='x'?side*(b.w/2+out):u),b.y+y,b.z+(axis==='z'?side*(b.d/2+out):u)],bar=(mat,u,y,out,w,h,d)=>batch.add('box',mat,face(u,y,out),axis==='z'?[w,h,d]:[d,h,w]);
@@ -22862,12 +23036,12 @@ const FPSArchitecture={
    }
    // Interior lower wall paint and skirting stay inside the room, with doors free.
    const segments=door?[[-(wall.length+door.w)/4,(wall.length-door.w)/2],[(wall.length+door.w)/4,(wall.length-door.w)/2]]:[[0,wall.length]];
-   for(const [u,w]of segments){bar(base,u,.09,-.239,w,.18,.018);bar(S.material('plaster','#b0b9ac'),u,.61,-.238,w,.85,.012);}
+   for(const [u,w]of segments){bar(base,u,.09,-.239,w,.18,.018);bar(S.material('plaster','#d9e6f2'),u,.61,-.238,w,.85,.012);}
   }
   // Four corner quoins, flush with the adjoining masonry.
   for(const sx of [-1,1])for(const sz of [-1,1])for(let j=0;j<Math.floor(b.h/.52);j++)box(trim,b.x+sx*b.w/2,b.y+.26+j*.52,b.z+sz*b.d/2,.58,.48,.58);
   for(const side of [-1,1]){const x=b.x+side*(b.w/2-.5),z=b.z+b.d/2+.33;batch.add('branch',metal,[x,b.y+b.h/2,z],[.055,b.h,.055]);for(let j=1;j<b.h;j+=1.4)box(dark,x,b.y+j,z,.16,.04,.14);}
-  const doorZ=b.z+b.d/2,awning=S.material('roof',b.x<0?'#b67f5b':'#68887d');box(awning,b.x,b.y+3.12,doorZ+1.15,4.8,.11,1.9,[.08,0,0]);box(metal,b.x,b.y+3.02,doorZ+2.02,4.85,.12,.08);
+  const doorZ=b.z+b.d/2,awning=S.material('roof',b.x<0?'#ff6f61':'#2ec4b6');box(awning,b.x,b.y+3.12,doorZ+1.15,4.8,.11,1.9,[.08,0,0]);box(metal,b.x,b.y+3.02,doorZ+2.02,4.85,.12,.08);
   for(const s of [-1,1]){box(metal,b.x+s*2.22,b.y+1.5,doorZ+1.96,.065,3,.065);box(base,b.x+s*2.22,b.y+.1,doorZ+1.96,.3,.2,.3);}
   // Roof machinery has feet and a separate kerb; no floating cylinders.
   box(roof,b.x-4,b.y+b.h+.46,b.z-2,2.4,.28,2.4);batch.add('cylinder',S.material('steel','#a4afaa'),[b.x-4,b.y+b.h+1.32,b.z-2],[.9,1.45,.9]);
@@ -22923,7 +23097,7 @@ const FPSWorld={
  init(){
   if(this.solids.length)return;
   const block=(x,z,w,d,h,type='wall',base=this.height(x,z))=>{const q={x,z,w,d,h,y:base,type};this.solids.push(q);return q;};
-  for(const args of [[38,22,26,22,7,'#d3c1a1'],[-44,-34,25,30,9,'#92a4a1']])FPSArchitecture.add(this,block,...args);
+  for(const args of [[38,22,26,22,7,'#ffc857'],[-44,-34,25,30,9,'#45b8c8']])FPSArchitecture.add(this,block,...args);
   const rng=srand(7441);
   for(let i=0;i<34;i++){
    const x=(rng()-.5)*180,z=(rng()-.5)*180;
@@ -22936,7 +23110,7 @@ const FPSWorld={
   this.dress(block);this.cover(block);FPSSupplies.populate(this);
  },
  dress(block){
-  for(const args of [[86,-48,24,25,6.5,'#d89973'],[-53,65,28,19,5.7,'#dfd5ba']])FPSArchitecture.add(this,block,...args);
+  for(const args of [[86,-48,24,25,6.5,'#f47c5c'],[-53,65,28,19,5.7,'#b99aee']])FPSArchitecture.add(this,block,...args);
   for(const [x,z,w,d,h,type]of [[-22,-17,8,1.1,1.1,'stone'],[22,16,8,1.1,1.1,'stone'],[-26,25,1.2,9,1.2,'stone'],[24,-29,1.2,8,1.2,'stone'],[56,62,12,4.8,3,'container'],[72,61,12,4.8,3,'container'],[61,74,4.8,12,3,'container'],[-73,-2,9,1,1.3,'stone'],[46,-62,5,2,1.2,'barrier']])block(x,z,w,d,h,type);
   for(const x of [-7,7])block(x,-76,1.5,1.8,7.4,'stone');block(0,-76,15.5,1.8,1.2,'stone',this.height(0,-76)+6.2);
   const tx=91,tz=87,base=this.height(tx,tz);for(const x of [-3,3])for(const z of [-3,3])block(tx+x,tz+z,.42,.42,10.7,'steel',base);
@@ -22945,8 +23119,8 @@ const FPSWorld={
   this.decor.push({type:'tower',x:tx,z:tz,y:base});
   // Autos estacionados y tambos a la orilla de los caminos: cobertura real (frenan balas), lejos de los puntos de aparición
   const free=(x,z,w,d)=>!this.spawns.some(p=>Math.hypot(x-p[0],z-p[1])<10)&&!this.solids.some(b=>Math.abs(x-b.x)<b.w/2+w/2+1.2&&Math.abs(z-b.z)<b.d/2+d/2+1.2);
-  for(const [x,z,rot,color]of [[5.6,-31,0,'#d9d6cf'],[-5.6,40,0,'#34465f'],[5.8,72,0,'#7a2b2b'],[-31,29.7,1,'#b8b2a3'],[-72,20.6,1,'#55636a'],[48,-8,1,'#c9c2b4']]){const w=rot?4.4:1.85,d=rot?1.85:4.4;if(!free(x,z,w,d))continue;const q=block(x,z,w,d,1.45,'car');q.color=color;q.rot=rot;}
-  for(const [cx,cz]of [[29,33],[-27,-49],[61,57]])for(const [ox,oz]of [[0,0],[.7,.15],[.25,.68]]){const x=cx+ox,z=cz+oz;if(free(x,z,.6,.6)){const q=block(x,z,.62,.62,.9,'barrel');q.color=['#2f4f7a','#7a3f22','#4f5a3a'][Math.abs(Math.round(cx))%3];}}
+  for(const [x,z,rot,color]of [[5.6,-31,0,'#f25c54'],[-5.6,40,0,'#3ab4f2'],[5.8,72,0,'#ffd23f'],[-31,29.7,1,'#7bd389'],[-72,20.6,1,'#ff8c42'],[48,-8,1,'#f7f7f2']]){const w=rot?4.4:1.85,d=rot?1.85:4.4;if(!free(x,z,w,d))continue;const q=block(x,z,w,d,1.45,'car');q.color=color;q.rot=rot;}
+  for(const [cx,cz]of [[29,33],[-27,-49],[61,57]])for(const [ox,oz]of [[0,0],[.7,.15],[.25,.68]]){const x=cx+ox,z=cz+oz;if(free(x,z,.6,.6)){const q=block(x,z,.62,.62,.9,'barrel');q.color=['#2f8fd6','#f26b3a','#49b86b'][Math.abs(Math.round(cx))%3];}}
   // Tree trunks are cover too. Foliage remains soft, translucent dressing.
   const rng=srand(6192);for(let i=0;i<340;i++){
    const x=(rng()-.5)*530,z=(rng()-.5)*530,near=Math.abs(x)<100&&Math.abs(z)<108;
@@ -23200,13 +23374,13 @@ const FPSScenery={
  begin(){this.textures.clear();this.materials.clear();},
  texture(kind){
   if(this.textures.has(kind))return this.textures.get(kind);const T=KartGL,n=512,cv=mkCanvas(n,n),c=cv.getContext('2d'),rng=srand(9713+kind.length*107),im=c.createImageData(n,n);
-  const palette={plaster:[222,210,185],stone:[152,151,138],grass:[112,135,87],earth:[174,148,104],steel:[137,153,155],wood:[157,125,84],roof:[114,135,139],concrete:[179,182,171],window:[76,111,128],sandbag:[184,171,134],gabion:[153,151,132],supply:[142,128,97]},base=palette[kind]||palette.stone;
-  for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=(y*n+x)*4,noise=(rng()-.5)*(kind==='plaster'?13:35)+Math.sin(x*.037)*Math.cos(y*.051)*(kind==='plaster'?.7:9)+Math.sin(x*.11+y*.023)*(kind==='plaster'?.4:3);for(let k=0;k<3;k++)im.data[i+k]=clamp(base[k]+noise,0,255);im.data[i+3]=255;}c.putImageData(im,0,0);
+  const palette={plaster:[240,234,224],stone:[214,210,200],grass:[226,236,214],earth:[232,214,184],steel:[206,214,218],wood:[222,190,146],roof:[214,222,226],concrete:[220,220,212],window:[76,111,128],sandbag:[232,214,168],gabion:[206,204,190],supply:[212,196,156],cliff:[226,226,220]},base=palette[kind]||palette.stone,soft=.36; // estilo pintado: color limpio, grano mínimo
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){const i=(y*n+x)*4,noise=((rng()-.5)*(kind==='plaster'?13:35)+Math.sin(x*.037)*Math.cos(y*.051)*(kind==='plaster'?.7:9)+Math.sin(x*.11+y*.023)*(kind==='plaster'?.4:3))*soft;for(let k=0;k<3;k++)im.data[i+k]=clamp(base[k]+noise,0,255);im.data[i+3]=255;}c.putImageData(im,0,0);
   if(kind==='plaster'){for(let i=0;i<85;i++){const x=rng()*n,y=rng()*n;c.fillStyle='rgba(91,80,61,.07)';c.fillRect(x,y,2+rng()*27,2+rng()*6);}for(let i=0;i<6;i++){let x=rng()*n,y=rng()*n;c.strokeStyle='rgba(81,76,65,.25)';c.lineWidth=.6;c.beginPath();c.moveTo(x,y);for(let j=0;j<8;j++){x+=(rng()-.5)*14;y+=rng()*9;c.lineTo(x,y);}c.stroke();}}
-  if(kind==='window'){const sky=c.createLinearGradient(0,0,0,n);sky.addColorStop(0,'#9bb7c2');sky.addColorStop(.42,'#426b80');sky.addColorStop(1,'#162e3b');c.fillStyle=sky;c.fillRect(0,0,n,n);c.fillStyle='rgba(222,235,235,.14)';c.beginPath();c.moveTo(40,0);c.lineTo(150,0);c.lineTo(n,390);c.lineTo(n,480);c.closePath();c.fill();c.fillStyle='rgba(12,27,34,.12)';c.fillRect(0,n-22,n,22);}
-  if(kind==='stone'){for(let row=0;row<8;row++)for(let col=-1;col<5;col++){const x=col*128+(row%2)*64,y=row*64;c.strokeStyle='#656f66';c.lineWidth=2;c.strokeRect(x+1,y+1,126,62);c.strokeStyle='rgba(237,234,212,.35)';c.lineWidth=1;c.strokeRect(x+4,y+4,120,56);}}
-  if(kind==='grass')for(let i=0;i<15000;i++){const x=rng()*n,y=rng()*n;c.strokeStyle=i%3?'rgba(49,75,32,.22)':'rgba(222,211,137,.3)';c.lineWidth=.5;c.beginPath();c.moveTo(x,y);c.lineTo(x+(rng()-.5)*4,y-2-rng()*8);c.stroke();}
-  if(kind==='steel'||kind==='roof'){for(let i=0;i<32;i++){const x=i*16;c.fillStyle='rgba(13,40,48,.23)';c.fillRect(x,0,3,n);c.fillStyle='rgba(240,248,237,.25)';c.fillRect(x+3,0,2,n);}for(let i=0;i<80;i++){c.fillStyle='rgba(139,79,41,.2)';c.fillRect(rng()*n,rng()*n,1+rng()*3,3+rng()*26);}}
+  if(kind==='window'){const sky=c.createLinearGradient(0,0,0,n);sky.addColorStop(0,'#c9f1ff');sky.addColorStop(.45,'#58b4e6');sky.addColorStop(1,'#2a6fb0');c.fillStyle=sky;c.fillRect(0,0,n,n);c.fillStyle='rgba(255,255,255,.42)';c.beginPath();c.moveTo(40,0);c.lineTo(150,0);c.lineTo(n,390);c.lineTo(n,480);c.closePath();c.fill();c.fillStyle='rgba(12,27,34,.12)';c.fillRect(0,n-22,n,22);}
+  if(kind==='stone'){for(let row=0;row<8;row++)for(let col=-1;col<5;col++){const x=col*128+(row%2)*64,y=row*64;c.strokeStyle='rgba(120,112,128,.55)';c.lineWidth=3;c.strokeRect(x+1,y+1,126,62);c.strokeStyle='rgba(255,252,240,.5)';c.lineWidth=1;c.strokeRect(x+4,y+4,120,56);}}
+  if(kind==='grass')for(let i=0;i<15000;i++){const x=rng()*n,y=rng()*n;c.strokeStyle=i%3?'rgba(70,120,60,.1)':'rgba(255,255,220,.14)';c.lineWidth=.5;c.beginPath();c.moveTo(x,y);c.lineTo(x+(rng()-.5)*4,y-2-rng()*8);c.stroke();}
+  if(kind==='steel'||kind==='roof'){for(let i=0;i<32;i++){const x=i*16;c.fillStyle='rgba(40,60,90,.16)';c.fillRect(x,0,3,n);c.fillStyle='rgba(255,255,255,.3)';c.fillRect(x+3,0,2,n);}}
   if(kind==='wood'){for(let i=0;i<65;i++){c.strokeStyle='rgba(61,43,29,.15)';c.beginPath();c.moveTo(i*8,0);c.bezierCurveTo(i*8+9,180,i*8-8,330,i*8+2,n);c.stroke();}for(let i=0;i<5;i++){c.fillStyle='#635b41';c.fillRect(i*104,0,2,n);}}
   if(kind==='sandbag'){for(let i=0;i<n;i+=4){c.fillStyle='rgba(40,43,27,.1)';c.fillRect(i,0,1,n);c.fillRect(0,i,n,1);}c.strokeStyle='rgba(58,52,31,.4)';c.setLineDash([3,3]);c.strokeRect(8,8,n-16,n-16);}
   if(kind==='gabion'){for(let i=0;i<1300;i++){const x=rng()*n,y=rng()*n;c.fillStyle=['#7b8177','#b1b29e','#959a87','#c4c2ac'][i%4];c.beginPath();c.ellipse(x,y,4+rng()*9,3+rng()*6,rng()*3,0,TAU);c.fill();}c.strokeStyle='rgba(37,50,48,.7)';c.lineWidth=1.4;for(let i=0;i<n;i+=24){c.beginPath();c.moveTo(i,0);c.lineTo(i,n);c.moveTo(0,i);c.lineTo(n,i);c.stroke();}}
@@ -23214,18 +23388,18 @@ const FPSScenery={
   const tex=new T.CanvasTexture(cv);tex.colorSpace=T.SRGBColorSpace;tex.wrapS=tex.wrapT=T.RepeatWrapping;tex.anisotropy=8;this.textures.set(kind,tex);return tex;
  },
  // el pasto y la tierra se leen dos veces (otra escala y otro giro) y se mezclan: así no se ve la cuadrícula del mosaico
- antiTile(m){m.onBeforeCompile=sh=>{sh.fragmentShader=sh.fragmentShader.replace('#include <map_fragment>','#ifdef USE_MAP\n vec4 tileA=texture2D(map,vMapUv),tileB=texture2D(map,mat2(.8,-.6,.6,.8)*vMapUv*.43+.37);diffuseColor*=mix(tileA,tileB,.45);\n#endif');};m.customProgramCacheKey=()=>'fps-anti-tile';return m;},
+ antiTile(m){m.onBeforeCompile=sh=>{sh.fragmentShader=sh.fragmentShader.replace('#include <map_fragment>','#ifdef USE_MAP\n vec4 tileA=texture2D(map,vMapUv),tileB=texture2D(map,mat2(.8,-.6,.6,.8)*vMapUv*.43+.37);diffuseColor*=mix(tileA,tileB,.45);\n#endif');Style3D.inject(sh,m);};m.customProgramCacheKey=()=>'fps-anti-tile-esmash';return m;},
  // manchas grandes de pasto verde, seco y oscuro (ruido suave) con orillas graduales hacia caminos y río
  groundColor(x,z,h,river,path){
-  const T=KartGL,P=this.palette||(this.palette={lush:new T.Color('#98b072'),dry:new T.Color('#c2bd8c'),dark:new T.Color('#7a945c'),high:new T.Color('#9ba877'),path:new T.Color('#cdb889'),bank:new T.Color('#d3c3a2')}),c=new T.Color();
+  const T=KartGL,P=this.palette||(this.palette={lush:new T.Color('#7fb568'),dry:new T.Color('#a8c474'),dark:new T.Color('#5f9c66'),high:new T.Color('#97c284'),path:new T.Color('#e6c692'),bank:new T.Color('#eedcae')}),c=new T.Color();
   const n1=Math.sin(x*.021+Math.sin(z*.017)*1.6)*Math.cos(z*.019-Math.sin(x*.013)*1.4),n2=Math.sin(x*.067+z*.041)*Math.cos(z*.073-x*.029),s=(a,b,v)=>{const t=clamp((v-a)/(b-a),0,1);return t*t*(3-2*t);};
   c.copy(P.lush).lerp(P.dry,s(.05,.7,n1)*.9).lerp(P.dark,s(.3,.85,-n1)*.8).lerp(P.high,s(11,17,h));c.multiplyScalar(.93+n2*.07);
-  return c.lerp(P.path,1-s(6,9.5,path)).lerp(P.bank,1-s(14,18,river));
+  return c.lerp(P.path,1-s(4.6,6.4,path)).lerp(P.bank,1-s(14,18,river));
  },
  material(kind,color='#ffffff',vertexColors=false){const key=kind+color+vertexColors;if(!this.materials.has(key)){const map=this.texture(kind);this.materials.set(key,(kind==='grass'||kind==='earth'?this.antiTile.bind(this):m=>m)(new KartGL.MeshStandardMaterial({color,map,bumpMap:map,bumpScale:kind==='window'?0:kind==='stone'?.065:kind==='plaster'?.012:.025,roughness:kind==='window'?.19:kind==='steel'?.57:.91,metalness:kind==='window'?.48:kind==='steel'?.55:0,vertexColors})));}return this.materials.get(key);},
  // auto compacto: carrocería con pintura metálica, cabina con vidrios oscuros, llantas, defensas y faros
  car(b,batch){
-  const T=KartGL,paint=KartModels.mat(b.color||'#c9c2b4',.55,.32),glass=KartModels.mat('#1b2730',.6,.08),rubber=KartModels.mat('#18191a',0,.9),trim=KartModels.mat('#26292b',.3,.6),chrome=KartModels.mat('#b8bec2',.9,.25),lamp=KartModels.mat('#eef3f2',.2,.2,'#2b2b26'),tail=KartModels.mat('#a3241f',.2,.3,'#3a0806');
+  const T=KartGL,paint=KartModels.paint(b.color||'#f25c54',.2),glass=KartModels.mat('#7fd4f5',.5,.08),rubber=KartModels.mat('#18191a',0,.9),trim=KartModels.mat('#26292b',.3,.6),chrome=KartModels.mat('#b8bec2',.9,.25),lamp=KartModels.mat('#eef3f2',.2,.2,'#2b2b26'),tail=KartModels.mat('#a3241f',.2,.3,'#3a0806');
   const ry=b.rot?Math.PI/2:0,c=Math.cos(ry),s=Math.sin(ry),at=(x,y,z)=>[b.x+x*c+z*s,b.y+y,b.z-x*s+z*c],add=(type,m,p,sc,r=[0,0,0])=>batch.add(type,m,at(...p),sc,[r[0],r[1]+ry,r[2]]);
   FPSGear.rounded();add('fps-rounded',paint,[0,.52,0],[1.82,.66,4.4]);add('fps-rounded',paint,[0,1.1,-.18],[1.6,.56,2.25]);
   add('box',glass,[0,1.1,.98],[1.46,.48,.05],[-.62,0,0]);add('box',glass,[0,1.1,-1.33],[1.42,.44,.05],[.66,0,0]);for(const x of [-1,1])add('box',glass,[x*.805,1.13,-.18],[.03,.38,1.95]);
@@ -23242,11 +23416,11 @@ const FPSScenery={
   const T=KartGL,geo=new T.BoxGeometry(b.w,b.h,b.d),p=geo.attributes.position,n=geo.attributes.normal,uv=geo.attributes.uv;
   for(let i=0;i<p.count;i++){const nx=Math.abs(n.getX(i)),ny=Math.abs(n.getY(i));uv.setXY(i,(nx>.5?p.getZ(i):p.getX(i))/3.5,(ny>.5?p.getZ(i):p.getY(i))/3.5);}
   const kind=b.finish==='concrete'?'concrete':b.finish==='floor'?'stone':b.type==='plaster'?'plaster':['steel','container'].includes(b.type)?'steel':b.type==='roof'?'roof':['crate','bridge','trunk'].includes(b.type)?'wood':'stone';
-  const color=(b.finish==='concrete'?'#b8beb2':b.finish==='floor'?'#c3c0ad':null)||b.color||({container:b.x>65?'#4a8290':'#bb7650',roof:'#d0ddd7',trunk:'#88775a',crate:'#d1ad7c',barrier:'#d4d9cb',steel:'#65828b',bridge:'#c2a57f',stone:'#d1cdb7'}[b.type])||'#d6d5c7';
+  const color=(b.finish==='concrete'?'#d9d6e0':b.finish==='floor'?'#e8dcc6':null)||b.color||({container:b.x>65?'#35b3c9':b.z>70?'#f2c53d':'#f0714d',roof:'#e8eef2',trunk:'#a8744a',crate:'#f0b660',barrier:'#f6f1e4',steel:'#5fa7c4',bridge:'#e0a868',stone:'#e6ddc8'}[b.type])||'#e8e4d8';
   batch.geometry(geo,this.material(kind,color),[b.x,b.y+b.h/2,b.z]);
  },
  cover(q,batch){
-  const T=KartGL,bag=q.type==='sandbag',rock=q.type==='gabion',mat=this.material(bag?'sandbag':rock?'gabion':'wood',bag?'#ede1be':rock?'#d3d2b5':'#a5b5a2'),rim=this.material('steel','#697570'),wood=this.material('wood','#cfb48c');
+  const T=KartGL,bag=q.type==='sandbag',rock=q.type==='gabion',mat=this.material(bag?'sandbag':rock?'gabion':'wood',bag?'#f2d896':rock?'#cfd2dc':'#5fc0a8'),rim=this.material('steel','#4f6f8f'),wood=this.material('wood','#f0c070');
   // The dense core fills its collision envelope. The small bevel is cosmetic.
   const geo=new T.BoxGeometry(q.w-(bag?.05:0),q.h-(bag?.3:0),q.d*(bag?.4:1));batch.geometry(geo,mat,[q.x,q.y+q.h/2,q.z]);
   if(bag){
@@ -23256,23 +23430,23 @@ const FPSScenery={
   else if(rock){for(const s of [-1,1]){batch.add('box',rim,[q.x+s*q.w/2,q.y+q.h/2,q.z],[.035,q.h,.035]);batch.add('box',rim,[q.x,q.y+q.h,q.z+s*q.d/2],[q.w,.025,.025]);}}
   else{for(const side of [-1,1])for(const k of [-1,1]){batch.add('box',rim,[q.x+k*q.w*.36,q.y+q.h/2,q.z+side*(q.d/2+.025)],[.09,q.h,.05]);batch.add('box',wood,[q.x,q.y+q.h/2+k*(q.h/2-.1),q.z+side*(q.d/2+.04)],[q.w,.13,.08]);}batch.add('box',rim,[q.x,q.y+q.h+.025,q.z],[q.w,.04,q.d]);}
  },
- batch(){const bins=new Map(),T=KartGL;return {geometry(g,mat,pos){g.translate(...pos);if(!bins.has(mat))bins.set(mat,[]);bins.get(mat).push(g);},add(type,mat,pos,scale,rot){const g=KartModels.geo(type).clone().applyMatrix4(KartModels.matrix(pos,scale,rot));if(!bins.has(mat))bins.set(mat,[]);bins.get(mat).push(g);},finish(scene,cast=true){for(const [mat,gs]of bins){const merged=T.mergeGeometries(gs,false),mesh=new T.Mesh(merged,mat);gs.forEach(g=>g.dispose());mesh.castShadow=cast;mesh.receiveShadow=true;scene.add(mesh);}bins.clear();}};},
+ batch(){const bins=new Map(),T=KartGL;return {geometry(g,mat,pos){g.translate(...pos);if(!bins.has(mat))bins.set(mat,[]);bins.get(mat).push(g);},add(type,mat,pos,scale,rot){const g=KartModels.geo(type).clone().applyMatrix4(KartModels.matrix(pos,scale,rot));if(!bins.has(mat))bins.set(mat,[]);bins.get(mat).push(g);},finish(scene,cast=true){for(const [mat,gs0]of bins){const mixed=gs0.some(g=>!g.index)&&gs0.some(g=>g.index),gs=mixed?gs0.map(g=>{if(!g.index)return g;const n=g.toNonIndexed();g.dispose();return n;}):gs0;gs.forEach(g=>g.clearGroups());const merged=T.mergeGeometries(gs,false),mesh=new T.Mesh(merged,mat);gs.forEach(g=>g.dispose());mesh.castShadow=cast;mesh.receiveShadow=true;scene.add(mesh);}bins.clear();}};},
  build(view){
-  this.begin();const T=KartGL,scene=view.scene;scene.fog=new T.FogExp2('#b7ccd0',.00165);scene.environmentIntensity=.32;
+  this.begin();const T=KartGL,scene=view.scene;scene.fog=new T.FogExp2(Style3D.THEMES.day.fog,.0017);scene.environmentIntensity=.34;
   const oldSky=Kart3D.skyMesh;KartWorld.sky(scene,{theme:'town'});view.sky=Kart3D.skyMesh;Kart3D.skyMesh=oldSky;
-  scene.add(new T.HemisphereLight('#b5d8ec','#766d4e',1.15));const sun=view.sun=new T.DirectionalLight('#ffe0ad',3.25);sun.position.set(-48,64,-36);sun.castShadow=true;sun.shadow.mapSize.set(IS_XBOX?1024:2048,IS_XBOX?1024:2048);Object.assign(sun.shadow.camera,{left:-39,right:39,top:39,bottom:-39,near:.1,far:200});sun.shadow.bias=-.0006;sun.shadow.normalBias=.1;sun.shadow.radius=2;scene.add(sun,sun.target);
+  scene.add(new T.HemisphereLight(Style3D.THEMES.day.hemiSky,Style3D.THEMES.day.hemiGround,1.5));const sun=view.sun=new T.DirectionalLight(Style3D.THEMES.day.sunLight,2.8);sun.position.set(-48,64,-36);sun.castShadow=true;sun.shadow.mapSize.set(IS_XBOX?1024:2048,IS_XBOX?1024:2048);Object.assign(sun.shadow.camera,{left:-39,right:39,top:39,bottom:-39,near:.1,far:200});sun.shadow.bias=-.0006;sun.shadow.normalBias=.1;sun.shadow.radius=2;scene.add(sun,sun.target);
   const buildings=FPSWorld.decor.filter(b=>b.type==='building'),terrain=new T.PlaneGeometry(630,630,160,160),p=terrain.attributes.position,uv=terrain.attributes.uv,colors=[];
   for(let i=0;i<p.count;i++){const x=p.getX(i),z=-p.getY(i),h=FPSWorld.height(x,z),building=buildings.find(b=>Math.abs(x-b.x)<b.w/2+1.6&&Math.abs(z-b.z)<b.d/2+1.6);p.setZ(i,building?Math.min(h,building.y-.12):h);uv.setXY(i,x/4,z/4);const river=Math.abs(x+115),path=Math.min(Math.abs(x),Math.abs(z-25)*.8),c=this.groundColor(x,z,h,river,path);colors.push(c.r,c.g,c.b);}
   terrain.setAttribute('color',new T.Float32BufferAttribute(colors,3));terrain.computeVertexNormals();const ground=view.mesh(terrain,this.material('grass','#ffffff',true),[0,0,0]);ground.rotation.x=-Math.PI/2;ground.name='fps-contoured-terrain';
   this.ridges(view);const solids=this.batch();for(const b of FPSWorld.solids)this.box(view,b,solids);solids.finish(scene);
-  const batch=this.batch(),stone=this.material('stone','#d5cebb'),cream=KartModels.mat('#d8ceb7'),trim=KartModels.mat('#e6deca'),dark=KartModels.mat('#263f47',.35,.65),metal=KartModels.mat('#637d80',.65,.5),wood=this.material('wood','#bca47d'),blue=KartModels.mat('#386c7c',.3,.35);
+  const batch=this.batch(),stone=this.material('stone','#efe4cf'),cream=KartModels.mat('#fff3d6'),trim=KartModels.mat('#fff8e8'),dark=KartModels.mat('#2f4a66',.35,.65),metal=KartModels.mat('#5f8fb0',.55,.5),wood=this.material('wood','#e8b46a'),blue=KartModels.mat('#2f9fd0',.3,.35);
   for(const b of FPSWorld.decor.filter(b=>b.type==='building'))FPSArchitecture.build(view,b,batch);
   for(const b of FPSWorld.solids.filter(b=>b.type==='container')){for(const z of [-1,1])for(let i=-2;i<=2;i++)batch.add('box',metal,[b.x+i*b.w/6,b.y+1.5,b.z+z*(b.d/2+.05)],[.04,2.6,.07]);batch.add('box',cream,[b.x-2,b.y+1.4,b.z+b.d/2+.07],[1.8,.6,.03]);}
   for(const b of FPSWorld.solids.filter(b=>b.type==='crate'))for(const side of [-1,1]){for(const x of [-1,1])batch.add('box',metal,[b.x+x*(b.w/2-.12),b.y+b.h/2,b.z+side*(b.d/2+.025)],[.12,b.h,.06]);for(const j of [-1,1])batch.add('box',wood,[b.x,b.y+b.h/2+j*(b.h/2-.12),b.z+side*(b.d/2+.08)],[b.w,.18,.09]);batch.add('box',wood,[b.x,b.y+b.h/2,b.z+side*(b.d/2+.05)],[b.w*1.17,.17,.08],[0,0,side*.58]);}
   // The central square is readable from ground level; paving and dirt trails
   // are draped over the same height function used by the player capsule.
-  this.patch(view,0,0,31,35,'stone','#d7cfb5',.024);this.patch(view,0,-49,10,60,'earth','#cbbfa3',.02);this.patch(view,0,49,10,62,'earth','#cbbfa3',.02);this.patch(view,-53,25,100,8,'earth','#cbbfa3',.022);
-  for(const [x,z]of [[-20,-19],[20,20],[-28,29],[28,-31]]){const y=FPSWorld.height(x,z);batch.add('box',stone,[x,y+.15,z],[4,.3,3]);for(let j=0;j<6;j++)batch.add('sphere',KartModels.mat(j%2?'#738b48':'#87984f'),[x+(j%3-1)*.8,y+.9,z+(j<3?-.5:.5)],[.7,.7,.6]);}
+  this.patch(view,0,0,31,35,'stone','#f4dcc0',.024);this.patch(view,0,-49,10,60,'earth','#f0cf96',.02);this.patch(view,0,49,10,62,'earth','#f0cf96',.02);this.patch(view,-53,25,100,8,'earth','#f0cf96',.022);
+  for(const [x,z]of [[-20,-19],[20,20],[-28,29],[28,-31]]){const y=FPSWorld.height(x,z);batch.add('box',stone,[x,y+.15,z],[4,.3,3]);for(let j=0;j<6;j++)batch.add('hill',KartModels.mat(['#57b85a','#8fd45c','#f58fb0'][j%3]),[x+(j%3-1)*.8,y+.9,z+(j<3?-.5:.5)],[.7,.7,.6]);}
   for(const x of [-13,13])for(const z of [-32,32]){const y=FPSWorld.height(x,z);batch.add('branch',dark,[x,y+3.4,z],[.065,6.8,.065]);batch.add('box',dark,[x+.6,y+6.8,z],[1.3,.08,.1]);batch.add('box',KartModels.mat('#fff2c8',0,.5,'#6c5a29'),[x+1.15,y+6.7,z],[.45,.06,.4]);}
   const gate=view.sign('SIERRA  //  DISTRITO 01');gate.scale.set(.9,.8,1);gate.position.set(0,FPSWorld.height(0,-76)+6.7,-74.98);scene.add(gate);
   const tower=FPSWorld.decor.find(b=>b.type==='tower');for(const x of [-3,3])for(const z of [-3,3])batch.add('box',blue,[tower.x+x,tower.y+10.5,tower.z+z],[.12,2.4,.12]);batch.add('box',metal,[tower.x,tower.y+11.7,tower.z],[8,.18,8]);
@@ -23292,7 +23466,7 @@ const FPSScenery={
   for(const [list,map]of [[shadows,blob],[strips,grime]]){if(!list.length)continue;const m=new T.Mesh(T.mergeGeometries(list,false),new T.MeshBasicMaterial({map,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2}));list.forEach(g=>g.dispose());m.renderOrder=1;view.scene.add(m);}
  },
  patch(view,x,z,w,d,kind,color,lift){const T=KartGL,geo=new T.PlaneGeometry(w,d,Math.ceil(w/2),Math.ceil(d/2)),p=geo.attributes.position,uv=geo.attributes.uv;for(let i=0;i<p.count;i++){const px=p.getX(i)+x,pz=-p.getY(i)+z;p.setZ(i,FPSWorld.height(px,pz)+lift);uv.setXY(i,px/3.5,pz/3.5);}geo.computeVertexNormals();const m=view.mesh(geo,this.material(kind,color),[x,0,z]);m.rotation.x=-Math.PI/2;},
- ridgePalette:[['#5f7a4e','#8d8b78'],['#71887a','#a3a497'],['#93a8b2','#c4d0d4']],
+ ridgePalette:[['#4fa860','#93b98a'],['#62b0a6','#a9cfd6'],['#8fc0ea','#d2e6f6']],
  ridges(view){
   const T=KartGL;for(let layer=0;layer<3;layer++){const n=180,rows=16,pos=[],colors=[],ix=[],rng=srand(881+layer),phase=rng()*6;
    const uv=[];for(let row=0;row<=rows;row++)for(let i=0;i<=n;i++){// crestas (1-|sen|): cumbres afiladas y valles redondos, en vez de dientes de sierra
@@ -23302,25 +23476,26 @@ const FPSScenery={
     // color por altura: bosque abajo, roca arriba y nieve en las cumbres altas de las capas lejanas
     const up=clamp((h+13)/Math.max(1,peak),0,1),R=this.ridgePalette[layer],c=new T.Color(R[0]).lerp(new T.Color(R[1]),clamp((up-.25)/.45,0,1));
     if(layer&&peak>150&&up>.8)c.lerp(new T.Color('#eef3f4'),clamp((up-.8)/.12,0,1));c.multiplyScalar(.9+Math.cos(angle-1)*.08);colors.push(c.r,c.g,c.b);if(row<rows&&i<n){const k=row*(n+1)+i;ix.push(k,k+1,k+n+1,k+1,k+n+2,k+n+1);}}
-   const geo=new T.BufferGeometry();geo.setAttribute('position',new T.Float32BufferAttribute(pos,3));geo.setAttribute('color',new T.Float32BufferAttribute(colors,3));geo.setAttribute('uv',new T.Float32BufferAttribute(uv,2));geo.setIndex(ix);geo.computeVertexNormals();const mat=this.material('cliff','#eeeee4',true);mat.side=T.DoubleSide;const m=view.mesh(geo,mat,[0,0,0]);m.name='fps-distant-ridge-'+layer;m.castShadow=false;
+   const geo=new T.BufferGeometry();geo.setAttribute('position',new T.Float32BufferAttribute(pos,3));geo.setAttribute('color',new T.Float32BufferAttribute(colors,3));geo.setAttribute('uv',new T.Float32BufferAttribute(uv,2));geo.setIndex(ix);geo.computeVertexNormals();const mat=this.material('cliff','#ffffff',true);mat.side=T.DoubleSide;const m=view.mesh(geo,mat,[0,0,0]);m.name='fps-distant-ridge-'+layer;m.castShadow=false;
   }
- },
- leafMaterial(){
-  const T=KartGL,cv=mkCanvas(256,256),c=cv.getContext('2d'),rng=srand(913);for(let i=0;i<160;i++){const x=rng()*256,y=rng()*256,a=rng()*TAU;c.save();c.translate(x,y);c.rotate(a);c.fillStyle=['#709345','#557e3f','#8ca34e','#a2b65b'][i%4];c.beginPath();c.ellipse(0,0,4+rng()*4,9+rng()*6,0,0,TAU);c.fill();c.strokeStyle='#b1ba6f';c.lineWidth=.6;c.beginPath();c.moveTo(0,-8);c.lineTo(0,8);c.stroke();c.restore();}
-  const map=new T.CanvasTexture(cv);map.colorSpace=T.SRGBColorSpace;map.anisotropy=4;return new T.MeshStandardMaterial({map,alphaTest:.38,side:T.DoubleSide,roughness:.9});
  },
  vegetation(view,batch){
-  const T=KartGL,leaf=this.leafMaterial(),wood=this.material('wood','#b2a581'),rng=srand(772);
-  for(const tree of FPSWorld.decor.filter(b=>b.type==='tree')){const {x,z,y,h}=tree;for(let j=0;j<5;j++){const a=j*2.4,rad=1.5+rng()*1.7,by=y+h*(.55+j%2*.12),bx=x+Math.cos(a)*rad,bz=z+Math.sin(a)*rad;const start=new T.Vector3(x,y+h*.33,z),end=new T.Vector3(bx,by,bz),delta=end.clone().sub(start),rot=new T.Euler().setFromQuaternion(new T.Quaternion().setFromUnitVectors(new T.Vector3(0,1,0),delta.clone().normalize()));batch.add('branch',wood,start.add(end).multiplyScalar(.5).toArray(),[.07,delta.length(),.07],[rot.x,rot.y,rot.z]);
-    for(let k=0;k<5;k++)batch.add('plane',leaf,[bx+(rng()-.5)*2,by+(rng()-.5)*2,bz+(rng()-.5)*2],[3.4+rng(),3+rng(),1],[rng()*1.8,rng()*TAU,rng()*1.6]);}
-  }
-  const grassCanvas=mkCanvas(128,128),c=grassCanvas.getContext('2d');for(let i=0;i<28;i++){const x=rng()*128;c.fillStyle=i%3?'#8c9c50':'#bac075';c.beginPath();c.moveTo(x-1.5,128);c.quadraticCurveTo(x+12,60,x+(rng()-.5)*40,4+rng()*64);c.quadraticCurveTo(x+7,92,x+2,128);c.fill();}const map=new T.CanvasTexture(grassCanvas);map.colorSpace=T.SRGBColorSpace;const mat=new T.MeshStandardMaterial({map,alphaTest:.4,side:T.DoubleSide,roughness:1});
-  const blades=this.batch();for(let i=0;i<2300;i++){const x=(rng()-.5)*360,z=(rng()-.5)*360;if(Math.abs(x)<19||Math.abs(z-25)<7||Math.abs(x+115)<17||FPSWorld.solids.some(b=>Math.abs(x-b.x)<b.w/2+2&&Math.abs(z-b.z)<b.d/2+2))continue;const y=FPSWorld.height(x,z),h=.35+rng()*.55;for(let j=0;j<2;j++)blades.add('plane',mat,[x,y+h*.4,z],[.8,h,1],[0,rng()*TAU+j*Math.PI/2,0]);}const group=view.grass=new T.Group();blades.finish(group,false);view.scene.add(group);
+  const T=KartGL,rng=srand(772),add=(type,color,pos,scale,rot)=>batch.add(type,KartModels.mat(color,0,.9),pos,scale,rot);
+  // Mismos árboles que las pistas del Kart: tronco grueso y copas de bloque (jacarandas y flamboyanes incluidos).
+  for(const tree of FPSWorld.decor.filter(b=>b.type==='tree'))Style3D.tree(add,tree.x,tree.y,tree.z,tree.h,srand(900+tree.seed),{trunk:false});
+  const grassCanvas=mkCanvas(128,128),c=grassCanvas.getContext('2d');for(let i=0;i<22;i++){const x=rng()*128;c.fillStyle=i%3?'#6cc04c':'#a9e064';c.beginPath();c.moveTo(x-3,128);c.quadraticCurveTo(x+10,60,x+(rng()-.5)*36,8+rng()*60);c.quadraticCurveTo(x+9,92,x+4,128);c.fill();}const map=new T.CanvasTexture(grassCanvas);map.colorSpace=T.SRGBColorSpace;const mat=new T.MeshStandardMaterial({map,alphaTest:.4,side:T.DoubleSide,roughness:1});
+  const blades=this.batch(),clear=(x,z,m=2)=>!(Math.abs(x)<19||Math.abs(z-25)<7||Math.abs(x+115)<17||FPSWorld.solids.some(b=>Math.abs(x-b.x)<b.w/2+m&&Math.abs(z-b.z)<b.d/2+m));
+  for(let i=0;i<2300;i++){const x=(rng()-.5)*360,z=(rng()-.5)*360;if(!clear(x,z))continue;const y=FPSWorld.height(x,z),h=.35+rng()*.55;for(let j=0;j<2;j++)blades.add('plane',mat,[x,y+h*.4,z],[.8,h,1],[0,rng()*TAU+j*Math.PI/2,0]);}
+  // flores y arbustos: manchas de color que rompen el verde
+  const petals=['#ff7aa8','#ffd23f','#ffffff','#b48cf2','#ff8c42'];
+  for(let i=0;i<260;i++){const x=(rng()-.5)*330,z=(rng()-.5)*330;if(!clear(x,z,1))continue;const col=petals[Math.floor(rng()*petals.length)];for(let j=0;j<5;j++){const fx=x+(rng()-.5)*2.6,fz=z+(rng()-.5)*2.6,y=FPSWorld.height(fx,fz);blades.add('bud',KartModels.mat(col,0,.8),[fx,y+.34,fz],[.12,.1,.12]);blades.add('branch',KartModels.mat('#4fa24c'),[fx,y+.16,fz],[.018,.34,.018]);}}
+  for(let i=0;i<70;i++){const x=(rng()-.5)*340,z=(rng()-.5)*340;if(!clear(x,z,3))continue;const y=FPSWorld.height(x,z),r=.7+rng()*.7;for(let j=0;j<3;j++)batch.add('hill',KartModels.mat(['#4faa52','#6fc457','#93d860'][j],0,.95),[x+(j-1)*r*.7,y+r*.45+(j===1?r*.2:0),z+(rng()-.5)*.6],[r,r*.75,r],[0,rng()*6,0]);}
+  const group=view.grass=new T.Group();blades.finish(group,false);view.scene.add(group);
  },
  river(view){
   const T=KartGL,geo=new T.PlaneGeometry(23,610,4,120),p=geo.attributes.position;for(let i=0;i<p.count;i++)p.setZ(i,FPSWorld.waterLevel(-p.getY(i))+.04);geo.computeVertexNormals();
-  const map=this.texture('roof').clone();map.repeat.set(1.4,38);const water=new T.MeshStandardMaterial({color:'#3c8e97',roughness:.24,metalness:.45,transparent:true,opacity:.9,bumpMap:map,bumpScale:.018});view.water=view.mesh(geo,water,[-115,0,0]);view.water.rotation.x=-Math.PI/2;
-  const batch=this.batch(),mat=this.material('stone','#c7c6ad'),rng=srand(731);for(let i=0;i<130;i++){const z=-300+i*4.6;for(const side of [-1,1])batch.add('rock',mat,[-115+side*(12+rng()*3),FPSWorld.height(-115,z),z],[1+rng(),.4+rng()*.8,1+rng()],[rng()*.2,rng()*6,0]);}batch.finish(view.scene);
+  const map=this.texture('roof').clone();map.repeat.set(1.4,38);const water=new T.MeshStandardMaterial({color:'#2fc7dd',emissive:'#0a5f78',emissiveIntensity:.35,roughness:.16,metalness:.25,transparent:true,opacity:.9,bumpMap:map,bumpScale:.018});view.water=view.mesh(geo,water,[-115,0,0]);view.water.rotation.x=-Math.PI/2;
+  const batch=this.batch(),mat=this.material('stone','#e9e2d2'),rng=srand(731);for(let i=0;i<130;i++){const z=-300+i*4.6;for(const side of [-1,1])batch.add('rock',mat,[-115+side*(12+rng()*3),FPSWorld.height(-115,z),z],[1+rng(),.4+rng()*.8,1+rng()],[rng()*.2,rng()*6,0]);}batch.finish(view.scene);
  },
 };
 
@@ -23429,16 +23604,14 @@ const FPSGear={
   // Equipo táctico sobre el vestuario: portaplacas a media altura (el estampado del pecho sigue a la vista),
   // portacargadores, radio, tirantes, cinturón de combate con funda y guantes. El color táctico varía por
   // personaje; cara, cabeza y colores de Esmash no se tocan.
-  this.rounded();const tac=this.tactical(['#6f6550','#545b48','#46494a','#7d725a'][Math.max(0,CHAR_ORDER.indexOf(id))%4]),strap=this.tactical('#2e302c'),pouch=this.tactical(['#655c49','#4b5141','#3d4041','#70664f'][Math.max(0,CHAR_ORDER.indexOf(id))%4]),vb=FPSScenery.batch();
-  vb.add('fps-rounded',tac,[0,-h*.5,-.012],[w*1.92,h*.42,w*1.38]);for(const z of [1,-1])vb.add('fps-rounded',strap,[0,-h*.31,-.012+z*w*.69],[w*1.5,h*.035,.012]);
-  for(let i=-1;i<=1;i++)vb.add('fps-rounded',pouch,[i*w*.36,-h*.6,-.012+w*.74],[w*.32,h*.2,w*.16]);for(let i=-1;i<=1;i++)vb.add('fps-rounded',strap,[i*w*.36,-h*.5,-.012+w*.83],[w*.26,h*.03,.006]);
-  vb.add('fps-rounded',pouch,[-w*.98,-h*.52,-.012],[w*.16,h*.3,w*.36]);vb.add('cylinder',strap,[-w*.98,-h*.28,.04],[.006,h*.3,.006]);
-  for(const x of [-1,1])vb.add('fps-rounded',strap,[x*w*.55,-h*.15,-.012],[w*.16,h*.32,w*1.3],[x*.12,0,0]);
-  vb.add('fps-rounded',strap,[0,-h*.9,-.012],[w*1.5,h*.09,w*1.16]);vb.add('fps-rounded',strap,[w*.86,-h*1.06,.0],[w*.2,h*.3,w*.34],[0,0,.08]);vb.finish(u.detail,true);
-  const glove=this.tactical(FPSHandArt.GLOVE);for(const arm of [u.limbs.armF,u.limbs.armB])arm.userData.end.traverse(o=>{if(o.isMesh)o.material=glove;});
+  // El personaje es el mismo de las peleas y del Kart: su vestuario queda a la vista. Solo suma un cinturón
+  // con funda y una mochila chica en su color de acento (antes un portaplacas militar tapaba el pecho).
+  this.rounded();const strap=Style3D.toon('#2b2440',0,.8),pouch=Style3D.toon(L.accent||'#2ec4b6',0,.7),vb=FPSScenery.batch();
+  vb.add('fps-rounded',strap,[0,-h*.9,-.012],[w*1.5,h*.09,w*1.16]);vb.add('fps-rounded',pouch,[w*.86,-h*1.06,.0],[w*.2,h*.3,w*.34],[0,0,.08]);
+  vb.add('fps-rounded',pouch,[0,-h*.44,-w*.74],[w*.86,h*.4,w*.3]);vb.add('fps-rounded',strap,[0,-h*.52,-w*.9],[w*.5,h*.14,w*.08]);for(const x of [-1,1])vb.add('fps-rounded',strap,[x*w*.5,-h*.2,-w*.3],[w*.14,h*.3,w*.9],[x*.1,0,0]);vb.finish(u.detail,true);
   // Boots retain the canonical shoe palette; add a separate toe cap and laces.
   if(L.shoe&&L.feet!=='claw')for(const leg of [u.legL,u.legR]){const foot=leg.userData.end,fb=FPSScenery.batch();for(let i=0;i<3;i++)fb.add('box',seam,[0,.033,.08+i*.04],[.085,.005,.007]);fb.add('box',leather,[0,-.055,.19],[.145,.02,.1]);fb.finish(foot);}
-  const old=m.children.find(c=>c.name===id+':equipped-gun');if(old){m.remove(old);old.traverse(c=>c.geometry?.dispose());}const eye=u.head.position.y*m.scale.y;m.scale.multiplyScalar(FPSBody.head/eye);u.baseHead=u.head.position.y;u.baseShoulder=u.torso.position.y;u.baseNeck=u.neck.position.y;u.weapon=null;u.weaponId=-1;return m;
+  const old=m.children.find(c=>c.name===id+':equipped-gun');if(old){m.remove(old);old.traverse(c=>c.geometry?.dispose());}const eye=u.head.position.y*m.scale.y;m.scale.multiplyScalar(FPSBody.head/eye);u.baseHead=u.head.position.y;u.baseShoulder=u.torso.position.y;u.baseNeck=u.neck.position.y;u.weapon=null;u.weaponId=-1;Style3D.outline(m,.017);return m;
  },
 };
 
@@ -23552,12 +23725,27 @@ const FPSWeaponArt={
   for(const [k,m]of Object.entries(M))KartModels.materials.set('fps-gun:'+k,m);
   return M;
  },
+ // Cada arma tiene su color de juguete (como los objetos de las peleas y del Kart): cuerpo de color vivo,
+ // empuñadura oscura y un acento. Las miras, cristales y retículas se comparten.
+ SKINS:[
+  {black:'#2f6fe0',steel:'#dfe9f5',poly:'#1c2540',fde:'#7fe3ff',od:'#2f6fe0',wood:'#f2a23a'},   // Cobalto 9
+  {black:'#ffc533',steel:'#f3f0e6',poly:'#22252e',fde:'#ff7a3a',od:'#ffc533',wood:'#f2a23a'},   // Avispa
+  {black:'#2bb5a0',steel:'#e6f2f0',poly:'#243044',fde:'#ff8c42',od:'#2bb5a0',wood:'#f2a23a'},   // Sierra M4
+  {black:'#e84a3a',steel:'#f0e6e0',poly:'#2a2233',fde:'#ffd23f',od:'#e84a3a',wood:'#e8923a'},   // Trueno 12
+  {black:'#8a5cf0',steel:'#ece6ff',poly:'#231d3a',fde:'#ffd23f',od:'#6d45d8',wood:'#f2a23a'},   // Horizonte
+ ],
+ skin(id){
+  const base=this.mats(),cache=this.skinCache||(this.skinCache=new Map());if(cache.has(id))return cache.get(id);
+  const S=this.SKINS[id]||this.SKINS[0],M={...base};
+  for(const [k,color] of Object.entries(S)){const m=base[k].clone();m.color.set(color);m.metalness=k==='steel'?.55:.12;m.roughness=k==='poly'?.7:.42;m.roughnessMap=null;m.bumpMap=k==='wood'?m.bumpMap:null;if(k==='wood')m.map=null;M[k]=m;KartModels.materials.set('fps-gun:'+id+':'+k,m);}
+  cache.set(id,M);return M;
+ },
  shapes(){
   if(KartModels.geometry.has('gun-cylz'))return;const T=KartGL,z=new T.CylinderGeometry(1,1,1,22);z.rotateX(Math.PI/2);KartModels.geometry.set('gun-cylz',z);
   const x=new T.CylinderGeometry(1,1,1,18);x.rotateZ(Math.PI/2);KartModels.geometry.set('gun-cylx',x);KartModels.geometry.set('gun-cyly',new T.CylinderGeometry(1,1,1,18));FPSGear.rounded();
  },
  build(id,character,thirdPerson=false){
-  this.shapes();const T=KartGL,L=CharacterDesign.get(character),M=this.mats(),root=new T.Group(),body=new T.Group(),magazine=new T.Group(),moving=new T.Group(),long=this.LONG[id];
+  this.shapes();const T=KartGL,L=CharacterDesign.get(character),M=this.skin(id),root=new T.Group(),body=new T.Group(),magazine=new T.Group(),moving=new T.Group(),long=this.LONG[id];
   root.add(body,magazine,moving);root.userData={design:L,body,magazine,moving,long,arms:[],weaponId:id};
   const B={body:FPSScenery.batch(),mag:FPSScenery.batch(),moving:FPSScenery.batch()};
   const P=(pts,w,m,part='body',bevel=.0012)=>B[part].geometry(this.profile(pts,w,bevel),m,[0,0,0]);
@@ -23785,6 +23973,52 @@ const FPSSupplyArt={
  },
 };
 
+// ---- js/fps-camera.js ----
+// ============================================================
+//  FPS: CÁMARA AL HOMBRO (estilo "battle royale")
+//  Ves a tu personaje —el mismo de las peleas y del Kart— desde atrás y a la derecha. La simulación no
+//  cambia: las balas siguen saliendo de los ojos hacia donde apuntas. La cámara se coloca detrás y gira
+//  hacia el punto exacto al que llega esa línea, así que la mira del centro marca donde pega el tiro.
+//  Una pared detrás acerca la cámara; el francotirador con mira pasa a primera persona.
+//  V (o cruceta arriba) alterna con la vista en primera persona de siempre; la elección se guarda.
+// ============================================================
+const FPSCam = {
+  third: true, padPrev: false,
+  load() { try { this.third = localStorage.getItem('esmash-fps-cam') !== 'first'; } catch (e) { this.third = true; } },
+  toggle() {
+    this.third = !this.third; try { localStorage.setItem('esmash-fps-cam', this.third ? 'third' : 'first'); } catch (e) { /* modo privado */ }
+    Toasts.push(this.third ? '🎥 Cámara al hombro' : '🎯 Primera persona');
+  },
+  // se llama desde el paso de simulación (ahí viven los flancos de tecla)
+  input() {
+    const pad = ModeControls.pad('fps'), up = !!pad?.buttons?.[12]?.pressed || pad?.buttons?.[12] === true;
+    if (keyEdge('kb1', 'KeyV') || (up && !this.padPrev)) this.toggle();
+    this.padPrev = up;
+  },
+  active(p) { return this.third && !(p.gun === 4 && p.ads > .6); },
+  // La cámara ya trae la posición de los ojos y la rotación de la mira. Devuelve true si quedó al hombro.
+  place(view, camera, p) {
+    if (!this.active(p)) { view.tpDist = view.tpAim = null; return false; }
+    const T = KartGL, eye = camera.position.clone(), fwd = new T.Vector3(0, 0, -1).applyQuaternion(camera.quaternion), right = new T.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+    const a = p.ads * p.ads * (3 - 2 * p.ads), dead = p.dead ? 1 : 0;
+    const back = lerp(3.4, 1.9, a) + dead * 1.6, side = lerp(1, .78, a) * (1 - dead), rise = lerp(.78, .5, a) + dead * .9;
+    const want = eye.clone().addScaledVector(fwd, -back).addScaledVector(right, side); want.y += rise;
+    const dir = want.clone().sub(eye), len = dir.length(); dir.multiplyScalar(1 / len);
+    const wall = FPSWorld.wallHit(eye, dir, len + .35), free = wall ? Math.max(.3, wall.distance - .35) : len;
+    // acercarse de golpe (no atravesar la pared), alejarse con suavidad
+    const dt = Math.min(GameFeel.dt || 1 / 60, .05);
+    view.tpDist = view.tpDist == null || free < view.tpDist ? free : lerp(view.tpDist, free, 1 - Math.exp(-dt * 7));
+    // punto al que llega la bala: la cámara converge ahí
+    const hit = FPSWorld.wallHit(eye, fwd, 160), reach = clamp(hit ? hit.distance : 160, 6, 160);
+    view.tpAim = view.tpAim == null ? reach : lerp(view.tpAim, reach, 1 - Math.exp(-dt * 12));
+    camera.position.copy(eye).addScaledVector(dir, view.tpDist);
+    const floor = FPSWorld.height(camera.position.x, camera.position.z) + .25; if (camera.position.y < floor) camera.position.y = floor;
+    camera.lookAt(eye.clone().addScaledVector(fwd, view.tpAim));
+    return true;
+  },
+};
+FPSCam.load();
+
 // ---- js/fps-render.js ----
 const FPSView={
  match:null,views:new Map(),models:[],guns:new Map(),owned:[],
@@ -23831,7 +24065,7 @@ const FPSView={
   CharacterModels.segment(u.limbs.armF,[chest,sh-.04,0],[[.3,sh-.32,.12+.1*(1-ready)],right,0]);CharacterModels.segment(u.limbs.armB,[-chest,sh-.04,0],[[-.26,sh-.3,.18+.1*(1-ready)],left,0]);
   const newShot=p.shot>(u.lastShot??p.shot);if(newShot)u.flashTime=.045;u.lastShot=p.shot;u.flashTime=Math.max(0,(u.flashTime||0)-dt);u.weapon.userData.flash.visible=u.flashTime>0;if(u.weapon.userData.flashStar)u.weapon.userData.flashStar.visible=u.flashTime>0;CharacterModels.expression(u.head,p.hurt||p.dead?'hurt':'normal');
  },
- weapon(id,character,thirdPerson=false){return FPSGear.weapon(id,character,thirdPerson);},
+ weapon(id,character,thirdPerson=false){return Style3D.outline(FPSGear.weapon(id,character,thirdPerson),thirdPerson?.012:.0035);},
  pose(p,alpha){const prev=p.prev||p,ang=(a,b)=>a+Math.atan2(Math.sin(b-a),Math.cos(b-a))*alpha;return {x:lerp(prev.x,p.x,alpha),y:lerp(prev.y,p.y,alpha),z:lerp(prev.z,p.z,alpha),yaw:ang(prev.yaw,p.yaw),pitch:lerp(prev.pitch,p.pitch,alpha),stance:lerp(FPSBody.stance(prev),FPSBody.stance(p),alpha)};},
  draw(match){
   if(!Kart3D.init()){ctx.fillStyle='#122333';ctx.fillRect(0,0,W,H);sfText('SE NECESITA WEBGL PARA ESTE MODO',640,300,45,GOLD);return;}
@@ -23845,12 +24079,12 @@ const FPSView={
    const box=rects[i];let view=this.views.get(p.index);if(!view){view={camera:new T.PerspectiveCamera(75,box.w/box.h,.06,10000),weaponCamera:new T.PerspectiveCamera(65,box.w/box.h,.02,5)};this.views.set(p.index,view);}
    const camera=view.camera,v=this.pose(p,alpha),bob=p.grounded&&!reducedMotion?Math.sin(p.bob*2)*Math.min(.024,Math.hypot(p.vx,p.vz)*.003)*(1-p.ads*.8):0,targetY=v.y+FPSBody.eyeHeight(v);if(view.eyeY===undefined||Math.abs(view.eyeY-targetY)>1.3||!p.grounded)view.eyeY=targetY;else view.eyeY=lerp(view.eyeY,targetY,1-Math.exp(-Math.min(GameFeel.dt||1/60,.05)*18));camera.position.set(v.x,view.eyeY+bob,v.z);camera.rotation.set(-v.pitch+p.recoil*.35,-v.yaw,0,'YXZ');
    // yaw is measured clockwise from north (-Z), matching right stick and mouse.
-   camera.rotation.y=-v.yaw;camera.fov=lerp(p.sprint?82:75,FPS_GUNS[p.gun].zoom,p.ads);camera.aspect=box.w/box.h;camera.updateProjectionMatrix();this.fx.shake(camera);this.fx.face(camera);
+   camera.rotation.y=-v.yaw;const tp=view.third=FPSCam.place(view,camera,p);camera.fov=tp?lerp(p.sprint?76:70,Math.max(FPS_GUNS[p.gun].zoom,50),p.ads):lerp(p.sprint?82:75,FPS_GUNS[p.gun].zoom,p.ads);camera.aspect=box.w/box.h;camera.updateProjectionMatrix();this.fx.shake(camera);this.fx.face(camera);
    const k=r.domElement.width/W,left=Math.round(box.x*k),bottom=Math.round((H-box.y-box.h)*k),right=Math.round((box.x+box.w)*k),top=Math.round((H-box.y)*k);r.setViewport(left,bottom,right-left,top-bottom);r.setScissor(left,bottom,right-left,top-bottom);
-   this.models[p.index].visible=false;this.sky.position.copy(camera.position);this.sun.position.set(v.x-48,v.y+64,v.z-36);this.sun.target.position.set(v.x,v.y,v.z);this.sun.target.updateMatrixWorld();this.grass.visible=Prefs.fx==='full'&&!ART.lite;r.shadowMap.enabled=!IS_XBOX&&!ART.lite&&Prefs.fx==='full'&&locals.length===1;r.toneMappingExposure=1.02;if(this.water?.material.bumpMap)this.water.material.bumpMap.offset.y=match.time*.006;const post=FPSPost.begin(r,locals.length);r.render(this.scene,camera);this.lastStats={calls:r.info.render.calls,triangles:r.info.render.triangles};
+   if(!tp)this.models[p.index].visible=false;this.sky.position.copy(camera.position);this.sun.position.set(v.x-48,v.y+64,v.z-36);this.sun.target.position.set(v.x,v.y,v.z);this.sun.target.updateMatrixWorld();this.grass.visible=Prefs.fx==='full'&&!ART.lite;r.shadowMap.enabled=!IS_XBOX&&!ART.lite&&Prefs.fx==='full'&&locals.length===1;r.toneMappingExposure=1;Style3D.tick((GameFeel.dt||1/60)/locals.length);Style3D.inkBudget(!ART.lite&&Prefs.fx==='full');if(this.water?.material.bumpMap)this.water.material.bumpMap.offset.y=match.time*.006;const post=FPSPost.begin(r,locals.length);r.render(this.scene,camera);this.lastStats={calls:r.info.render.calls,triangles:r.info.render.triangles};
    const key=p.index+':'+p.gun;let gun=this.guns.get(key);if(!gun){gun=this.weapon(p.gun,p.id);this.guns.set(key,gun);this.weaponScene.add(gun);}this.guns.forEach(m=>m.visible=m===gun);gun.visible=!p.dead;
    if(view.gun!==p.gun){view.gun=p.gun;view.equip=1;}view.equip=Math.max(0,(view.equip||0)-(match.paused&&!match.online?0:GameFeel.dt)*5);
-   if(p.shot>(view.lastShot??p.shot))view.flash=.05;view.lastShot=p.shot;const step=match.paused&&!match.online?0:Math.min(GameFeel.dt||1/60,.04);view.flash=Math.max(0,(view.flash||0)-step);const star=gun.userData.flashStar;gun.userData.flash.visible=view.flash>0;if(star){star.visible=view.flash>0;star.rotation.z=hash1(p.shot,7)*TAU;star.scale.setScalar(.8+hash1(p.shot,3)*.5);}FPSGear.animate(gun,p);FPSHandling.place(view,p,gun,step);let nade=view.nade;if(!nade){nade=view.nade=FPSSupplyArt.grenade();this.weaponScene.add(nade);}const tt=p.throwTimer>0?1-p.throwTimer/.5:1;nade.visible=!p.dead&&p.throwTimer>0&&tt<.24&&!!gun.userData.leftHand;if(nade.visible){gun.updateMatrixWorld(true);gun.userData.leftHand.getWorldPosition(nade.position);nade.position.y+=.035;nade.position.z-=.03;nade.rotation.set(tt*5,tt*2,.3);}FPSHandling.light(this.weaponKey,this.sun,camera);if(this.muzzleLight){gun.updateMatrixWorld(true);const mz=gun.localToWorld(new KartGL.Vector3(...FPSWeaponArt.MUZZLE[p.gun]));this.muzzleLight.position.copy(mz);this.muzzleLight.intensity=view.flash>0?2.4:0;this.worldFlash.position.copy(camera.position).addScaledVector(new KartGL.Vector3(0,0,-1).applyQuaternion(camera.quaternion),1.2);this.worldFlash.intensity=view.flash>0?22:0;}gun.visible=!p.dead&&!(p.gun===4&&p.ads>.82);
+   if(p.shot>(view.lastShot??p.shot))view.flash=.05;view.lastShot=p.shot;const step=match.paused&&!match.online?0:Math.min(GameFeel.dt||1/60,.04);view.flash=Math.max(0,(view.flash||0)-step);const star=gun.userData.flashStar;gun.userData.flash.visible=view.flash>0;if(star){star.visible=view.flash>0;star.rotation.z=hash1(p.shot,7)*TAU;star.scale.setScalar(.8+hash1(p.shot,3)*.5);}FPSGear.animate(gun,p);FPSHandling.place(view,p,gun,step);let nade=view.nade;if(!nade){nade=view.nade=FPSSupplyArt.grenade();this.weaponScene.add(nade);}const tt=p.throwTimer>0?1-p.throwTimer/.5:1;nade.visible=!tp&&!p.dead&&p.throwTimer>0&&tt<.24&&!!gun.userData.leftHand;if(nade.visible){gun.updateMatrixWorld(true);gun.userData.leftHand.getWorldPosition(nade.position);nade.position.y+=.035;nade.position.z-=.03;nade.rotation.set(tt*5,tt*2,.3);}FPSHandling.light(this.weaponKey,this.sun,camera);if(this.muzzleLight){gun.updateMatrixWorld(true);const mz=gun.localToWorld(new KartGL.Vector3(...FPSWeaponArt.MUZZLE[p.gun]));this.muzzleLight.position.copy(mz);this.muzzleLight.intensity=view.flash>0?2.4:0;this.worldFlash.position.copy(camera.position).addScaledVector(new KartGL.Vector3(0,0,-1).applyQuaternion(camera.quaternion),1.2);this.worldFlash.intensity=view.flash>0?22:0;}gun.visible=!tp&&!p.dead&&!(p.gun===4&&p.ads>.82);
    view.weaponCamera.aspect=box.w/box.h;view.weaponCamera.updateProjectionMatrix();r.clearDepth();r.autoClear=false;r.render(this.weaponScene,view.weaponCamera);r.autoClear=true;if(post)FPSPost.finish(r,p,match.paused&&!match.online);this.models[p.index].visible=!p.dead;
   });
   r.setScissorTest(false);r.autoClear=true;Kart3D.present();locals.forEach((p,i)=>this.hud(match,p,rects[i]));
@@ -24149,6 +24383,7 @@ APP.fpsGameUpdate=function(){
  const m=APP.fps;if(!m)return FPSMenu.exit();const raw=FPSControls.read(0);
  if(raw.pause&&!ShellUI.active){m.paused=!m.paused;FPSControls.reset();if(m.paused)document.exitPointerLock?.();}
  if(m.paused){const resume=()=>{m.paused=false;FPSControls.reset();FPSControls.lock();},exit=()=>m.online?FPSOnline.leave():FPSMenu.exit();if(KartMenu.hit({x:430,y:310,w:420,h:60}))resume();if(KartMenu.hit({x:430,y:390,w:420,h:60}))return exit();for(const d of Devices.list){const n=Devices.nav(d);if(n.up||n.down)m.pauseSel=m.pauseSel?0:1;if(n.confirm&&!raw.pause){if(m.pauseSel)return exit();resume();}}}
+ if(!m.paused)FPSCam.input();
  if(m.online)return FPSOnline.update(raw);if(m.paused)return;
  const inputs=m.players.map(p=>p.bot?{}:p.index===0?raw:FPSControls.read(p.index));m.update(inputs);if(m.phase==='done')APP.go('fpsResults');
 };

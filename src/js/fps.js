@@ -35,7 +35,7 @@ const FPSWorld={
  init(){
   if(this.solids.length)return;
   const block=(x,z,w,d,h,type='wall',base=this.height(x,z))=>{const q={x,z,w,d,h,y:base,type};this.solids.push(q);return q;};
-  for(const args of [[38,22,26,22,7,'#d3c1a1'],[-44,-34,25,30,9,'#92a4a1']])FPSArchitecture.add(this,block,...args);
+  for(const args of [[38,22,26,22,7,'#ffc857'],[-44,-34,25,30,9,'#45b8c8']])FPSArchitecture.add(this,block,...args);
   const rng=srand(7441);
   for(let i=0;i<34;i++){
    const x=(rng()-.5)*180,z=(rng()-.5)*180;
@@ -48,7 +48,7 @@ const FPSWorld={
   this.dress(block);this.cover(block);FPSSupplies.populate(this);
  },
  dress(block){
-  for(const args of [[86,-48,24,25,6.5,'#d89973'],[-53,65,28,19,5.7,'#dfd5ba']])FPSArchitecture.add(this,block,...args);
+  for(const args of [[86,-48,24,25,6.5,'#f47c5c'],[-53,65,28,19,5.7,'#b99aee']])FPSArchitecture.add(this,block,...args);
   for(const [x,z,w,d,h,type]of [[-22,-17,8,1.1,1.1,'stone'],[22,16,8,1.1,1.1,'stone'],[-26,25,1.2,9,1.2,'stone'],[24,-29,1.2,8,1.2,'stone'],[56,62,12,4.8,3,'container'],[72,61,12,4.8,3,'container'],[61,74,4.8,12,3,'container'],[-73,-2,9,1,1.3,'stone'],[46,-62,5,2,1.2,'barrier']])block(x,z,w,d,h,type);
   for(const x of [-7,7])block(x,-76,1.5,1.8,7.4,'stone');block(0,-76,15.5,1.8,1.2,'stone',this.height(0,-76)+6.2);
   const tx=91,tz=87,base=this.height(tx,tz);for(const x of [-3,3])for(const z of [-3,3])block(tx+x,tz+z,.42,.42,10.7,'steel',base);
@@ -57,8 +57,8 @@ const FPSWorld={
   this.decor.push({type:'tower',x:tx,z:tz,y:base});
   // Autos estacionados y tambos a la orilla de los caminos: cobertura real (frenan balas), lejos de los puntos de aparición
   const free=(x,z,w,d)=>!this.spawns.some(p=>Math.hypot(x-p[0],z-p[1])<10)&&!this.solids.some(b=>Math.abs(x-b.x)<b.w/2+w/2+1.2&&Math.abs(z-b.z)<b.d/2+d/2+1.2);
-  for(const [x,z,rot,color]of [[5.6,-31,0,'#d9d6cf'],[-5.6,40,0,'#34465f'],[5.8,72,0,'#7a2b2b'],[-31,29.7,1,'#b8b2a3'],[-72,20.6,1,'#55636a'],[48,-8,1,'#c9c2b4']]){const w=rot?4.4:1.85,d=rot?1.85:4.4;if(!free(x,z,w,d))continue;const q=block(x,z,w,d,1.45,'car');q.color=color;q.rot=rot;}
-  for(const [cx,cz]of [[29,33],[-27,-49],[61,57]])for(const [ox,oz]of [[0,0],[.7,.15],[.25,.68]]){const x=cx+ox,z=cz+oz;if(free(x,z,.6,.6)){const q=block(x,z,.62,.62,.9,'barrel');q.color=['#2f4f7a','#7a3f22','#4f5a3a'][Math.abs(Math.round(cx))%3];}}
+  for(const [x,z,rot,color]of [[5.6,-31,0,'#f25c54'],[-5.6,40,0,'#3ab4f2'],[5.8,72,0,'#ffd23f'],[-31,29.7,1,'#7bd389'],[-72,20.6,1,'#ff8c42'],[48,-8,1,'#f7f7f2']]){const w=rot?4.4:1.85,d=rot?1.85:4.4;if(!free(x,z,w,d))continue;const q=block(x,z,w,d,1.45,'car');q.color=color;q.rot=rot;}
+  for(const [cx,cz]of [[29,33],[-27,-49],[61,57]])for(const [ox,oz]of [[0,0],[.7,.15],[.25,.68]]){const x=cx+ox,z=cz+oz;if(free(x,z,.6,.6)){const q=block(x,z,.62,.62,.9,'barrel');q.color=['#2f8fd6','#f26b3a','#49b86b'][Math.abs(Math.round(cx))%3];}}
   // Tree trunks are cover too. Foliage remains soft, translucent dressing.
   const rng=srand(6192);for(let i=0;i<340;i++){
    const x=(rng()-.5)*530,z=(rng()-.5)*530,near=Math.abs(x)<100&&Math.abs(z)<108;

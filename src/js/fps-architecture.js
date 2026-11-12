@@ -35,7 +35,7 @@ const FPSArchitecture={
   world.decor.push(b);return b;
  },
  build(view,b,batch){
-  const T=KartGL,S=FPSScenery,trim=S.material('plaster','#eee7d6'),base=S.material('stone','#aaa997'),metal=S.material('steel','#677572'),dark=KartModels.mat('#273b3b',.3,.65),wood=S.material('wood','#a28b68'),roof=S.material('stone','#c6c5b4');
+  const T=KartGL,S=FPSScenery,trim=S.material('plaster','#fffaf0'),base=S.material('stone','#9aa0c0'),metal=S.material('steel','#5f8fb0'),dark=KartModels.mat('#2f4a66',.3,.65),wood=S.material('wood','#e0a868'),roof=S.material('stone','#f0876a');
   const box=(mat,x,y,z,w,h,d,rot)=>batch.add('box',mat,[x,y,z],[w,h,d],rot);
   for(const wall of b.walls){
    const {axis,side}=wall,face=(u,y,out)=>[b.x+(axis==='x'?side*(b.w/2+out):u),b.y+y,b.z+(axis==='z'?side*(b.d/2+out):u)],bar=(mat,u,y,out,w,h,d)=>batch.add('box',mat,face(u,y,out),axis==='z'?[w,h,d]:[d,h,w]);
@@ -55,12 +55,12 @@ const FPSArchitecture={
    }
    // Interior lower wall paint and skirting stay inside the room, with doors free.
    const segments=door?[[-(wall.length+door.w)/4,(wall.length-door.w)/2],[(wall.length+door.w)/4,(wall.length-door.w)/2]]:[[0,wall.length]];
-   for(const [u,w]of segments){bar(base,u,.09,-.239,w,.18,.018);bar(S.material('plaster','#b0b9ac'),u,.61,-.238,w,.85,.012);}
+   for(const [u,w]of segments){bar(base,u,.09,-.239,w,.18,.018);bar(S.material('plaster','#d9e6f2'),u,.61,-.238,w,.85,.012);}
   }
   // Four corner quoins, flush with the adjoining masonry.
   for(const sx of [-1,1])for(const sz of [-1,1])for(let j=0;j<Math.floor(b.h/.52);j++)box(trim,b.x+sx*b.w/2,b.y+.26+j*.52,b.z+sz*b.d/2,.58,.48,.58);
   for(const side of [-1,1]){const x=b.x+side*(b.w/2-.5),z=b.z+b.d/2+.33;batch.add('branch',metal,[x,b.y+b.h/2,z],[.055,b.h,.055]);for(let j=1;j<b.h;j+=1.4)box(dark,x,b.y+j,z,.16,.04,.14);}
-  const doorZ=b.z+b.d/2,awning=S.material('roof',b.x<0?'#b67f5b':'#68887d');box(awning,b.x,b.y+3.12,doorZ+1.15,4.8,.11,1.9,[.08,0,0]);box(metal,b.x,b.y+3.02,doorZ+2.02,4.85,.12,.08);
+  const doorZ=b.z+b.d/2,awning=S.material('roof',b.x<0?'#ff6f61':'#2ec4b6');box(awning,b.x,b.y+3.12,doorZ+1.15,4.8,.11,1.9,[.08,0,0]);box(metal,b.x,b.y+3.02,doorZ+2.02,4.85,.12,.08);
   for(const s of [-1,1]){box(metal,b.x+s*2.22,b.y+1.5,doorZ+1.96,.065,3,.065);box(base,b.x+s*2.22,b.y+.1,doorZ+1.96,.3,.2,.3);}
   // Roof machinery has feet and a separate kerb; no floating cylinders.
   box(roof,b.x-4,b.y+b.h+.46,b.z-2,2.4,.28,2.4);batch.add('cylinder',S.material('steel','#a4afaa'),[b.x-4,b.y+b.h+1.32,b.z-2],[.9,1.45,.9]);
