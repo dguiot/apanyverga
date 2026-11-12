@@ -444,6 +444,13 @@ de los seis vehículos, vibración proporcional y las llamadas al actuador inal�
 con palanca, cruceta, WASD, flechas y controles táctiles, y verifica desplazamiento,
 orientación y ruedas delanteras en los seis vehículos de las tres pistas.
 
+`node src/test/tstyle-total.cjs` comprueba la capa de estilo compartida (tinta y sombreado de caricatura en
+karts y personajes del FPS, cielo y árboles comunes, colores de las armas), la cámara al hombro (posición,
+convergencia de la mira, pared detrás, mira del francotirador y alternancia con V), los números de daño, las
+recogidas con haz de luz, las fotos del mundo 3D usadas como fondo de las arenas Mercado y Sierra, sus peligros
+(karts y granadas), la dirección de la música y Esmash Total de punta a punta: reparto, carrera, ventajas en el
+combate, vidas y Golpe Final en la final, puntos dobles, campeón y salida.
+
 `node src/test/tfps.cjs` verifica movimiento, salto, colisión, acceso a azoteas, impactos,
 escudos, munición, cambio de arma, recarga, reaparición, controles de mando, vista en
 primera persona y división exclusivamente local. `node src/test/tfps-online.cjs` comprueba

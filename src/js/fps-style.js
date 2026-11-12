@@ -54,7 +54,7 @@ const FPSPop = {
     const T = KartGL, m = new T.ShaderMaterial({
       transparent: true, depthWrite: false, side: T.DoubleSide, blending: T.AdditiveBlending, uniforms: { tint: { value: new T.Color(color) } },
       vertexShader: 'varying float h;void main(){h=uv.y;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
-      fragmentShader: 'uniform vec3 tint;varying float h;void main(){float a=pow(1.-h,1.6)*.5;gl_FragColor=vec4(tint*1.6,a);\n#include <tonemapping_fragment>\n#include <colorspace_fragment>\n}',
+      fragmentShader: 'uniform vec3 tint;varying float h;void main(){float a=pow(1.-h,1.8)*.26;gl_FragColor=vec4(tint*1.5,a);\n#include <tonemapping_fragment>\n#include <colorspace_fragment>\n}',
     });
     M.set(key, m); return m;
   };
@@ -68,7 +68,7 @@ const FPSPop = {
       b.add('sphere', '#e9f8ff', [.09, .38, .17], [.05, .07, .03], null, 0, .2, '#bfeaff'); b.add('fps-loot-ring', '#3ab4f2', [0, .035, 0], [1, 1, 1], [Math.PI / 2, 0, 0], .2, .5, '#0d5f9a'); b.finish(root, false);
     }
     const color = q.type === 'weapon' ? (FPSWeaponArt.SKINS[q.gun] || FPSWeaponArt.SKINS[0]).black : BEAM[q.type] || '#ffffff';
-    if (!KartModels.geometry.has('fps-beam')) { const g = new T.CylinderGeometry(.32, .46, 9, 14, 1, true); g.translate(0, 4.5, 0); KartModels.geometry.set('fps-beam', g); }
+    if (!KartModels.geometry.has('fps-beam')) { const g = new T.CylinderGeometry(.1, .3, 7, 12, 1, true); g.translate(0, 3.5, 0); KartModels.geometry.set('fps-beam', g); }
     const beam = new T.Mesh(KartModels.geo('fps-beam'), beamMaterial(color)); beam.userData.noInk = true; beam.renderOrder = 4; beam.castShadow = beam.receiveShadow = false;
     Style3D.outline(root, .009); root.add(beam); root.userData.baseY = root.position.y; root.userData.beam = beam; return root;
   };
