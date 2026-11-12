@@ -26,6 +26,62 @@ La ilustración original de portada está en `src/assets/cover-three-games.webp`
 con ImageGen a partir de los personajes existentes. El compilador la incluye en el HTML;
 no depende de un CDN ni de descargar imágenes al abrir el juego.
 
+## Un solo estilo para los tres juegos
+
+Peleas, Kart y FPS comparten dirección de arte: la caricatura de tinta gruesa y color vivo de las peleas.
+`src/js/style3d.js` es la capa común del 3D y se aplica a los materiales que ya existían (ningún modelo se reescribió):
+
+- **Tinta.** Personajes, vehículos, armas y recogidas llevan el contorno oscuro de las peleas (casco invertido).
+  Se apaga sola con «Efectos reducidos», en Calidad «Rápida» y en Xbox.
+- **Sombreado.** Los personajes usan sombra de un solo corte (cel) y luz de borde; el mundo conserva luz suave
+  con color saturado. El tono de salida es *Neutral* en lugar de ACES, que deslavaba los colores.
+- **Cielo pintado.** Un mismo cielo para pistas y mundo abierto: degradado, sol con halo y rayos, nubes de
+  caricatura con borde nítido, y de noche estrellas y aurora. Tres ambientes: día, atardecer y noche.
+- **Mismo mundo.** Las fachadas del Mercado y los edificios de la Sierra usan la misma paleta; los árboles de
+  bloque (jacarandas y flamboyanes incluidos) salen de una sola función para Kart y FPS.
+- **Mismos personajes.** En el FPS ya no llevan portaplacas militar: se ven como en las peleas y en el Kart,
+  con un cinturón y una mochila en su color de acento.
+
+Dos arenas de pelea ocurren en los otros juegos. Su fondo **es** el mundo 3D real: la escena se construye una vez,
+se fotografía de lado y la pelea se dibuja encima (`src/js/stages4.js`). Sin WebGL, en Xbox o en modo ligero se
+pinta un respaldo 2D con la misma paleta.
+
+| Arena | Mundo | Qué pasa |
+| --- | --- | --- |
+| Mercado del Sol | La calle de la pista del Kart | Los karts de la carrera cruzan la calle y atropellan; los toldos son refugio |
+| Sierra | La plaza del FPS | Caen granadas; sacos de arena, cajas y un dron sirven de plataformas |
+
+## Esmash Total
+
+La cuarta opción de la pantalla «¿A qué jugamos?» mezcla los tres juegos en una sola competencia
+(`src/js/total.js`). Los mismos cuatro personajes —de 1 a 4 jugadores en este dispositivo; las plazas libres son
+CPU— juegan tres rondas seguidas y suman puntos (10 · 7 · 5 · 3; la final vale doble):
+
+1. **Carrera** en el Mercado del Sol (Kart, 150 cc, con objetos).
+2. **Combate** en la Sierra (FPS a 8 bajas o 3 minutos). El podio de la carrera da ventaja: el 1º empieza con
+   2 bajas y 3 granadas, el 2º con 1 baja y 2 granadas.
+3. **Gran final**: pelea por vidas en la arena del Mercado, con los karts cruzando **y** las granadas cayendo.
+   Los dos primeros de la tabla llegan con 3 vidas y los otros dos con 2; el líder entra con el Golpe Final listo.
+
+Entre rondas se muestra la tabla y la ventaja que te llevas a la siguiente. Por ahora es local; en una sala
+online se avisa y no se inicia.
+
+## Música: la banda
+
+`src/js/music-band.js` reemplaza los senos y triángulos sueltos por una banda sintetizada al momento (sin
+archivos de audio): batería con bombo, tarola, palmas, contratiempos, congas, cencerro, güiro y platillos; bajo con
+filtro; piano eléctrico FM; colchón de cuerdas; metales con ataque y vibrato; acordeón, marimba, flauta, guitarra
+y arpegios. La mezcla pasa por reverberación de sala, eco estéreo, compresor y el «bombeo» del bombo.
+
+- Cada tema conserva su armonía, melodía y tempo, y ahora tiene **estilo** (cumbia, samba, disco/funk, synthwave,
+  relajado) y **forma de canción**: entrada, verso, subida, coro con metales a dos voces, puente y cierre, con
+  remates de batería cada ocho compases.
+- **La música sigue al juego.** En la última vuelta del Kart el tempo sube 7 %; en las peleas entra más
+  percusión cuando alguien pasa de 100 % o queda en su última vida; en el FPS la mezcla se abre durante un
+  tiroteo y se calma al explorar.
+- Catorce composiciones: las doce anteriores, «Plaza eléctrica» (arena Sierra) y «Tres en uno» (Esmash Total).
+  El tema del menú no cambió.
+
 ## Controles de Kart
 
 | Acción | Teclado | Mando Xbox / PlayStation |
@@ -75,17 +131,27 @@ los 15 personajes en ambos modelos, las superficies delanteras y la ausencia de 
 
 ## FPS
 
+**Cámara al hombro.** Por omisión ves a tu personaje desde atrás y a la derecha, como en un battle royale;
+**V** (o cruceta arriba) alterna con la primera persona de siempre y la elección se guarda. La simulación no
+cambia: la bala sale de los ojos y la cámara converge en el punto exacto donde pega, así que la mira del centro
+no miente. Una pared detrás acerca la cámara y el francotirador con mira pasa a primera persona
+(`src/js/fps-camera.js`).
+
+Los impactos muestran **números de daño** sobre el rival (blanco al cuerpo, amarillo a la cabeza, azul al
+escudo) que se acumulan mientras sigues pegando. Las recogidas flotan, giran y se anuncian con un **haz de luz**
+de su color; el escudo es una poción azul. Cada arma tiene color de juguete propio: Cobalto azul, Avispa
+amarilla, Sierra turquesa y naranja, Trueno roja y Horizonte morada (`src/js/fps-style.js`).
+
 FPS es un mundo de unos 500 × 500 metros: valle, bosque, río con puentes,
 patio central, almacenes accesibles, escaleras y azoteas. Conserva los 15 personajes.
 El combate libre termina a las 12 bajas o a los siete minutos, con escudos, munición,
 coberturas que bloquean disparos, reaparición y CPU para completar cuatro plazas.
 
 Las cinco armas tienen cargadores, cadencias, dispersión, retroceso y tiempos de recarga
-distintos, y modelos a escala real con acabados de verdad (aluminio anodizado con desgaste,
-acero, polímero punteado, Cerakote, nogal): Cobalto 9 (pistola con miras de tritio), Avispa
-(subfusil con punto rojo), Sierra M4 (fusil con guardamanos color arena y mira holográfica),
+distintos, y modelos detallados con color de juguete y contorno de tinta: Cobalto 9 (pistola con
+miras de tritio), Avispa (subfusil con punto rojo), Sierra M4 (fusil con mira holográfica),
 Trueno 12 (escopeta de bomba con mira de fibra óptica) y Horizonte (francotirador de cerrojo con
-anteojo de 30 mm). Las retículas brillan contra cualquier fondo. Todos llevan guantes tácticos.
+anteojo de 30 mm). Las retículas brillan contra cualquier fondo.
 
 En la mano el arma tiene inercia al mirar, paso en forma de ocho, postura baja al correr,
 inclinación al moverte de lado, caída al aterrizar y retroceso propio (patada, cabeceo y giro).
@@ -112,8 +178,8 @@ calculado a donde te escondiste. Contra alguien que se mueve de lado todo el tie
 | Difícil | ~35 % | ~26 |
 | Experto | ~55 % | ~42 |
 
-Los personajes llevan portaplacas con portacargadores, radio y cinturón de combate sobre su vestuario
-(cara y colores de Esmash intactos). Corren en la dirección real del movimiento, inclinan el torso,
+Los personajes conservan su vestuario de Esmash a la vista, con un cinturón con funda y una mochila
+chica en su color de acento. Corren en la dirección real del movimiento, inclinan el torso,
 siguen la mira, se llevan el arma al hombro al apuntar, la bajan al correr, recogen las piernas en
 el aire, reaccionan al recibir un tiro y caen al morir. El mapa suma autos estacionados y tambos que
 frenan balas, sombras de contacto bajo las coberturas y mugre en la base de los edificios.
@@ -145,26 +211,27 @@ munición y puntuación; los invitados predicen su movimiento y reciben correcci
 
 ## Música por escenario
 
-El tema del lobby se conserva. Hay doce composiciones originales de la misma familia
-disco/funk electrónico, con bajo sincopado, teclas cálidas, pulsaciones de guitarra,
-percusión y secciones de 32 compases. Cada arena y circuito tiene su propia armonía,
-melodía y patrón; los tempos van de 103 a 130 BPM. También hay un tema para FPS.
+El tema del lobby se conserva. Hay catorce composiciones originales, tocadas por la banda
+descrita arriba, con secciones de 32 compases. Cada arena y circuito tiene su propia armonía,
+melodía, estilo y patrón; los tempos van de 103 a 130 BPM. También hay un tema para FPS.
 Se respetan los ajustes de música/efectos, volumen general y atenuación de la voz.
 
-| Escenario | Tema | BPM |
-| --- | --- | --- |
-| Templo | Piedra y terciopelo | 110 |
-| Volcán (peleas) | Disco de magma | 128 |
-| Barco | Sal en el vinilo | 105 |
-| Espacio | Órbita de seda | 116 |
-| Ciudad | Semáforo ámbar | 121 |
-| Estadio | La última vuelta al sol | 125 |
-| Xochimilco | Canal de miel | 103 |
-| Pirámide | Cobre al amanecer | 113 |
-| Mercado del Sol | Domingo de groove | 119 |
-| Cañón de Fuego | Fuego de medianoche | 130 |
-| Cumbre Neón | Lluvia cromada | 123 |
-| FPS | Horizonte eléctrico | 112 |
+| Escenario | Tema | Estilo | BPM |
+| --- | --- | --- | --- |
+| Templo | Piedra y terciopelo | Relajado | 110 |
+| Volcán (peleas) | Disco de magma | Samba | 128 |
+| Barco | Sal en el vinilo | Cumbia | 105 |
+| Espacio | Órbita de seda | Synthwave | 116 |
+| Ciudad | Semáforo ámbar | Funk | 121 |
+| Estadio | La última vuelta al sol | Samba | 125 |
+| Xochimilco | Canal de miel | Cumbia | 103 |
+| Pirámide | Cobre al amanecer | Relajado | 113 |
+| Mercado del Sol (pista y arena) | Domingo de groove | Cumbia | 119 |
+| Cañón de Fuego | Fuego de medianoche | Samba | 130 |
+| Cumbre Neón | Lluvia cromada | Synthwave | 123 |
+| FPS | Horizonte eléctrico | Synthwave | 112 |
+| Sierra (arena) | Plaza eléctrica | Funk | 118 |
+| Esmash Total | Tres en uno | Funk | 122 |
 
 ## Respuesta y movimiento
 
@@ -443,7 +510,7 @@ pistola y de guardamanos usan poses diferentes, conservando piel, guantes y mang
 del personaje de Esmash. La arquitectura comparte un solo diseño entre colisiones
 y renderizado; las ventanas son vidrio opaco como cobertura, sin destrucción.
 `node src/test/tstage-music.cjs` renderiza audio real, mide nivel/saturación, distingue
-las doce composiciones, comprueba la identidad del lobby y sus transiciones/ajustes.
+las catorce composiciones, comprueba la identidad del lobby y sus transiciones/ajustes.
 
 `node src/test/tshell-ui.cjs` recorre la portada, los tres pasos de cada juego, selección
 de moto con mando real simulado, dos pilotos locales independientes y ajustes/remapeo

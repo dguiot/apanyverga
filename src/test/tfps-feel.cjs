@@ -2,7 +2,7 @@
 // Each check runs against the real simulation or the real draw path.
 const {chromium}=require('playwright'),path=require('node:path'),{pathToFileURL}=require('node:url');
 (async()=>{const b=await chromium.launch({headless:true,...(process.env.CHROME_PATH?{executablePath:process.env.CHROME_PATH}:{})});try{
- const p=await b.newPage({viewport:{width:1280,height:720}}),errors=[];p.on('pageerror',e=>errors.push(e.stack));p.on('console',m=>{if(m.type()==='error')errors.push(m.text());});await p.addInitScript(()=>{requestAnimationFrame=()=>0;navigator.getGamepads=()=>[];});await p.route('**/config.js',r=>r.fulfill({body:'window.APYV_CONFIG={};'}));await p.goto(pathToFileURL(path.resolve(__dirname,'../../index.html')).href);
+ const p=await b.newPage({viewport:{width:1280,height:720}}),errors=[];p.on('pageerror',e=>errors.push(e.stack));p.on('console',m=>{if(m.type()==='error')errors.push(m.text());});await p.addInitScript(()=>{requestAnimationFrame=()=>0;navigator.getGamepads=()=>[];});await p.route('**/config.js',r=>r.fulfill({body:'window.APYV_CONFIG={};'}));await p.addInitScript(()=>{try{localStorage.setItem('esmash-fps-cam','first');}catch(e){}});await p.goto(pathToFileURL(path.resolve(__dirname,'../../index.html')).href);
  const checks=await p.evaluate(()=>{
   const out=[],ok=(name,pass,details)=>out.push({name,pass:!!pass,details});FPSAudio.play=()=>{};
   // A bot that spawns inside a building leaves through a door instead of pressing into the wall nearest its target.

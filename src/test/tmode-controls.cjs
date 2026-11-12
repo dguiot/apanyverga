@@ -4,7 +4,7 @@ const {chromium}=require('playwright'),path=require('node:path'),{pathToFileURL}
  const page=await b.newPage({viewport:{width:1280,height:720}}),errors=[];
  page.on('pageerror',e=>errors.push(e.stack));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
  await page.addInitScript(()=>{requestAnimationFrame=()=>0;window.__pads=[0,1,2].map(index=>({id:index===1?'Xbox Wireless Controller':'Xbox Controller',index,connected:true,mapping:'standard',axes:[0,0,0,0],buttons:Array.from({length:17},()=>({pressed:false,value:0}))}));navigator.getGamepads=()=>__pads;});
- await page.route('**/config.js',r=>r.fulfill({body:'window.APYV_CONFIG={};'}));await page.goto(pathToFileURL(path.resolve(__dirname,'../../index.html')).href);
+ await page.route('**/config.js',r=>r.fulfill({body:'window.APYV_CONFIG={};'}));await page.addInitScript(()=>{try{localStorage.setItem('esmash-fps-cam','first');}catch(e){}});await page.goto(pathToFileURL(path.resolve(__dirname,'../../index.html')).href);
  const checks=await page.evaluate(()=>{
   const out=[],ok=(name,pass,details)=>out.push({name,pass:!!pass,details});
   const clear=()=>{keysDown.clear();keyPulses.clear();keysTapped.clear();TouchPad.active=false;__pads.forEach(p=>{p.axes.fill(0);p.buttons.forEach(b=>b.pressed=false);});Devices.poll();};

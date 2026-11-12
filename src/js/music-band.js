@@ -148,7 +148,7 @@ const Band = {
   },
   // nota de acorde más cercana (en cualquier octava)
   snap(n, chord) { let best = n, gap = 99; for (const c of chord) for (let o = -24; o <= 24; o += 12) { const d = Math.abs(c + o - n); if (d < gap) { gap = d; best = c + o; } } return best; },
-  below(n, chord) { let best = n - 4; for (const c of chord) for (let o = -24; o <= 24; o += 12) { const q = c + o; if (q <= n - 3 && q >= n - 9 && (best > n - 3 || q > best)) best = q; } return best; },
+  below(n, chord) { let best = null; for (const c of chord) for (let o = -24; o <= 24; o += 12) { const q = c + o; if (q <= n - 3 && q >= n - 9 && (best === null || q > best)) best = q; } return best ?? n - 12; },
   schedule(ctx, g, index, time, mood) {
     const d = STAGE_SCORE[mood], K = g.kit || (g.kit = this.kit(ctx, g)); if (g.bandMood !== mood) { g.bandMood = mood; K.tempo(d.bpm, time); }
     const style = this.STYLE[mood] || 'disco', sp = 60 / d.bpm / 4, step = index % 16, bar = Math.floor(index / 16), ph = bar % 32, sec = Math.floor(bar / 2) % 4, chord = d.chords[sec].map(n => n + d.key), t = time + (step % 2 ? sp * d.swing : 0);
