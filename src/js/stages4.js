@@ -122,9 +122,14 @@ STAGE_DEFS.mercado = () => ({
     surf(190, -140, 200, 14, { plat: 1, awning: '#2ec4b6' }),
     surf(-95, -270, 190, 14, { plat: 1, banner: 1, move: (t, s) => [s.bx + Math.sin(t * .012) * 120, s.by] }),
   ],
-  karts: [], nextKarts: 780, kartDir: 1, wave: 0,
+  karts: [], nextKarts: 780, kartDir: 1, wave: 0, totalMix: false, nextNades: 520,
   update() {
     this.nextKarts--;
+    // Esmash Total: en la gran final también caen las granadas del FPS
+    if (this.totalMix && --this.nextNades <= 100) {
+      if (this.nextNades === 100) warnBanner('¡Granadas!', '#ff8c42');
+      if (this.nextNades <= 0) { const from = pick([-1, 1]); for (let i = 0; i < 2; i++) spawnProjectile(null, { type: 'cannon', x: from * 1250, y: -420, delay: 10 + i * 40, toX: rand(-380, 380), r: 17, life: 400, dmg: 15, ang: 62, bkb: 10, kbg: 9, col: '#2f7d46', explodeGround: 1, grav: .34 }); this.nextNades = randi(900, 1300); }
+    }
     if (this.nextKarts === 110) { this.kartDir = pick([-1, 1]); warnBanner(this.kartDir > 0 ? '¡Vienen los karts! →' : '← ¡Vienen los karts!', '#ffc53d'); }
     if (this.nextKarts <= 0 && this.nextKarts > -70 && this.nextKarts % 23 === 0) {
       this.karts.push({ x: this.kartDir > 0 ? -1500 : 1500, dir: this.kartDir, who: (this.wave * 3 + this.karts.length + 5) % CHAR_ORDER.length, veh: (this.wave + this.karts.length) % 4, v: 27 + this.karts.length * 1.5 });
@@ -232,5 +237,3 @@ STAGE_DEFS.sierra = () => ({
   },
   drawFG() { },
 });
-// La arena de la Sierra suena como el FPS; la del Mercado ya comparte tema con su pista.
-if (typeof STAGE_SCORE !== 'undefined' && STAGE_SCORE.aurora) { STAGE_SCORE.sierra = STAGE_SCORE.aurora; KartMusic.themes.sierra = KartMusic.themes.aurora; }
