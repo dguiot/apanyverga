@@ -6,7 +6,7 @@
 //  con más contraste, viñeta y un ligero desenfoque de orillas al correr. Solo con una vista local y
 //  con ART.hi (se apaga en Xbox, en Calidad «Rápida», con «Efectos reducidos» o si el equipo es lento).
 // ============================================================
-const FPS_GRADE = { sat: 1.0, contrast: 1.13, lift: [0.003, 0.002, -0.004], gain: [1.03, 1.0, 0.97], bloom: 0.2, radius: 0.45, threshold: 1.15, vig: 0.4, exposure: 1.04 };
+const FPS_GRADE = { sat: 1.06, contrast: 1.12, lift: [0.003, 0.002, -0.004], gain: [1.03, 1.0, 0.97], bloom: 0.16, radius: 0.45, threshold: 1.25, vig: 0.34, exposure: .93 };
 const FPSPost = {
   composer: null, w: 0, h: 0, blur: 0,
   enabled(views) { return views === 1 && KartPost.enabled(); },

@@ -1,6 +1,6 @@
 const {chromium}=require('playwright'),path=require('node:path'),{pathToFileURL}=require('node:url');
 (async()=>{const browser=await chromium.launch({headless:true,...(process.env.CHROME_PATH?{executablePath:process.env.CHROME_PATH}:{})});try{
-const page=await browser.newPage({viewport:{width:1280,height:720}}),errors=[];page.on('pageerror',e=>errors.push(e.stack));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});await page.addInitScript(()=>requestAnimationFrame=()=>0);await page.route('**/config.js',r=>r.fulfill({body:'window.APYV_CONFIG={};'}));await page.goto(pathToFileURL(path.resolve(__dirname,'../../index.html')).href);
+const page=await browser.newPage({viewport:{width:1280,height:720}}),errors=[];page.on('pageerror',e=>errors.push(e.stack));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});await page.addInitScript(()=>requestAnimationFrame=()=>0);await page.route('**/config.js',r=>r.fulfill({body:'window.APYV_CONFIG={};'}));await page.addInitScript(()=>{try{localStorage.setItem('esmash-fps-cam','first');}catch(e){}});await page.goto(pathToFileURL(path.resolve(__dirname,'../../index.html')).href);
 const checks=await page.evaluate(()=>{
  const out=[],ok=(name,pass,details)=>out.push({name,pass:!!pass,details}),m=new FPSMatch([{id:'daniel',gun:4,bot:false}]);APP.fps=m;APP.go('fpsGame');GameFeel.dt=1/60;GameFeel.alpha=1;const p=m.player,buildings=FPSWorld.decor.filter(b=>b.type==='building');
  for(const [i,b]of buildings.entries()){

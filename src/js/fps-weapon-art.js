@@ -108,12 +108,27 @@ const FPSWeaponArt={
   for(const [k,m]of Object.entries(M))KartModels.materials.set('fps-gun:'+k,m);
   return M;
  },
+ // Cada arma tiene su color de juguete (como los objetos de las peleas y del Kart): cuerpo de color vivo,
+ // empuñadura oscura y un acento. Las miras, cristales y retículas se comparten.
+ SKINS:[
+  {black:'#2f6fe0',steel:'#dfe9f5',poly:'#1c2540',fde:'#7fe3ff',od:'#2f6fe0',wood:'#f2a23a'},   // Cobalto 9
+  {black:'#ffc533',steel:'#f3f0e6',poly:'#22252e',fde:'#ff7a3a',od:'#ffc533',wood:'#f2a23a'},   // Avispa
+  {black:'#2bb5a0',steel:'#e6f2f0',poly:'#243044',fde:'#ff8c42',od:'#2bb5a0',wood:'#f2a23a'},   // Sierra M4
+  {black:'#e84a3a',steel:'#f0e6e0',poly:'#2a2233',fde:'#ffd23f',od:'#e84a3a',wood:'#e8923a'},   // Trueno 12
+  {black:'#8a5cf0',steel:'#ece6ff',poly:'#231d3a',fde:'#ffd23f',od:'#6d45d8',wood:'#f2a23a'},   // Horizonte
+ ],
+ skin(id){
+  const base=this.mats(),cache=this.skinCache||(this.skinCache=new Map());if(cache.has(id))return cache.get(id);
+  const S=this.SKINS[id]||this.SKINS[0],M={...base};
+  for(const [k,color] of Object.entries(S)){const m=base[k].clone();m.color.set(color);m.metalness=k==='steel'?.55:.12;m.roughness=k==='poly'?.7:.42;m.roughnessMap=null;m.bumpMap=k==='wood'?m.bumpMap:null;if(k==='wood')m.map=null;M[k]=m;KartModels.materials.set('fps-gun:'+id+':'+k,m);}
+  cache.set(id,M);return M;
+ },
  shapes(){
   if(KartModels.geometry.has('gun-cylz'))return;const T=KartGL,z=new T.CylinderGeometry(1,1,1,22);z.rotateX(Math.PI/2);KartModels.geometry.set('gun-cylz',z);
   const x=new T.CylinderGeometry(1,1,1,18);x.rotateZ(Math.PI/2);KartModels.geometry.set('gun-cylx',x);KartModels.geometry.set('gun-cyly',new T.CylinderGeometry(1,1,1,18));FPSGear.rounded();
  },
  build(id,character,thirdPerson=false){
-  this.shapes();const T=KartGL,L=CharacterDesign.get(character),M=this.mats(),root=new T.Group(),body=new T.Group(),magazine=new T.Group(),moving=new T.Group(),long=this.LONG[id];
+  this.shapes();const T=KartGL,L=CharacterDesign.get(character),M=this.skin(id),root=new T.Group(),body=new T.Group(),magazine=new T.Group(),moving=new T.Group(),long=this.LONG[id];
   root.add(body,magazine,moving);root.userData={design:L,body,magazine,moving,long,arms:[],weaponId:id};
   const B={body:FPSScenery.batch(),mag:FPSScenery.batch(),moving:FPSScenery.batch()};
   const P=(pts,w,m,part='body',bevel=.0012)=>B[part].geometry(this.profile(pts,w,bevel),m,[0,0,0]);

@@ -5,7 +5,7 @@ const Kart3D={
     if(this.renderer)return true;if(this.error)return false;
     try{
       const T=KartGL,r=this.renderer=new T.WebGLRenderer({antialias:!IS_XBOX,alpha:true,powerPreference:'high-performance'});
-      r.outputColorSpace=T.SRGBColorSpace;r.toneMapping=T.ACESFilmicToneMapping;r.toneMappingExposure=1.22;
+      r.outputColorSpace=T.SRGBColorSpace;r.toneMapping=7;r.toneMappingExposure=1.05; // 7 = Neutral: conserva el color saturado (ACES lo deslavaba)
       r.shadowMap.enabled=!IS_XBOX;r.shadowMap.type=T.PCFSoftShadowMap;
       this.rebuildEnvironment();
       r.domElement.id='kart-world';r.domElement.setAttribute('aria-hidden','true');
@@ -84,7 +84,7 @@ const Kart3D={
     const T=KartGL,info=C.info,neon=info.theme==='neon';
     const asphalt=KartWorld.texture('asphalt');
     asphalt.wrapS=asphalt.wrapT=T.RepeatWrapping;asphalt.anisotropy=Math.min(16,this.renderer.capabilities.getMaxAnisotropy());
-    const road=new T.MeshStandardMaterial({color:neon?'#30475f':info.theme==='canyon'?'#827972':'#89949e',map:asphalt,bumpMap:asphalt,bumpScale:.004,roughness:neon?.64:1,metalness:neon?.08:0});road.name='race-asphalt';
+    const road=new T.MeshStandardMaterial({color:neon?'#3a4a8c':info.theme==='canyon'?'#8f7a86':'#8e93ad',map:asphalt,bumpMap:asphalt,bumpScale:.004,roughness:neon?.64:1,metalness:neon?.08:0});road.name='race-asphalt';
     const terrain=KartWorld.material(info.theme==='canyon'?'earth':'grass','#a0ac8b',true),curb=new T.MeshStandardMaterial({vertexColors:true,roughness:.86});
     this.ribbon(C,-1,1,.03,road);
     const land=(s,x)=>{const noise=Math.sin(s*.007+x*.42)*Math.sin(s*.017-x*.4);return -Math.max(0,Math.abs(x)-1.6)*2+noise*Math.max(0,Math.abs(x)-1.8)*2.3;};
@@ -113,10 +113,10 @@ const Kart3D={
       for(let i=-1;i<2;i++){const q=C.world(b.s+i*3,b.x,.16);this.instance('box','#f8ffd7',[q.x,q.y,q.z],[p.width*.43,.025,.35],[0,Math.atan2(p.tx,p.tz),0],0,.5,'#9ee1a4');}}
     for(const ramp of C.ramps||[]){const p=C.sample(ramp.s),w=C.world(ramp.s,ramp.x,.6);this.instance('box','#d6b25c',[w.x,w.y,w.z],[p.width*.55,.3,11],[-.13,Math.atan2(p.tx,p.tz),0],.3);
       for(let i=0;i<3;i++){const v=C.world(ramp.s-4+i*2,ramp.x,.3+i*.27);this.instance('box','#ffe8a5',[v.x,v.y,v.z],[p.width*.5,.09,.25],[0,Math.atan2(p.tx,p.tz),0]);}}
-    const floor=new T.Mesh(new T.PlaneGeometry(12000,12000),KartModels.mat(info.theme==='canyon'?'#4e342f':info.theme==='neon'?'#142b41':'#82a76a',0,1));floor.rotation.x=-Math.PI/2;floor.position.set(1000,-90,0);floor.receiveShadow=true;this.scene.add(floor);
+    const floor=new T.Mesh(new T.PlaneGeometry(12000,12000),KartModels.mat(info.theme==='canyon'?'#8a4a3a':info.theme==='neon'?'#141c4a':'#62b05a',0,1));floor.rotation.x=-Math.PI/2;floor.position.set(1000,-90,0);floor.receiveShadow=true;this.scene.add(floor);
   },
   scenery(C){
-    const rng=srand(984+C.info.id.length),theme=C.info.theme,colors=['#e9c190','#d78467','#91b0a5','#d89f91','#a8bfd0'];
+    const rng=srand(984+C.info.id.length),theme=C.info.theme,colors=['#ffc857','#f47c5c','#45b8c8','#f58fb0','#b99aee','#fff0c8']; // la misma paleta de fachadas que el mundo del FPS
     for(let s=30;s<C.length;s+=theme==='town'?28:76){
       const p=C.sample(s),angle=Math.atan2(p.tx,p.tz);if(p.zone==='bridge')continue;
       for(const side of [-1,1]){
@@ -198,8 +198,8 @@ const Kart3D={
     for(let i=0;i<4;i++)this.instance('sphere',i%2?'#5e956c':'#488963',[w.x+Math.sin(i*2)*1.5,w.y+h+(i%2)*1.3,w.z+Math.cos(i*2)*1.5],[2.5,2.4,2.6]);
   },
   lighting(scene,theme){
-    const T=KartGL,night=theme==='neon';scene.add(new T.HemisphereLight(night?'#92b7ee':'#c9e8ff',night?'#142332':'#72865c',night?1.3:1.35));
-    const sun=new T.DirectionalLight(night?'#b7d6ff':theme==='canyon'?'#ffd2a3':'#fff2d0',night?1.4:2.5);sun.position.set(-60,110,-40);
+    const T=KartGL,night=theme==='neon',P=Style3D.THEMES[Style3D.themeOf({theme})];scene.add(new T.HemisphereLight(P.hemiSky,P.hemiGround,night?1.05:1.55));
+    const sun=new T.DirectionalLight(P.sunLight,night?1.5:2.7);sun.position.set(-60,110,-40);
     sun.castShadow=!IS_XBOX;sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-45,right:45,top:45,bottom:-45,near:.1,far:300});sun.shadow.bias=-.0007;sun.shadow.normalBias=.15;
     scene.add(sun);scene.add(sun.target);return sun;
   },
@@ -212,7 +212,7 @@ const Kart3D={
   },
   build(race){
     const T=KartGL;this.disposeScene();this.race=race;this.scene=new T.Scene();this.scene.environment=this.environment;this.scene.environmentIntensity=race.course.info.theme==='neon'?.18:.4;this.batches.clear();
-    this.scene.fog=new T.FogExp2(race.course.info.theme==='neon'?'#182841':race.course.info.theme==='canyon'?'#d5a580':'#b3d3de',.00029);
+    this.scene.fog=new T.FogExp2(Style3D.THEMES[Style3D.themeOf(race.course.info)].fog,race.course.info.theme==='neon'?.00022:.00034);
     this.sky(this.scene,race.course.info);this.sun=this.lighting(this.scene,race.course.info.theme);this.terrainSurface(race.course);this.track(race.course);this.scenery(race.course);this.flush();
     this.camera=new T.PerspectiveCamera(60,W/H,.45,6500);this.cameraPos=null;this.cameraLook=null;this.views=new Map();
     this.drivers=race.racers.map(r=>{const mesh=KartModels.kart(r.id,r.vehicle);this.scene.add(mesh);return mesh;});
@@ -319,7 +319,7 @@ const Kart3D={
     this.followCamera(race,p,alpha,this);
     const w=C.world(s,x),texel=90/this.sun.shadow.mapSize.x,sx=Math.round(w.x/texel)*texel,sz=Math.round(w.z/texel)*texel;
     this.sun.position.set(sx-65,w.y+110,sz-50);this.sun.target.position.set(sx,w.y,sz);this.sun.target.updateMatrixWorld();
-    this.renderer.shadowMap.enabled=!IS_XBOX&&!ART.lite&&Prefs.fx==='full';this.renderer.toneMappingExposure=C.info.theme==='neon'?1.18:1.12;
+    this.renderer.shadowMap.enabled=!IS_XBOX&&!ART.lite&&Prefs.fx==='full';this.renderer.toneMappingExposure=C.info.theme==='neon'?1.1:1;Style3D.tick(GameFeel.dt||1/60);Style3D.inkBudget(!ART.lite&&Prefs.fx==='full');
   },
   followCamera(race,p,alpha,view){
     const T=KartGL,C=race.course,v=KartMotion.view(p,alpha),s=v.s,x=v.x;

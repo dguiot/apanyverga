@@ -837,8 +837,8 @@ const APP = {
   // al cambiar a Fútbol desde aquí: equipos forzados y repartidos
   toStagesTeams() { this.balanceTeams(); },
   stageRect(i) {
-    const n = STAGE_INFO.length, cols = n > 6 ? 4 : n > 4 ? 3 : n, w = cols === 4 ? 293 : cols === 3 ? 390 : 286, h = cols >= 3 ? 138 : 258, gap = 16, x0 = (W - (cols * w + (cols - 1) * gap)) / 2;
-    return { x: x0 + (i % cols) * (w + gap), y: 80 + Math.floor(i / cols) * (h + gap), w, h, cols };
+    const n = STAGE_INFO.length, cols = n > 6 ? 4 : n > 4 ? 3 : n, tall = Math.ceil(n / cols) > 2, w = cols === 4 ? 293 : cols === 3 ? 390 : 286, h = cols >= 3 ? (tall ? 94 : 138) : 258, gap = tall ? 9 : 16, x0 = (W - (cols * w + (cols - 1) * 16)) / 2; // tres filas: tarjetas más bajas
+    return { x: x0 + (i % cols) * (w + 16), y: 80 + Math.floor(i / cols) * (h + gap), w, h, cols };
   },
   stageselUpdate() {
     const rows = this.ruleRows(), N = STAGE_INFO.length, cols = this.stageRect(0).cols;
