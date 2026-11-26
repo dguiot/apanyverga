@@ -68,11 +68,20 @@ const {chromium,devices}=require('playwright'),{pathToFileURL}=require('node:url
  // ---------- Kart ----------
  {const {p,ctx,steps,touch,button}=await play('kart');
   const info=await p.evaluate(()=>({screen:APP.screen,shown:TouchPad.shown(),phase:APP.kartRace?.phase,labels:TouchPad.L.btns.map(b=>b.label)}));
-  ok('the race shows driving buttons',info.screen==='kartRace'&&info.shown&&info.labels.includes('GAS'),info);
-  const G=await button('attack');const s0=await p.evaluate(()=>APP.kartRace.player.s);
-  await touch('touchStart',[[G[0],G[1],4],[150,300,5]]);await steps(2);for(let i=1;i<=4;i++){await touch('touchMove',[[G[0],G[1],4],[150-i*14,300,5]]);await steps(1);}
-  await steps(150);const r=await p.evaluate(()=>({s:APP.kartRace.player.s,v:APP.kartRace.player.v,x:APP.kartRace.player.x}));await touch('touchEnd',[]);
-  ok('GAS accelerates the kart and the stick steers it',r.s-s0>20&&r.v>20,{gained:r.s-s0,v:r.v,x:r.x});
+  ok('the race shows thumb-friendly driving buttons (it accelerates on its own)',info.screen==='kartRace'&&info.shown&&['DERRAPE','FRENO','ÍTEM','ATRÁS'].every(l=>info.labels.includes(l))&&!info.labels.includes('GAS'),info);
+  const s0=await p.evaluate(()=>APP.kartRace.player.s);await steps(120);let r=await p.evaluate(()=>({s:APP.kartRace.player.s,v:APP.kartRace.player.v}));
+  ok('the kart accelerates without holding any button',r.s-s0>15&&r.v>20,{gained:r.s-s0,v:r.v});
+  const B=await button('special');await touch('touchStart',[[B[0],B[1],4]]);await steps(60);const braked=await p.evaluate(()=>APP.kartRace.player.v);await touch('touchEnd',[]);await steps(2);
+  ok('FRENO slows the kart down',braked<r.v*.7,{before:r.v,after:braked});
+  await steps(30);await p.evaluate(()=>{const r=APP.kartRace.player;r.x=0;r.yaw=0;r.v=70;});const D=await button('attack');
+  // como en las carreras de karts: se gira y se mantiene el derrape
+  await touch('touchStart',[[150,300,5]]);await steps(1);for(let i=1;i<=3;i++){await touch('touchMove',[[150+i*12,300,5]]);await steps(1);}
+  await touch('touchStart',[[150+36,300,5],[D[0],D[1],4]]);await steps(30);
+  const drift=await p.evaluate(()=>{const r=APP.kartRace.player;return {drift:r.drift,charge:+r.charge.toFixed(2),v:+r.v.toFixed(1),x:+r.x.toFixed(2),steer:+r.steer.toFixed(2)};});await touch('touchEnd',[]);await steps(3);
+  ok('the big button drifts while the stick steers',drift.drift&&drift.charge>0,drift);
+  // en la cuenta regresiva el botón grande es GAS (salida turbo)
+  await p.evaluate(()=>{const R=APP.kartRace;R.phase='grid';R.countdown=3.5;R.player.launch=0;TouchPad.draw();});
+  ok('during the countdown the big button is GAS for the turbo start',await p.evaluate(()=>TouchPad.L.btns.find(b=>b.a==='attack').label==='GAS'));
   await ctx.close();}
  }catch(e){errors.push(e.stack);}
  console.log((errors.length?'FAIL ':'PASS ')+'no browser errors '+JSON.stringify(errors.slice(0,4)));

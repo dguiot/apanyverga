@@ -48,7 +48,7 @@ const KartControls = {
       if(b[14]) steer=-1;if(b[15]) steer=1;
     }
     const t=Devices.ctrls.touch;
-    if((!dev||dev==='kb1')&&TouchPad.active&&t){const c=t.cur;if(Math.abs(c.x)>.08)steer=c.x;gas=gas||c.attack;brake=brake||c.special;drift=drift||c.jump;item=item||c.shield;rear=rear||c.grab;pause=pause||c.start;}
+    if((!dev||dev==='kb1')&&TouchPad.active&&t){const c=t.cur;if(Math.abs(c.x)>.08)steer=c.x;if(typeof KartTouch!=='undefined'&&KartTouch.auto){const grid=KartTouch.grid();gas=gas||(grid?c.attack:!c.special);brake=brake||c.special;drift=drift||(!grid&&c.attack);item=item||c.jump;rear=rear||c.shield;}else{gas=gas||c.attack;brake=brake||c.special;drift=drift||c.jump;item=item||c.shield;rear=rear||c.grab;}pause=pause||c.start;}
     // Course lateral +x is screen-left from the chase camera. Convert human
     // screen-right input here once; AI, physics and network packets use course space.
     const now={steer:-steer,gas:!!gas,brake:!!brake,drift:!!drift,item:!!item,rear:!!rear,pause:!!pause,music:keyboard&&has('KeyM')};
