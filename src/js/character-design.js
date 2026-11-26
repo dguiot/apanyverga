@@ -3,7 +3,7 @@
 // Change a palette, feature or costume here to update all three games.
 const CHARACTER_DESIGNS = {
   "daniel": {
-    "skin": "#b97a5a",
+    "skin": "#fea976",
     "hair": "#2e241c",
     "hairBack": "long",
     "toonBeard": "short",
@@ -32,7 +32,7 @@ const CHARACTER_DESIGNS = {
     }
   },
   "nacho": {
-    "skin": "#d6a084",
+    "skin": "#e38a6e",
     "hair": "#8a6444",
     "hairBack": "mullet",
     "toonBeard": "stubble",
@@ -59,7 +59,7 @@ const CHARACTER_DESIGNS = {
     }
   },
   "pablo": {
-    "skin": "#cc8e70",
+    "skin": "#db6e50",
     "hair": "#231c18",
     "hairBack": "short",
     "toonBeard": "short",
@@ -87,7 +87,7 @@ const CHARACTER_DESIGNS = {
     }
   },
   "robes": {
-    "skin": "#b98470",
+    "skin": "#c47f69",
     "hair": "#3b2f28",
     "hairBack": "bun",
     "beard": "full",
@@ -118,8 +118,8 @@ const CHARACTER_DESIGNS = {
     }
   },
   "nicole": {
-    "skin": "#dcae95",
-    "hair": "#65432e",
+    "skin": "#be8e7c",
+    "hair": "#c9a46c",
     "hairBack": "long",
     "hairLen": 46,
     "eye": "#3f6e8a",
@@ -465,7 +465,7 @@ const CHARACTER_DESIGNS = {
     }
   },
   "puentin": {
-    "skin": "#c48a6c",
+    "skin": "#be5e4e",
     "hair": "#221816",
     "hairBack": "short",
     "eye": "#2b1a10",

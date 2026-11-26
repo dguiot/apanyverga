@@ -16,7 +16,8 @@ const CharacterModels = {
   head(id) {
     const L=CharacterDesign.get(id),K=skOf(id),g=this.group(id,'head'),b=KartModels.batch(),rx=K.headRX/60,ry=K.headRY/60,hair=L.hair||L.skin,sp=L.species;
     // Proportions come from Esmash's own skeleton.
-    b.add(sp==='robot'?'box':'sphere',L.skin,[0,0,-.025],sp==='robot'?[rx*2,ry*1.8,rx*1.55]:[rx,ry,rx*.78],null,L.art.metalness,L.art.roughness);
+    const art=!sp&&typeof FACE_TOON!=='undefined'&&FACE_TOON[id];
+    if(!art)b.add(sp==='robot'?'box':'sphere',L.skin,[0,0,-.025],sp==='robot'?[rx*2,ry*1.8,rx*1.55]:[rx,ry,rx*.78],null,L.art.metalness,L.art.roughness);
     if(!sp||sp==='mariachi'){
       b.add('sphere',hair,[0,ry*.36,-rx*.3],[rx*1.04,ry*.72,rx*.72]);
       if(L.hairBack==='long'||L.hairBack==='mullet')b.add('sphere',hair,[0,-ry*.65,-rx*.7],[rx*1.07,ry*(L.hairBack==='long'?1.5:1),rx*.38]);
@@ -33,9 +34,44 @@ const CharacterModels = {
     if(sp==='cat'||sp==='chupa')for(const side of [-1,1])b.add('cone',L.skin,[side*rx*.7,ry*.9,-.015],[rx*.42,ry*.7,rx*.35],[0,0,-side*.2]);
     if(sp==='dino'){b.add('sphere',L.skin,[rx*.25,-ry*.12,-rx*.1],[rx*1.1,ry*.53,rx*.65]);for(let i=0;i<4;i++)b.add('cone',L.stripe,[0,ry*.75-i*.035,-rx*.6-i*.055],[.045,.12,.04],[-.6,0,0]);}
     if(sp==='chupa')for(let i=0;i<4;i++)b.add('cone',L.spine,[0,ry*.7-i*.05,-rx*.7],[.045,.16,.04],[-1.1,0,0]);
-    b.finish(g);const front=CharacterArt.patch(id);g.add(front);g.userData={design:L,front,face:'normal'};return g;
+    b.finish(g);
+    // personas reales: la cara ilustrada va pintada SOBRE la cabeza (antes era una placa delante: parecía máscara)
+    if(art){const face=this.faceHead(id,rx,ry);g.add(face);g.userData={design:L,front:null,faceMesh:face,face:'normal'};return g;}
+    const front=CharacterArt.patch(id);g.add(front);g.userData={design:L,front,face:'normal'};return g;
   },
-  expression(head,face='normal') {const u=head.userData;if(u.face!==face){u.front.material=CharacterArt.drawing(u.design.id,'head',face).material;u.front.userData.face=u.face=face;}},
+  // Cabeza de una persona real: mitad de enfrente con su cara (proyección frontal), mitad de atrás color piel.
+  // Las orillas de la ilustración se difuminan hacia la piel, así que no hay borde de máscara.
+  faceTexture(id,rx,ry){
+    const key='face-head:'+id;if(KartWorld.textures.has(key))return KartWorld.textures.get(key);
+    const T=KartGL,d=FACE_TOON[id],n=512,cv=mkCanvas(n,n),c=cv.getContext('2d');c.fillStyle=d.skin;c.fillRect(0,0,n,n);
+    const tex=new T.CanvasTexture(cv);tex.colorSpace=T.SRGBColorSpace;tex.anisotropy=8;KartWorld.textures.set(key,tex);
+    FaceArt.whenTex(id,a=>{
+      // la cara ocupa casi todo el alto de la cabeza; si queda muy ancha, se limita al 92 % del ancho
+      let hu=2.1,wu=hu*ry/rx*a.tex.width/a.tex.height*1.06;if(wu>1.98){hu*=1.98/wu;wu=1.98;}
+      const px=v=>(v+1)/2*n,py=v=>(1-(v+1)/2)*n,yc=-.02,L=CharacterDesign.get(id);
+      // arriba de la frente y a los lados de arriba: pelo (si no, la cabeza se veía calva sobre la cara)
+      const top=py(yc+hu/2-hu*.12),gr=c.createLinearGradient(0,top-n*.05,0,top+n*.12);gr.addColorStop(0,L.hair||d.skin);gr.addColorStop(1,'rgba(0,0,0,0)');
+      c.fillStyle=L.hair||d.skin;c.fillRect(0,0,n,Math.max(0,top-n*.05));c.fillStyle=gr;c.fillRect(0,top-n*.05,n,n*.17);
+      if(L.hairBack==='long'){const side=c.createLinearGradient(px(-1),0,px(-wu/2+.08),0);side.addColorStop(0,L.hair);side.addColorStop(1,'rgba(0,0,0,0)');c.fillStyle=side;c.fillRect(0,0,px(-wu/2+.08),n);const s2=c.createLinearGradient(px(1),0,px(wu/2-.08),0);s2.addColorStop(0,L.hair);s2.addColorStop(1,'rgba(0,0,0,0)');c.fillStyle=s2;c.fillRect(px(wu/2-.08),0,n,n);}
+      c.drawImage(a.tex,px(-wu/2),py(yc+hu/2),wu/2*n,hu/2*n);tex.needsUpdate=true;
+    });
+    return tex;
+  },
+  faceHead(id,rx,ry){
+    const T=KartGL,g=new T.Group(),L=CharacterDesign.get(id);g.name=id+':face-head';
+    let front=KartModels.geometry.get('face-front');
+    if(!front){front=new T.SphereGeometry(1,40,32,0,Math.PI);const p=front.attributes.position,uv=front.attributes.uv;for(let i=0;i<p.count;i++)uv.setXY(i,(p.getX(i)+1)/2,(p.getY(i)+1)/2);KartModels.geometry.set('face-front',front);KartModels.geometry.set('face-back',new T.SphereGeometry(1,40,32,Math.PI,Math.PI));}
+    const mats=this.faceMaterials(id,rx,ry);
+    const f=new T.Mesh(front,mats.normal),back=new T.Mesh(KartModels.geometry.get('face-back'),Style3D.toon(L.hair||FACE_TOON[id].skin,0,.8));
+    for(const m of [f,back]){m.scale.set(rx,ry,rx*.82);m.position.set(0,0,-.025);m.castShadow=m.receiveShadow=true;g.add(m);}
+    g.userData={design:L,front:f,mats};return g;
+  },
+  faceMaterials(id,rx,ry){
+    const key='face-mat:'+id;if(KartModels.materials.has(key+':normal'))return {normal:KartModels.materials.get(key+':normal'),hurt:KartModels.materials.get(key+':hurt')};
+    const map=this.faceTexture(id,rx,ry),T=KartGL,make=hurt=>{const m=new T.MeshStandardMaterial({map,roughness:.72,metalness:0,emissive:hurt?'#7a0d0d':'#000000',emissiveIntensity:hurt?.55:0});m.userData.esToon=true;m.userData.esPlain=true;return m;};
+    const out={normal:make(false),hurt:make(true)};KartModels.materials.set(key+':normal',out.normal);KartModels.materials.set(key+':hurt',out.hurt);return out;
+  },
+  expression(head,face='normal') {const u=head.userData;if(u.faceMesh){if(u.face!==face){u.face=face;const fu=u.faceMesh.userData;fu.front.material=face==='hurt'||face==='ko'?fu.mats.hurt:fu.mats.normal;}return;}if(u.face!==face){u.front.material=CharacterArt.drawing(u.design.id,'head',face).material;u.front.userData.face=u.face=face;}},
   torso(id) {
     this.bodyGeometry();const L=CharacterDesign.get(id),K=skOf(id),B=L.build;
     const g=this.part(id,'torso',b=>{
@@ -69,7 +105,7 @@ const CharacterModels = {
     g.add(upper,fore,end);g.userData={design:L,upper,fore,end};return g;
   },
   create(id) {
-    const g=this.group(id,'character'),L=CharacterDesign.get(id),head=this.head(id),torso=this.torso(id),neck=this.part(id,'neck',b=>b.add('sphere',L.skin,[0,0,0],[.09,.14,.09]));
+    const g=this.group(id,'character'),L=CharacterDesign.get(id),head=this.head(id),torso=this.torso(id),neck=this.part(id,'neck',b=>{const art=typeof FACE_TOON!=='undefined'&&FACE_TOON[id]&&!L.species;b.add('sphere',art?shade(L.skin,-.14):L.skin,[0,0,0],art?[.07,.12,.07]:[.09,.14,.09]);});
     const limbs={armF:this.limb(id,'arm-front'),armB:this.limb(id,'arm-back'),legF:this.limb(id,'leg-front',true),legB:this.limb(id,'leg-back',true)};
     g.add(torso,neck,head,...Object.values(limbs));
     const back=this.part(id,'back',b=>{

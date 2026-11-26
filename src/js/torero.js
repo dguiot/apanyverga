@@ -107,13 +107,13 @@ drawFoot2 = function (c, L, x, y, rot, k, dk, OUT) {
 };
 
 // montera: negra, de astracán, con sus dos borlas; sobre la cabeza estilizada
-function drawHeadwear(c, id, L, OUT) {
+function drawHeadwear(c, id, L, OUT, art = false) {
   if (L.headwear !== 'montera') return;
   const RX = SK.headRX, RY = SK.headRY;
   let by = -RY * 0.56, k = 1;
   c.save(); c.translate(0, by); c.scale(k, k);
   // coleta del torero: el moñito negro de la nuca
-  { c.fillStyle = OUT; c.beginPath(); c.ellipse(-RX * 0.98, RY * 0.5, 4.6, 3.8, 0.4, 0, TAU); c.fill(); c.fillStyle = L.hair; c.beginPath(); c.ellipse(-RX * 0.98, RY * 0.5, 3.4, 2.7, 0.4, 0, TAU); c.fill(); }
+  if (!art) { c.fillStyle = OUT; c.beginPath(); c.ellipse(-RX * 0.98, RY * 0.5, 4.6, 3.8, 0.4, 0, TAU); c.fill(); c.fillStyle = L.hair; c.beginPath(); c.ellipse(-RX * 0.98, RY * 0.5, 3.4, 2.7, 0.4, 0, TAU); c.fill(); }
   const path = pad => {
     c.beginPath();
     c.moveTo(-RX * 1.1 - pad, 2 + pad);
