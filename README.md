@@ -26,6 +26,24 @@ La ilustración original de portada está en `src/assets/cover-three-games.webp`
 con ImageGen a partir de los personajes existentes. El compilador la incluye en el HTML;
 no depende de un CDN ni de descargar imágenes al abrir el juego.
 
+## En el celular
+
+Los tres juegos se juegan con la pantalla táctil (de lado). Se entra tocando la portada, como en la compu.
+
+- **Esmash:** palanca flotante donde pongas el pulgar izquierdo y botones A, B, Saltar, Escudo y Agarrar.
+  Antes el jugador quedaba asignado al teclado y la palanca se dibujaba pero no movía al personaje;
+  ahora con pantalla táctil el jugador 1 juega con lo que toque (pantalla, mando o teclado).
+- **FPS** (antes no tenía controles táctiles): palanca para caminar (al tope hacia adelante corre sola),
+  arrastrar en la mitad derecha para mirar, **DISPARAR** grande (y otro a la izquierda) que también apunta
+  si lo arrastras, **MIRA** y **AGACHAR** que se quedan puestos con un toque (agacharse corriendo hace la
+  barrida), SALTAR, RECARGAR, ARMA, GRANADA y RECOGER. El marcador, la vida y la munición van arriba.
+  Con pantalla táctil o mando hay **asistencia de mira**: la mira frena un poco sobre un rival visible y lo
+  sigue suavemente mientras te mueves, disparas o apuntas. Con ratón no hay asistencia.
+- **Kart:** acelera solo. El botón grande es **DERRAPE** (suelta para el turbo) y hay FRENO, ÍTEM y ATRÁS;
+  durante la cuenta regresiva el botón grande es GAS, para la salida turbo. Antes había que mantener GAS y
+  derrapar o lanzar con el mismo pulgar.
+- La pausa es el botón ⏸ de arriba a la derecha.
+
 ## Un solo estilo para los tres juegos
 
 Peleas, Kart y FPS comparten dirección de arte: la caricatura de tinta gruesa y color vivo de las peleas.
@@ -94,6 +112,9 @@ y arpegios. La mezcla pasa por reverberación de sala, eco estéreo, compresor y
 | Pausa y ajustes | Esc / Enter | Menu / Options |
 
 Y y R no rescatan ni reinician el kart. El rescate es automático al caer de un puente.
+**El objeto que llevas te cubre la espalda:** con una tortilla, salsa, chile, triple o piñata en mano, un
+proyectil que te alcanza por detrás se pierde junto con tu objeto y no te pega (la salsa en el piso, de
+frente, sí te hace girar).
 La invulnerabilidad se muestra con un halo constante: el piloto nunca se oculta ni parpadea.
 Los avisos de vuelta y meta son discretos; los objetos y efectos activos se consultan en el HUD.
 Los mismos controles de objetos se usan en solitario, pantalla dividida y online.
@@ -107,8 +128,20 @@ mando/navegador exponga un actuador háptico, y se apaga desde Sonido e imagen.
 
 ## Un solo diseño de personajes
 
-Esmash conserva su dibujo, siluetas, proporciones y animaciones. Las fotos se sustituyen
-por las caras dibujadas de ese mismo estilo. No se introduce otro renderer para las peleas.
+Esmash conserva su dibujo, siluetas, proporciones y animaciones. No se introduce otro renderer para las peleas.
+
+**Las seis personas reales** (Daniel, Nacho, Pablo, Robes, Nicole y Puentin) llevan su cara ilustrada a partir
+de su foto: antes todas usaban la misma cara genérica y la barba era un bloque oscuro que parecía máscara.
+`src/tools/toon_faces.py` convierte cada foto (`src/assets/faces/<id>-head.webp`) en una ilustración del
+estilo del juego —luz en escalones, color plano, líneas de tinta y contorno— que conserva forma de la cara,
+barba, sonrisa, lentes y color de ojos, y la guarda en `src/js/faces.js`. El juego publicado no incluye las
+fotos, solo esas ilustraciones. Para regenerarlas: `pip install opencv-python-headless numpy pillow` y
+`python3 src/tools/toon_faces.py`. Su piel en `character-design.js` es la de su cara ilustrada.
+
+- **Peleas, marcador y selección:** la cara ilustrada reemplaza a la genérica (`drawFaceArt` en `draw.js`);
+  al recibir golpes se tiñe. La montera de Puentin va sobre la frente.
+- **Kart y FPS:** la cara va **pintada sobre la cabeza 3D** (mitad de enfrente) con la orilla difuminada
+  hacia la piel y pelo arriba; antes era una placa delante de la cabeza, que se veía como máscara.
 
 `src/js/character-design.js` es la única definición de los 15 personajes: piel, pelo,
 vestuario, accesorios y proporciones. El registro es inmutable y `CharacterDesign.get(id)`
@@ -127,7 +160,8 @@ artística: esta unificación no presenta los escenarios ni la jugabilidad de Ka
 terminados o con la calidad de la ilustración. Las mejoras gráficas continúan un juego a la vez.
 
 `node src/test/tcharacters.cjs` comprueba el renderer conservado, las texturas compartidas,
-los 15 personajes en ambos modelos, las superficies delanteras y la ausencia de fotos.
+los 15 personajes en ambos modelos, las caras ilustradas de las seis personas (en pelea, retratos y 3D,
+pintadas sobre la cabeza y no como placa) y que el juego publicado no contiene fotos.
 
 ## FPS
 
@@ -160,6 +194,14 @@ Las recargas son completas: el cargador sale y cae, la mano trae otro, lo insert
 estaba vacía jala la palanca o la corredera; la escopeta se carga cartucho por cartucho y bombea
 después de cada tiro, y el francotirador mueve el cerrojo. Cada paso tiene su sonido.
 Agacharse mientras corres hace una **barrida** de unos 0.7 s, más rápida que correr.
+**Escalar:** salta contra una caja, un auto, sacos, una barrera o un contenedor y te subes encima
+(en ~1/3 s, con la mira libre). Los muros de los edificios no se escalan.
+
+**Apariciones seguras.** Medido antes: quien acababa de aparecer moría a los ~4 s en cualquier dificultad,
+porque solo había 4 puntos de aparición a la vista unos de otros. Ahora hay 16 puntos repartidos y se elige
+el más lejano de los rivales y que ninguno tenga a la vista (también al empezar la partida). La protección
+dura 3 s y se pierde en cuanto disparas; la CPU no le dispara a alguien protegido y no se juntan los tres
+bots sobre el mismo blanco.
 
 La granada es de fragmentación a escala real y su explosión tiene bola de fuego, humo que sube,
 esquirlas que rebotan, onda en el suelo, marca quemada, luz propia, sacudida según la distancia y
@@ -344,7 +386,8 @@ terminan todos los pilotos conectados. El anfitrión puede volver a la sala sin 
 | Pausa | Esc / Enter | Menú ☰ |
 | Música / solo efectos | M | X en pausa |
 
-En celular, los botones cambian a **Gas, Freno, Derrape, Ítem y Atrás**. En el garaje,
+En celular el kart acelera solo y los botones son **Derrape, Freno, Ítem y Atrás** (en la cuenta regresiva
+el botón grande es **Gas**). En el garaje,
 X / Espacio cambia la cilindrada y LT / RT / L alterna la asistencia. En la selección de pista,
 X / Espacio alterna carrera individual y copa. Los controles de carrera tienen su propio esquema;
 la reasignación del menú «Configurar botones» se aplica a las peleas.
@@ -450,6 +493,14 @@ convergencia de la mira, pared detrás, mira del francotirador y alternancia con
 recogidas con haz de luz, las fotos del mundo 3D usadas como fondo de las arenas Mercado y Sierra, sus peligros
 (karts y granadas), la dirección de la música y Esmash Total de punta a punta: reparto, carrera, ventajas en el
 combate, vidas y Golpe Final en la final, puntos dobles, campeón y salida.
+
+`node src/test/tmobile-touch.cjs` emula un iPhone de lado y entra tocando la pantalla: en Esmash la palanca
+mueve al luchador y A ataca; en el FPS camina, corre sola, mira arrastrando, dispara y apunta con el mismo
+botón, y prueba mira, salto, agacharse, arma, recarga, asistencia de mira y pausa; en el Kart acelera solo,
+frena, derrapa y la salida usa GAS. `node src/test/tfps-gameplay.cjs` comprueba escalar (y que los muros no),
+los 16 puntos de aparición, que nadie muere a los 6 s de aparecer en ninguna dificultad, la protección y el
+reparto del fuego. `node src/test/tkart-play.cjs` comprueba que el objeto en mano bloquea por detrás y los
+controles táctiles del Kart.
 
 `node src/test/tfps.cjs` verifica movimiento, salto, colisión, acceso a azoteas, impactos,
 escudos, munición, cambio de arma, recarga, reaparición, controles de mando, vista en
