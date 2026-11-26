@@ -31,7 +31,7 @@ const FPSSupplyArt={
  },
  hud(m,p){
   if(p.dead)return;const q=FPSSupplies.near(m,p),grenade=m.grenades.find(g=>g.owner!==p.index&&Math.hypot(g.pos.x-p.x,g.pos.z-p.z)<9&&Math.abs(g.pos.y-p.y)<4);
-  text('G / LB: GRANADA  '+p.grenades+' / 2',1230,580,13,'#dfc58f',{align:'right',body:true,stroke:'#172b33',strokeW:3});
+  text((TouchPad.active?'GRANADAS  ':'G / LB: GRANADA  ')+p.grenades+' / 2',1230,TouchPad.active?122:580,13,'#dfc58f',{align:'right',body:true,stroke:'#172b33',strokeW:3});
   if(q){KartRender.panel(397,524,486,44);text('F / R3  ·  RECOGER '+FPS_GUNS[q.gun].name.toUpperCase(),640,548,17,'#ebd3a1',{body:true,weight:700});}
   else if(p.pickupUntil>m.time)text(p.pickupText,640,546,15,'#c5e4cc',{body:true,stroke:'#172b33',strokeW:3});
   if(grenade)text('⚠ GRANADA CERCA',640,475,16,'#f0ba72',{body:true,stroke:'#172b33',strokeW:3});

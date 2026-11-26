@@ -44,7 +44,7 @@ const FPSPop = {
     hud.call(this, match, p, box);
     ctx.save(); ctx.translate(box.x, box.y); ctx.scale(box.w / W, box.h / H);
     FPSPop.draw(match, p, this.views.get(p.index)?.camera);
-    if (box.w >= 800 && match.time < 14) text('V / cruceta ↑: cámara al hombro o primera persona', 640, 688, 12, '#ffe9a8', { body: true, stroke: '#132a35', strokeW: 3 });
+    if (box.w >= 800 && !TouchPad.active && match.time < 14) text('V / cruceta ↑: cámara al hombro o primera persona', 640, 688, 12, '#ffe9a8', { body: true, stroke: '#132a35', strokeW: 3 });
     ctx.restore();
   };
   // ----- recogidas -----
