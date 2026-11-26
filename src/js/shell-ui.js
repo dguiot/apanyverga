@@ -101,7 +101,7 @@ const ShellUI={
   if(this.online){Net.lob.players=people.map(p=>({peer:p.peer,id:CHAR_ORDER[p.ch],gun:p.fg,ready:1}));const sync=FPSOnline.sync;FPSOnline.sync=()=>{};try{return FPSOnline.start();}finally{FPSOnline.sync=sync;}}
   const roster=Array.from({length:4},(_,i)=>({id:CHAR_ORDER[people[i]?.ch??(i*3+2)%15],gun:people[i]?.fg??i%5,bot:i>=people.length}));APP.fps=new FPSMatch(roster);APP.fps.target=this.config.target;APP.fps.duration=this.config.minutes*60;APP.fps.level=this.config.fpsLevel;FPSControls.reset();APP.go('fpsGame');FPSControls.lock();
  },
- localDevices(){if(this.config.locals===1)return [APP.firstDev?.startsWith('pad')?APP.firstDev:'kb1'];const pads=padInfo.map(p=>'pad'+p.index);return this.game==='fight'?['kb1',...(pads.length>=this.config.locals-1?pads:['kb2',...pads])]:['kb1',...pads];},
+ localDevices(){const pad=APP.firstDev?.startsWith('pad'),touch=TouchPad.active&&!pad&&this.game==='fight';if(this.config.locals===1)return [pad?APP.firstDev:touch?'local':'kb1'];const pads=padInfo.map(p=>'pad'+p.index);return this.game==='fight'?[touch?'touch':'kb1',...(pads.length>=this.config.locals-1?pads:['kb2',...pads])]:['kb1',...pads];},
  player(){return this.locals[this.online?0:this.edit];},
  setPlayer(key,value){const p=this.player();p[key]=value;this.resetReady();if(this.online)Net.set({ch:p.ch,vh:p.vh,fg:p.fg});},
  current(){return this.game==='fight'?APP.battle||Net.view:this.game==='kart'?APP.kartRace:APP.fps;},
@@ -236,7 +236,7 @@ const shellUpdate=APP.update;APP.update=function(){
   if(ShellUI.active&&['battle','netview','kartRace','fpsGame'].includes(this.screen)){
   const pause=keyEdge('kb1','Escape')||(ShellUI.game==='kart'&&keyEdge('kb1','Enter'))||padPause||(TouchPad.active&&Devices.nav('touch').start)||(ShellUI.game==='fight'&&Devices.list.some(d=>Devices.nav(d).start));
   if(pause){if(ShellUI.paused)ShellUI.resume();else ShellUI.pause();return;}
-  if(Pointer.clicked&&clickIn(W-194,H-36,170,28)){ShellUI.pause();return;}
+  if(Pointer.clicked&&!TouchPad.active&&clickIn(W-194,H-36,170,28)){ShellUI.pause();return;}
   if(!ShellUI.paused&&ShellUI.current()?.paused)ShellUI.pause();
   if(ShellUI.paused){if(ShellUI.online&&ShellUI.game==='kart')KartOnline.raceUpdate();else if(ShellUI.online&&ShellUI.game==='fps')FPSOnline.update({});else if(ShellUI.online&&ShellUI.game==='fight')ShellUI.quietFight();ShellUI.settingsUpdate();return;}
  }
@@ -246,7 +246,7 @@ const shellDraw=APP.draw;APP.draw=function(){
  if(this.screen==='title'||ShellUI.active&&ShellUI.screens.has(this.screen)){this[this.screen+'Draw']?.();ShellUI.notices();return;}
  if(ShellUI.active&&['results','kartResults','fpsResults'].includes(this.screen)){ShellUI.resultsDraw();Toasts.draw();return;}
  if(ShellUI.active&&ShellUI.paused&&this.screen!=='binds'){ShellUI.settingsDraw();Toasts.draw();return;}
- shellDraw.call(this);if(ShellUI.active&&['battle','netview','kartRace','fpsGame'].includes(this.screen))ShellUI.button('PAUSA / AJUSTES',{x:W-194,y:H-36,w:170,h:28});
+ shellDraw.call(this);if(ShellUI.active&&['battle','netview','kartRace','fpsGame'].includes(this.screen)){if(!TouchPad.active)ShellUI.button('PAUSA / AJUSTES',{x:W-194,y:H-36,w:170,h:28});}
 };
 
 // Gamepads select vehicles directly; no dependency on the fighting button map.

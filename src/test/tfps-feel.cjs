@@ -13,7 +13,7 @@ const {chromium}=require('playwright'),path=require('node:path'),{pathToFileURL}
   ok('a bot inside a building finds the door within twelve seconds',!inside(a)&&a.deaths===0,{x:a.x,z:a.z,time:m.time});
   // Seeing a target is not firing at it: reaction time first, then an aim error that settles.
   m=new FPSMatch([{id:'daniel',gun:2,bot:true},{id:'torito',gun:2,bot:true}]);[a,q]=m.players;
-  Object.assign(a,{x:0,z:0,y:50,yaw:0,pitch:0});Object.assign(q,{x:0,z:-20,y:50,vx:0,vz:0});let first=-1;
+  Object.assign(a,{x:0,z:0,y:50,yaw:0,pitch:0});Object.assign(q,{x:0,z:-20,y:50,vx:0,vz:0,invuln:0});let first=-1;
   for(let i=0;i<120;i++){const I=m.inputAI(a);if(I.fire&&first<0)first=m.time;a.yaw+=(I.lx||0)*m.lookScale(a);m.time+=1/60;}
   ok('bots react before their first shot instead of firing on the first frame',first>=FPS_LEVELS[m.level].react*.8-1e-6&&first<1.2,{first,level:m.level});
   const aimErrors=[0,1,2,3].map(i=>{const mm=new FPSMatch([{id:'daniel',gun:2,bot:true},{id:'torito',gun:2,bot:true}].map((r,k)=>({...r,id:CHAR_ORDER[(i+k)%15]})));mm.time=i*.7;const [x]=mm.players;Object.assign(x,{x:0,z:0,y:50,yaw:0});Object.assign(mm.players[1],{x:0,z:-20,y:50});mm.inputAI(x);return Math.abs(x.ai.err);});

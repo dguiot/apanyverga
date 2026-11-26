@@ -402,8 +402,43 @@ function drawHead(c, id, face = 'normal', opt = {}) {
   useSK(id);
   const L = LOOKS[id], OUT = opt.outline || 'rgba(8,10,16,.92)';
   if (L.species) return drawCreatureHead(c, L, face, OUT);
+  if (drawFaceArt(c, id, L, face, OUT)) { if (L.headwear && typeof drawHeadwear === 'function') { c.save(); c.translate(0, -SK.headRY * 0.42); c.scale(1.14, 1.14); drawHeadwear(c, id, L, OUT, true); c.restore(); } return; }
   drawToonHead(c, id, L, face, OUT);
   if (L.headwear && typeof drawHeadwear === 'function') drawHeadwear(c, id, L, OUT);
+}
+// Caras de las personas reales: ilustración hecha a partir de su foto (src/tools/toon_faces.py), con el mismo
+// trazo y color plano de los personajes. Antes todas usaban la misma cara genérica y la barba era un bloque
+// oscuro que parecía máscara. Mientras la imagen carga (un instante) se dibuja la cara genérica.
+const FaceArt = {
+  cache: new Map(),
+  get(id) {
+    const d = typeof FACE_TOON !== 'undefined' && FACE_TOON[id]; if (!d) return null;
+    let a = this.cache.get(id);
+    if (!a) {
+      a = { img: new Image(), tex: new Image(), ready: false, texReady: false, hurt: null, ko: null, d, waiting: [] };
+      a.img.onload = () => { a.ready = true; a.hurt = this.tint(a.img, 'rgba(255,40,40,.4)'); a.ko = this.tint(a.img, 'rgba(20,24,40,.5)'); };
+      a.tex.onload = () => { a.texReady = true; for (const f of a.waiting.splice(0)) f(a); };
+      a.img.src = d.head; a.tex.src = d.tex; this.cache.set(id, a);
+    }
+    return a;
+  },
+  tint(img, col) { const cv = mkCanvas(img.width, img.height), g = cv.getContext('2d'); g.drawImage(img, 0, 0); g.globalCompositeOperation = 'source-atop'; g.fillStyle = col; g.fillRect(0, 0, cv.width, cv.height); return cv; },
+  // llama cuando la textura 3D esté lista (en seguida si ya cargó)
+  whenTex(id, f) { const a = this.get(id); if (!a) return false; if (a.texReady) f(a); else a.waiting.push(f); return true; },
+};
+if (typeof FACE_TOON !== 'undefined') for (const id of Object.keys(FACE_TOON)) FaceArt.get(id); // se decodifican al arrancar
+function drawFaceArt(c, id, L, face, OUT) {
+  const a = FaceArt.get(id); if (!a || !a.ready) return false;
+  const RX = SK.headRX, RY = SK.headRY, d = a.d, w = RX * 2.02 * (d.k || 1), h = w * d.h / d.w;
+  // oreja del lado de atrás, como en la cabeza dibujada
+  c.fillStyle = OUT; c.beginPath(); c.ellipse(-RX * 0.66, RY * 0.08, 4.2, 5.6, 0, 0, TAU); c.fill();
+  c.fillStyle = shade(L.skin, -0.12); c.beginPath(); c.ellipse(-RX * 0.66, RY * 0.08, 3, 4.4, 0, 0, TAU); c.fill();
+  const img = face === 'ko' ? a.ko : face === 'hurt' ? a.hurt : a.img, squash = face === 'hurt' ? 0.94 : 1;
+  c.save();
+  if (DRAW_OPT && DRAW_OPT.flip) c.scale(-1, 1); // el lienzo viene espejado: la cara no (lentes, raya del pelo)
+  c.drawImage(img || a.img, -w / 2, -h / 2 - RY * 0.06 + h * (1 - squash) / 2, w, h * squash);
+  c.restore();
+  return true;
 }
 function drawToonHead(c, id, L, face, OUT, clipInside) {
   const RX = SK.headRX, RY = SK.headRY;
